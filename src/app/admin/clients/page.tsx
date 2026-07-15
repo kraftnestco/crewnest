@@ -1,0 +1,75 @@
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EditClientDialog } from './edit-client-dialog';
+import { NewClientDialog } from './new-client-dialog';
+
+export default async function ClientsPage() {
+  const supabase = await createSupabaseServerClient();
+  const { data: tenants } = await supabase
+    .from('tenants')
+    .select(
+      'id, business_name, slug, meta_page_id, instagram_id, whatsapp_phone_number_id, widget_public_key, widget_allowed_origins, system_prompt, catalog_data, is_active, created_at, openai_key_secret_id, meta_token_secret_id, whatsapp_token_secret_id',
+    )
+    .order('created_at', { ascending: false });
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-xl font-semibold">Clients</h1>
+          <p className="text-sm text-muted-foreground">Manage tenant businesses and their channels.</p>
+        </div>
+        <NewClientDialog />
+      </div>
+
+      <div className="rounded-xl bg-card ring-1 ring-foreground/10">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Business</TableHead>
+              <TableHead>Channels</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(tenants ?? []).map((t) => (
+              <TableRow key={t.id}>
+                <TableCell className="font-medium">
+                  {t.business_name}
+                  {t.slug && <span className="ml-2 text-xs text-muted-foreground">/{t.slug}</span>}
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    {t.whatsapp_phone_number_id && <Badge variant="secondary">WhatsApp</Badge>}
+                    {t.meta_page_id && <Badge variant="secondary">Messenger</Badge>}
+                    {t.instagram_id && <Badge variant="secondary">Instagram</Badge>}
+                    {t.widget_public_key && <Badge variant="secondary">Web</Badge>}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {t.is_active ? <Badge>Active</Badge> : <Badge variant="outline">Inactive</Badge>}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {new Date(t.created_at).toLocaleDateString()}
+                </TableCell>
+                <TableCell className="text-right">
+                  <EditClientDialog tenant={t} />
+                </TableCell>
+              </TableRow>
+            ))}
+            {(!tenants || tenants.length === 0) && (
+              <TableRow>
+                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                  No clients yet — create your first one.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}

@@ -1,11 +1,24 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
+import type { Database } from '@/types/database';
 import type { ChatSession, Platform } from '@/types/domain';
 
 /**
  * Session lifecycle. Uses the SERVICE client from webhook/after() context.
- * TODO(sonnet): implement against generated types. See docs/08 §5.2.
+ * See docs/08 §5.2.
  */
+
+type ChatSessionRow = Database['public']['Tables']['chat_sessions']['Row'];
+
+function mapSession(row: ChatSessionRow): ChatSession {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    platform: row.platform,
+    externalUserId: row.external_user_id,
+    isHumanHandoff: row.is_human_handoff,
+  };
+}
 
 /** Find the session for (tenant, platform, external user), or create it. */
 export async function findOrCreate(
@@ -13,19 +26,51 @@ export async function findOrCreate(
   platform: Platform,
   externalUserId: string,
 ): Promise<ChatSession> {
-  // Upsert on the unique (tenant_id, platform, external_user_id) constraint,
-  // or select-then-insert. Return the mapped ChatSession.
-  void createServiceClient();
-  void tenantId;
-  void platform;
-  void externalUserId;
-  throw new Error('TODO(sonnet): implement findOrCreate (see docs/08 §5.2)');
+  const client = createServiceClient();
+
+  const { data: existing, error: selectError } = await client
+    .from('chat_sessions')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('platform', platform)
+    .eq('external_user_id', externalUserId)
+    .maybeSingle();
+
+  if (selectError) throw selectError;
+  if (existing) return mapSession(existing);
+
+  const { data: inserted, error: insertError } = await client
+    .from('chat_sessions')
+    .insert({ tenant_id: tenantId, platform, external_user_id: externalUserId })
+    .select('*')
+    .single();
+
+  if (insertError) {
+    // Unique-constraint race: another concurrent webhook created the row first.
+    if (insertError.code === '23505') {
+      const { data: raced, error: raceError } = await client
+        .from('chat_sessions')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('platform', platform)
+        .eq('external_user_id', externalUserId)
+        .single();
+      if (raceError) throw raceError;
+      return mapSession(raced);
+    }
+    throw insertError;
+  }
+
+  return mapSession(inserted);
 }
 
 /** Toggle the human-handoff flag (used by the AI on [HUMAN_HANDOFF] and by the inbox Take Over). */
 export async function setHandoff(sessionId: string, value: boolean): Promise<void> {
-  void createServiceClient();
-  void sessionId;
-  void value;
-  throw new Error('TODO(sonnet): implement setHandoff (see docs/08 §5.2)');
+  const client = createServiceClient();
+  const { error } = await client
+    .from('chat_sessions')
+    .update({ is_human_handoff: value })
+    .eq('id', sessionId);
+
+  if (error) throw error;
 }

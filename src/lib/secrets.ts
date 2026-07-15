@@ -31,10 +31,18 @@ export async function getTenantSecret(secretId: string): Promise<string | null> 
  * master fallback. The second element indicates whether BYOK was used (for
  * usage_logs.used_byok).
  */
-export async function getLlmKey(tenant: Pick<Tenant, 'openaiKeySecretId'>): Promise<{ key: string; usedByok: boolean }> {
+export async function getLlmKey(
+  tenant: Pick<Tenant, 'openaiKeySecretId' | 'llmProvider'>,
+): Promise<{ key: string; usedByok: boolean }> {
   if (tenant.openaiKeySecretId) {
     const key = await getTenantSecret(tenant.openaiKeySecretId);
     if (key) return { key, usedByok: true };
+  }
+  if (tenant.llmProvider === 'openrouter') {
+    if (!env.MASTER_OPENROUTER_KEY) {
+      throw new Error('Tenant is configured for openrouter but MASTER_OPENROUTER_KEY is not set.');
+    }
+    return { key: env.MASTER_OPENROUTER_KEY, usedByok: false };
   }
   return { key: env.MASTER_OPENAI_KEY, usedByok: false };
 }

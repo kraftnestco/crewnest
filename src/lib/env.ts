@@ -15,6 +15,7 @@ const schema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   MASTER_OPENAI_KEY: z.string().min(1),
+  MASTER_OPENROUTER_KEY: z.string().optional(),
   META_VERIFY_TOKEN: z.string().min(1),
   META_APP_SECRET: z.string().min(1),
   META_GRAPH_VERSION: z.string().default('v21.0'),

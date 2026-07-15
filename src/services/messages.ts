@@ -8,6 +8,11 @@ import type { LlmUsage } from './ai/provider';
  * Uses the SERVICE client from webhook/after() context. See docs/08 §5.3.
  */
 
+/** Crude chars-per-token estimate for trimming the memory window without a tokenizer. */
+const CHARS_PER_TOKEN_ESTIMATE = 4;
+/** Hard cap on rows fetched before applying the token budget, to bound query size. */
+const WINDOW_FETCH_LIMIT = 50;
+
 export async function persist(args: {
   sessionId: string;
   tenantId: string;
@@ -16,9 +21,17 @@ export async function persist(args: {
   providerMsgId?: string;
   tokenCount?: number;
 }): Promise<void> {
-  void createServiceClient();
-  void args;
-  throw new Error('TODO(sonnet): implement persist (insert chat_messages)');
+  const client = createServiceClient();
+  const { error } = await client.from('chat_messages').insert({
+    session_id: args.sessionId,
+    tenant_id: args.tenantId,
+    role: args.role,
+    content: args.content,
+    provider_msg_id: args.providerMsgId ?? null,
+    token_count: args.tokenCount ?? null,
+  });
+
+  if (error) throw error;
 }
 
 /**
@@ -29,10 +42,27 @@ export async function loadWindow(
   sessionId: string,
   budgetTokens: number,
 ): Promise<Pick<ChatMessage, 'role' | 'content'>[]> {
-  void createServiceClient();
-  void sessionId;
-  void budgetTokens;
-  throw new Error('TODO(sonnet): implement loadWindow (select recent chat_messages)');
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from('chat_messages')
+    .select('role, content')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false })
+    .limit(WINDOW_FETCH_LIMIT);
+
+  if (error) throw error;
+
+  const selected: Pick<ChatMessage, 'role' | 'content'>[] = [];
+  let usedTokens = 0;
+
+  for (const row of data ?? []) {
+    const approxTokens = Math.ceil(row.content.length / CHARS_PER_TOKEN_ESTIMATE);
+    if (selected.length > 0 && usedTokens + approxTokens > budgetTokens) break;
+    selected.push({ role: row.role, content: row.content });
+    usedTokens += approxTokens;
+  }
+
+  return selected.reverse();
 }
 
 /** Write a per-turn usage row for billing/cost/abuse. */
@@ -45,7 +75,18 @@ export async function logUsage(args: {
   usedByok: boolean;
   costUsd: number;
 }): Promise<void> {
-  void createServiceClient();
-  void args;
-  throw new Error('TODO(sonnet): implement logUsage (insert usage_logs)');
+  const client = createServiceClient();
+  const { error } = await client.from('usage_logs').insert({
+    tenant_id: args.tenantId,
+    session_id: args.sessionId,
+    provider: args.provider,
+    model: args.model,
+    prompt_tokens: args.usage.promptTokens,
+    completion_tokens: args.usage.completionTokens,
+    total_tokens: args.usage.totalTokens,
+    estimated_cost_usd: args.costUsd,
+    used_byok: args.usedByok,
+  });
+
+  if (error) throw error;
 }

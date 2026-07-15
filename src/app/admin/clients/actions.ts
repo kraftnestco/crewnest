@@ -1,0 +1,195 @@
+'use server';
+
+import { randomBytes } from 'node:crypto';
+import { revalidatePath } from 'next/cache';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { setTenantSecret } from '@/lib/secrets';
+import type { Database, Json } from '@/types/database';
+import type { CreateTenantState, UpdateTenantState } from './action-state';
+
+type TenantSecretIdFields = Pick<
+  Database['public']['Tables']['tenants']['Update'],
+  'openai_key_secret_id' | 'meta_token_secret_id' | 'whatsapp_token_secret_id'
+>;
+
+function optionalString(value: FormDataEntryValue | null): string | null {
+  const s = typeof value === 'string' ? value.trim() : '';
+  return s.length > 0 ? s : null;
+}
+
+export async function createTenantAction(
+  _prev: CreateTenantState,
+  formData: FormData,
+): Promise<CreateTenantState> {
+  const businessName = optionalString(formData.get('business_name'));
+  if (!businessName) {
+    return { error: 'Business name is required.', success: false, widgetPublicKey: null };
+  }
+
+  const slug = optionalString(formData.get('slug'));
+  const metaPageId = optionalString(formData.get('meta_page_id'));
+  const instagramId = optionalString(formData.get('instagram_id'));
+  const whatsappPhoneNumberId = optionalString(formData.get('whatsapp_phone_number_id'));
+  const systemPrompt = String(formData.get('system_prompt') ?? '');
+  const catalogRaw = optionalString(formData.get('catalog_data'));
+  const allowedOriginsRaw = optionalString(formData.get('widget_allowed_origins'));
+
+  let catalogData: Json = {};
+  if (catalogRaw) {
+    try {
+      catalogData = JSON.parse(catalogRaw) as Json;
+    } catch {
+      return { error: 'Catalogue must be valid JSON.', success: false, widgetPublicKey: null };
+    }
+  }
+
+  const widgetAllowedOrigins = allowedOriginsRaw
+    ? allowedOriginsRaw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+
+  const widgetPublicKey = `pk_live_${randomBytes(16).toString('hex')}`;
+
+  const supabase = await createSupabaseServerClient();
+  const { data: tenant, error: insertError } = await supabase
+    .from('tenants')
+    .insert({
+      business_name: businessName,
+      slug,
+      meta_page_id: metaPageId,
+      instagram_id: instagramId,
+      whatsapp_phone_number_id: whatsappPhoneNumberId,
+      system_prompt: systemPrompt,
+      catalog_data: catalogData,
+      widget_public_key: widgetPublicKey,
+      widget_allowed_origins: widgetAllowedOrigins,
+    })
+    .select('id')
+    .single();
+
+  if (insertError || !tenant) {
+    return { error: insertError?.message ?? 'Failed to create tenant.', success: false, widgetPublicKey: null };
+  }
+
+  const secretUpdates: TenantSecretIdFields = {};
+  const openaiKey = optionalString(formData.get('openai_byok_key'));
+  const metaToken = optionalString(formData.get('meta_page_token'));
+  const whatsappToken = optionalString(formData.get('whatsapp_token'));
+
+  try {
+    if (openaiKey) {
+      secretUpdates.openai_key_secret_id = await setTenantSecret(`tenant:${tenant.id}:openai`, openaiKey);
+    }
+    if (metaToken) {
+      secretUpdates.meta_token_secret_id = await setTenantSecret(`tenant:${tenant.id}:meta`, metaToken);
+    }
+    if (whatsappToken) {
+      secretUpdates.whatsapp_token_secret_id = await setTenantSecret(`tenant:${tenant.id}:whatsapp`, whatsappToken);
+    }
+  } catch (err) {
+    return {
+      error: `Client created, but storing secrets failed: ${err instanceof Error ? err.message : 'unknown error'}`,
+      success: false,
+      widgetPublicKey,
+    };
+  }
+
+  if (Object.keys(secretUpdates).length > 0) {
+    const { error: updateError } = await supabase.from('tenants').update(secretUpdates).eq('id', tenant.id);
+    if (updateError) {
+      return {
+        error: `Client created, but linking secrets failed: ${updateError.message}`,
+        success: false,
+        widgetPublicKey,
+      };
+    }
+  }
+
+  revalidatePath('/admin/clients');
+  return { error: null, success: true, widgetPublicKey };
+}
+
+export async function updateTenantAction(
+  tenantId: string,
+  _prev: UpdateTenantState,
+  formData: FormData,
+): Promise<UpdateTenantState> {
+  const businessName = optionalString(formData.get('business_name'));
+  if (!businessName) {
+    return { error: 'Business name is required.', success: false };
+  }
+
+  const slug = optionalString(formData.get('slug'));
+  const metaPageId = optionalString(formData.get('meta_page_id'));
+  const instagramId = optionalString(formData.get('instagram_id'));
+  const whatsappPhoneNumberId = optionalString(formData.get('whatsapp_phone_number_id'));
+  const systemPrompt = String(formData.get('system_prompt') ?? '');
+  const catalogRaw = optionalString(formData.get('catalog_data'));
+  const allowedOriginsRaw = optionalString(formData.get('widget_allowed_origins'));
+  const isActive = formData.get('is_active') === 'on';
+
+  let catalogData: Json = {};
+  if (catalogRaw) {
+    try {
+      catalogData = JSON.parse(catalogRaw) as Json;
+    } catch {
+      return { error: 'Catalogue must be valid JSON.', success: false };
+    }
+  }
+
+  const widgetAllowedOrigins = allowedOriginsRaw
+    ? allowedOriginsRaw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+
+  const supabase = await createSupabaseServerClient();
+
+  const secretUpdates: TenantSecretIdFields = {};
+  const openaiKey = optionalString(formData.get('openai_byok_key'));
+  const metaToken = optionalString(formData.get('meta_page_token'));
+  const whatsappToken = optionalString(formData.get('whatsapp_token'));
+
+  try {
+    if (openaiKey) {
+      secretUpdates.openai_key_secret_id = await setTenantSecret(`tenant:${tenantId}:openai`, openaiKey);
+    }
+    if (metaToken) {
+      secretUpdates.meta_token_secret_id = await setTenantSecret(`tenant:${tenantId}:meta`, metaToken);
+    }
+    if (whatsappToken) {
+      secretUpdates.whatsapp_token_secret_id = await setTenantSecret(`tenant:${tenantId}:whatsapp`, whatsappToken);
+    }
+  } catch (err) {
+    return {
+      error: `Storing secrets failed: ${err instanceof Error ? err.message : 'unknown error'}`,
+      success: false,
+    };
+  }
+
+  const { error: updateError } = await supabase
+    .from('tenants')
+    .update({
+      business_name: businessName,
+      slug,
+      meta_page_id: metaPageId,
+      instagram_id: instagramId,
+      whatsapp_phone_number_id: whatsappPhoneNumberId,
+      system_prompt: systemPrompt,
+      catalog_data: catalogData,
+      widget_allowed_origins: widgetAllowedOrigins,
+      is_active: isActive,
+      ...secretUpdates,
+    })
+    .eq('id', tenantId);
+
+  if (updateError) {
+    return { error: updateError.message, success: false };
+  }
+
+  revalidatePath('/admin/clients');
+  return { error: null, success: true };
+}

@@ -32,6 +32,15 @@ export async function createSupabaseServerClient() {
           }
         },
       },
+      // docs/02-SECURITY.md §3: HttpOnly + Secure + SameSite=Lax. `localhost` is a
+      // browser-trusted secure context, so `secure: true` also works in local dev.
+      // The browser client can no longer read this cookie (by design) — Realtime
+      // auth is bridged explicitly via `realtime.setAuth()`, see admin/chat/inbox.tsx.
+      cookieOptions: {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+      },
     },
   );
 }

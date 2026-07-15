@@ -41,6 +41,7 @@ export interface LlmProvider {
 }
 
 import { openAiProvider } from './openai';
+import { openRouterProvider } from './openrouter';
 
 /**
  * Factory. Add providers here as they are implemented.
@@ -51,6 +52,8 @@ export function getProvider(id: string): LlmProvider {
   switch (id) {
     case 'openai':
       return openAiProvider;
+    case 'openrouter':
+      return openRouterProvider;
     default:
       throw new Error(`Unknown LLM provider: ${id}`);
   }

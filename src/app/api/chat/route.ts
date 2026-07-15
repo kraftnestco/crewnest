@@ -26,10 +26,11 @@ export async function POST(req: NextRequest) {
     return json({ error: 'missing fields' }, 400, origin);
   }
 
-  // Resolve tenant + enforce origin allowlist.
+  // Resolve tenant + enforce origin allowlist. Fail closed: no Origin header or
+  // an unconfigured/non-matching allowlist both reject (docs/06-INTEGRATIONS.md §2).
   const tenant = await tenants.resolveByWidgetKey(key);
   if (!tenant) return json({ error: 'unknown key' }, 403, origin);
-  if (origin && tenant.widgetAllowedOrigins.length > 0 && !tenant.widgetAllowedOrigins.includes(origin)) {
+  if (!origin || !tenant.widgetAllowedOrigins.includes(origin)) {
     return json({ error: 'origin not allowed' }, 403, origin);
   }
 
