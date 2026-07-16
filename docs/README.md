@@ -31,6 +31,10 @@ architecture. **Read the docs in order before writing code.**
 | [`06-INTEGRATIONS.md`](./06-INTEGRATIONS.md) | Meta (WhatsApp/FB/IG) inbound + outbound, website widget, token model, Shopify & voice (later) |
 | [`07-PHASES.md`](./07-PHASES.md) | Phase 1→4 scope, acceptance criteria, and where Opus is needed |
 | [`08-IMPLEMENTATION-GUIDE.md`](./08-IMPLEMENTATION-GUIDE.md) | File-by-file build order for Sonnet + the Next.js 16 gotcha cheat-sheet |
+| [`09-ORDERS-AND-TOOLS.md`](./09-ORDERS-AND-TOOLS.md) | Tool-calling foundation, the `create_order` tool, orders domain + dashboard (Phase 2) |
+| [`10-CUSTOM-ORDERS-MEDIA-AND-INTAKE.md`](./10-CUSTOM-ORDERS-MEDIA-AND-INTAKE.md) | Custom orders, image/voice/video media intake, the client intake wizard, per-tenant approval toggle (Phase 2) |
+| [`11-PAYMENTS-AND-ORDER-LIFECYCLE.md`](./11-PAYMENTS-AND-ORDER-LIFECYCLE.md) | Payment collection (COD → manual transfer → hosted gateway) + order edit/cancel; orthogonal `payment_status` axis (Phase 2) |
+| [`12-KNOWLEDGE-BASE-AND-RETRIEVAL.md`](./12-KNOWLEDGE-BASE-AND-RETRIEVAL.md) | Knowledge base / FAQ / business-hours (stuff-and-cache) → `pgvector` retrieval when it outgrows the budget (Phase 2→3) |
 
 SQL migrations live in [`../supabase/migrations/`](../supabase/migrations/). TypeScript interface
 stubs live under [`../src/`](../src/) with `TODO(sonnet)` markers where bodies must be filled in.

@@ -53,7 +53,14 @@ Everything else in Phase 1 is mechanical for Sonnet given the stubs + guide.
   book appointment, create lead, fetch live inventory). A workflow registry per tenant.
 - **Shopify auto-sync:** webhook updates `catalog_data`; initial catalogue import.
 - **Client-facing logins:** activate `user_tenants` roles; tenant_admins manage their own prompt,
-  catalogue, and inbox (RLS already supports this — no policy rewrite).
+  catalogue, and inbox (RLS already supports this — no policy rewrite). The client-dashboard **feature
+  surface is already designed/built** by doc 09 (orders, inbox, kill switch) + doc 10 (intake wizard,
+  custom-order config, approval queue); the remaining Phase-2 work is auth + the routing change to admit
+  `tenant_admin` past the `is_platform_admin` gate — see [`10-…`](./10-CUSTOM-ORDERS-MEDIA-AND-INTAKE.md) §9.
+- **Custom orders & media intake:** image → voice → video customer media, catalogue matching, per-tenant
+  approval toggle, and the client intake wizard — designed in
+  [`10-CUSTOM-ORDERS-MEDIA-AND-INTAKE.md`](./10-CUSTOM-ORDERS-MEDIA-AND-INTAKE.md). `[OPUS]` gates: storage
+  RLS grants, the multimodal `LlmMessage` union, and the video frame pipeline (doc 10 §11).
 - **Embedded Meta signup:** OAuth connect flow writing Vault secrets.
 - **Billing:** Stripe subscriptions + usage metering from `usage_logs`; plan limits/quotas.
 - **Conversation summarisation** for long sessions.

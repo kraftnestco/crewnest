@@ -9,6 +9,7 @@ const RATES: Record<string, { inputPerM: number; outputPerM: number }> = {
   // TODO(sonnet): verify current prices before relying on billing figures.
   'gpt-4o-mini': { inputPerM: 0.15, outputPerM: 0.6 },
   'gpt-4o': { inputPerM: 2.5, outputPerM: 10 },
+  'text-embedding-3-small': { inputPerM: 0.02, outputPerM: 0 },
 };
 
 export function estimateCostUsd(usage: LlmUsage, model: string): number {
