@@ -1,7 +1,7 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
 import type { Database } from '@/types/database';
-import type { ChatSession, Platform } from '@/types/domain';
+import type { AlertSignal, ChatSession, Platform } from '@/types/domain';
 
 /**
  * Session lifecycle. Uses the SERVICE client from webhook/after() context.
@@ -17,6 +17,7 @@ function mapSession(row: ChatSessionRow): ChatSession {
     platform: row.platform,
     externalUserId: row.external_user_id,
     isHumanHandoff: row.is_human_handoff,
+    alertSignal: (row.alert_signal as AlertSignal | null) ?? null,
   };
 }
 
@@ -70,6 +71,17 @@ export async function setHandoff(sessionId: string, value: boolean): Promise<voi
   const { error } = await client
     .from('chat_sessions')
     .update({ is_human_handoff: value })
+    .eq('id', sessionId);
+
+  if (error) throw error;
+}
+
+/** Persist the Live Inbox alert signal detected from the assistant's reply (or clear it with null). */
+export async function setAlertSignal(sessionId: string, signal: AlertSignal | null): Promise<void> {
+  const client = createServiceClient();
+  const { error } = await client
+    .from('chat_sessions')
+    .update({ alert_signal: signal })
     .eq('id', sessionId);
 
   if (error) throw error;

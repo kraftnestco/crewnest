@@ -1,7 +1,12 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Inbox } from './inbox';
 
-export default async function ChatPage() {
+export default async function ChatPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ session?: string }>;
+}) {
+  const { session: deepLinkSessionId } = await searchParams;
   const supabase = await createSupabaseServerClient();
 
   // Auth cookies are HttpOnly (docs/02-SECURITY.md §3), so the browser client can't
@@ -14,7 +19,9 @@ export default async function ChatPage() {
   const [{ data: sessions }, { data: tenants }] = await Promise.all([
     supabase
       .from('chat_sessions')
-      .select('id, tenant_id, platform, external_user_id, is_human_handoff, last_message_at, unread_count, created_at')
+      .select(
+        'id, tenant_id, platform, external_user_id, is_human_handoff, alert_signal, last_message_at, unread_count, created_at',
+      )
       .order('last_message_at', { ascending: false })
       .limit(100),
     supabase.from('tenants').select('id, business_name, system_prompt, catalog_data'),
@@ -31,6 +38,7 @@ export default async function ChatPage() {
       initialSessions={initialSessions}
       tenants={tenants ?? []}
       realtimeAccessToken={session?.access_token ?? null}
+      initialSelectedId={deepLinkSessionId ?? null}
     />
   );
 }

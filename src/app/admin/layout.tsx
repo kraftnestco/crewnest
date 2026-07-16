@@ -1,15 +1,8 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Button } from '@/components/ui/button';
 import { signOutAction } from './actions';
-
-const NAV_ITEMS = [
-  { href: '/admin', label: 'Overview' },
-  { href: '/admin/clients', label: 'Clients' },
-  { href: '/admin/chat', label: 'Live Inbox' },
-  { href: '/admin/settings', label: 'Settings' },
-];
+import { AdminNav } from './admin-nav';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createSupabaseServerClient();
@@ -49,17 +42,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="p-4">
           <p className="font-heading text-sm font-semibold">CrewNest</p>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 px-2">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-lg px-3 py-2 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <AdminNav />
         <div className="border-t border-sidebar-border p-3">
           <p className="truncate px-1 text-xs text-muted-foreground">
             {profile.full_name || profile.email}

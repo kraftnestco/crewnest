@@ -1,4 +1,5 @@
-import { HUMAN_HANDOFF_TOKEN, MAX_INBOUND_CHARS } from '@/lib/constants';
+import { HUMAN_HANDOFF_TOKEN, MAX_INBOUND_CHARS, SIGNAL_TOKENS } from '@/lib/constants';
+import type { AlertSignal } from '@/types/domain';
 
 /**
  * Sanitise untrusted customer text before it is stored or sent to the model.
@@ -20,6 +21,11 @@ export function sanitizeInbound(input: string): string {
   // Neutralise any attempt to inject the handoff control token from user text.
   text = text.split(HUMAN_HANDOFF_TOKEN).join('[human-handoff]');
 
+  // Same neutralisation for the alert-signal tokens (see extractSignal below).
+  for (const token of Object.values(SIGNAL_TOKENS)) {
+    text = text.split(token).join(token.toLowerCase());
+  }
+
   // Collapse excessive whitespace and cap length.
   text = text.replace(/\s{4,}/g, '   ').trim();
   if (text.length > MAX_INBOUND_CHARS) text = text.slice(0, MAX_INBOUND_CHARS);
@@ -35,4 +41,21 @@ export function stripHandoffToken(text: string): string {
 /** True if the ASSISTANT output requested human takeover. */
 export function assistantRequestedHandoff(text: string): boolean {
   return text.includes(HUMAN_HANDOFF_TOKEN);
+}
+
+/** The first alert signal the ASSISTANT output requested, if any (checked in fixed priority order). */
+export function extractSignal(text: string): AlertSignal | null {
+  for (const [signal, token] of Object.entries(SIGNAL_TOKENS) as [AlertSignal, string][]) {
+    if (text.includes(token)) return signal;
+  }
+  return null;
+}
+
+/** Strip all signal control tokens from assistant output before storing/echoing. */
+export function stripSignalTokens(text: string): string {
+  let result = text;
+  for (const token of Object.values(SIGNAL_TOKENS)) {
+    result = result.split(token).join('');
+  }
+  return result.trim();
 }
