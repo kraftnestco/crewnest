@@ -1,14 +1,18 @@
-import type { InboundMessage, Platform } from '@/types/domain';
+import type { AttachmentKind, InboundAttachment, InboundMessage, Platform } from '@/types/domain';
 
 /**
  * Normalise a Meta webhook POST body into InboundMessage[].
  *
  * The three products deliver different envelopes; we flatten them all to the
- * single InboundMessage shape the orchestrator consumes. Phase 1 = TEXT only.
- * We deliberately skip everything that is not an inbound customer text message:
+ * single InboundMessage shape the orchestrator consumes. We extract image/
+ * audio/video attachments (docs/10 §2.5) alongside any text/caption, and only
+ * skip a message when it has NEITHER text NOR a supported attachment —
  * delivery/read receipts, message echoes (our own outbound), reactions,
- * attachments, postbacks, and any non-text WhatsApp message type. See
- * docs/06-INTEGRATIONS.md §1.1 for the destination-id → tenant column mapping.
+ * postbacks, and unsupported attachment types (file/template/fallback) are
+ * still dropped. Gating attachments on tenant config (customOrdersEnabled /
+ * mediaHandling) happens downstream in the orchestrator — this parser is
+ * tenant-agnostic. See docs/06-INTEGRATIONS.md §1.1 for the destination-id →
+ * tenant column mapping.
  *
  * Shapes:
  *  - WhatsApp (object 'whatsapp_business_account'):
@@ -16,13 +20,16 @@ import type { InboundMessage, Platform } from '@/types/domain';
  *      destination   = entry[].changes[].value.metadata.phone_number_id
  *      from          = messages[].from
  *      providerMsgId = messages[].id
- *      text          = messages[].text.body  (only when type === 'text')
+ *      text          = messages[].text.body        (type === 'text')
+ *      attachment    = messages[].{image,audio,video}.{id, mime_type, caption?}
+ *                      (type === 'image'|'audio'|'video'; caption is absent for audio)
  *      (value.statuses[] are receipts → ignored: we only read value.messages[])
  *  - Messenger (object 'page') & Instagram (object 'instagram'):
  *      entry[].messaging[]
  *      from          = sender.id
  *      providerMsgId = message.mid
  *      text          = message.text
+ *      attachments   = message.attachments[].{type, payload.url}
  *      destination   = recipient.id (page id) for Messenger,
  *                      entry[].id (IG account id) for Instagram
  *      (skip message.is_echo, and events with no `message` object)
@@ -78,21 +85,49 @@ function parseWhatsAppEntry(entry: Record<string, unknown>, out: InboundMessage[
 
     for (const msgRaw of asArray(value.messages)) {
       const msg = asRecord(msgRaw);
-      if (!msg || msg.type !== 'text') continue; // Phase 1: text only.
+      if (!msg) continue;
 
-      const text = asString(asRecord(msg.text)?.body);
       const from = asString(msg.from);
-      if (!text || !from) continue;
+      if (!from) continue;
+
+      const type = asString(msg.type);
+      const text = type === 'text' ? asString(asRecord(msg.text)?.body) : null;
+      const attachments = extractWhatsAppAttachment(msg, type);
+
+      if (!text && !attachments) continue; // Neither text nor a supported attachment.
 
       out.push({
         platform: 'whatsapp',
         destinationId,
         externalUserId: from,
-        text,
+        text: text ?? '',
+        attachments,
         providerMsgId: asString(msg.id) ?? undefined,
       });
     }
   }
+}
+
+/** WhatsApp media messages nest the descriptor under a key named after `type` itself. */
+function extractWhatsAppAttachment(
+  msg: Record<string, unknown>,
+  type: string | null,
+): InboundAttachment[] | undefined {
+  const kind = mapAttachmentKind(type);
+  if (!kind) return undefined;
+
+  const media = asRecord(msg[kind]);
+  const mediaId = asString(media?.id);
+  if (!media || !mediaId) return undefined;
+
+  return [
+    {
+      kind,
+      mediaId,
+      mimeType: asString(media.mime_type) ?? undefined,
+      caption: asString(media.caption) ?? undefined,
+    },
+  ];
 }
 
 function parseMessagingEntry(
@@ -111,7 +146,8 @@ function parseMessagingEntry(
     if (message.is_echo === true) continue; // Our own outbound, echoed back.
 
     const text = asString(message.text);
-    if (!text) continue; // Attachment-only / reaction / unsupported → skip.
+    const attachments = extractMessagingAttachments(message.attachments);
+    if (!text && !attachments) continue; // Reaction / unsupported attachment / empty → skip.
 
     const from = asString(asRecord(event.sender)?.id);
     if (!from) continue;
@@ -126,10 +162,37 @@ function parseMessagingEntry(
       platform,
       destinationId,
       externalUserId: from,
-      text,
+      text: text ?? '',
+      attachments,
       providerMsgId: asString(message.mid) ?? undefined,
     });
   }
+}
+
+/** Messenger/IG attachments carry a time-limited CDN url directly in the payload — no token fetch. */
+function extractMessagingAttachments(value: unknown): InboundAttachment[] | undefined {
+  const items = asArray(value);
+  if (items.length === 0) return undefined;
+
+  const out: InboundAttachment[] = [];
+  for (const itemRaw of items) {
+    const item = asRecord(itemRaw);
+    if (!item) continue;
+
+    const kind = mapAttachmentKind(asString(item.type));
+    if (!kind) continue; // 'file' / 'template' / 'fallback' / etc. → unsupported, skip.
+
+    const url = asString(asRecord(item.payload)?.url);
+    if (!url) continue;
+
+    out.push({ kind, url });
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/** Shared by both channels — WhatsApp's `type` and Messenger/IG's `attachments[].type` use the same strings. */
+function mapAttachmentKind(type: string | null): AttachmentKind | null {
+  return type === 'image' || type === 'audio' || type === 'video' ? type : null;
 }
 
 // --- safe narrowing helpers (webhook bodies are untrusted `unknown`) --------

@@ -47,6 +47,30 @@ export async function getLlmKey(
   return { key: env.MASTER_OPENAI_KEY, usedByok: false };
 }
 
+/**
+ * Resolve the API key for OpenAI's transcription endpoint (docs/10 §5). Always OpenAI,
+ * independent of the tenant's chat `llmProvider` — OpenRouter has no transcription API.
+ */
+export async function getTranscriptionKey(
+  tenant: Pick<Tenant, 'openaiKeySecretId'>,
+): Promise<{ key: string; usedByok: boolean }> {
+  if (tenant.openaiKeySecretId) {
+    const key = await getTenantSecret(tenant.openaiKeySecretId);
+    if (key) return { key, usedByok: true };
+  }
+  return { key: env.MASTER_OPENAI_KEY, usedByok: false };
+}
+
+/**
+ * Resolve the API key for OpenAI's embeddings endpoint (docs/12 §5.2). Always
+ * OpenAI, independent of the tenant's chat llmProvider — same rule as transcription.
+ */
+export async function getEmbeddingKey(
+  tenant: Pick<Tenant, 'openaiKeySecretId'>,
+): Promise<{ key: string; usedByok: boolean }> {
+  return getTranscriptionKey(tenant);
+}
+
 /** Resolve the Meta channel token (page / whatsapp) for outbound sends. */
 export async function getMetaToken(
   tenant: Pick<Tenant, 'metaTokenSecretId' | 'whatsappTokenSecretId'>,

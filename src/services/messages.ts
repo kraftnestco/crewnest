@@ -1,6 +1,7 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
-import type { ChatMessage, MessageRole } from '@/types/domain';
+import type { Json } from '@/types/database';
+import type { ChatMessage, MessageRole, OrderAttachment } from '@/types/domain';
 import type { LlmUsage } from './ai/provider';
 
 /**
@@ -18,6 +19,7 @@ export async function persist(args: {
   tenantId: string;
   role: MessageRole;
   content: string;
+  attachments?: OrderAttachment[] | null;
   providerMsgId?: string;
   tokenCount?: number;
 }): Promise<void> {
@@ -27,6 +29,7 @@ export async function persist(args: {
     tenant_id: args.tenantId,
     role: args.role,
     content: args.content,
+    attachments: (args.attachments ?? null) as unknown as Json,
     provider_msg_id: args.providerMsgId ?? null,
     token_count: args.tokenCount ?? null,
   });
@@ -63,6 +66,24 @@ export async function loadWindow(
   }
 
   return selected.reverse();
+}
+
+/** Abuse cap: how many media attachments this session has had processed within the window (docs/10 §4.4/§8). */
+export async function countRecentAttachments(sessionId: string, windowMinutes: number): Promise<number> {
+  const client = createServiceClient();
+  const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+  const { data, error } = await client
+    .from('chat_messages')
+    .select('attachments')
+    .eq('session_id', sessionId)
+    .not('attachments', 'is', null)
+    .gte('created_at', since);
+
+  if (error) throw error;
+  return (data ?? []).reduce(
+    (sum, row) => sum + (Array.isArray(row.attachments) ? row.attachments.length : 0),
+    0,
+  );
 }
 
 /** Write a per-turn usage row for billing/cost/abuse. */

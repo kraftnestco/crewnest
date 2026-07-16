@@ -1,6 +1,9 @@
+import Link from 'next/link';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Badge } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 import { EditClientDialog } from './edit-client-dialog';
 import { NewClientDialog } from './new-client-dialog';
 
@@ -56,7 +59,15 @@ export default async function ClientsPage() {
                   {new Date(t.created_at).toLocaleDateString()}
                 </TableCell>
                 <TableCell className="text-right">
-                  <EditClientDialog tenant={t} />
+                  <div className="flex justify-end gap-2">
+                    <Link
+                      href={`/admin/clients/${t.id}/intake`}
+                      className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+                    >
+                      Intake
+                    </Link>
+                    <EditClientDialog tenant={t} />
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
