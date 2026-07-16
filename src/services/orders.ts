@@ -1,0 +1,364 @@
+import 'server-only';
+import { createServiceClient } from '@/lib/supabase/service';
+import { ORDER_DEDUPE_WINDOW_MINUTES, ORDER_CAP_WINDOW_MINUTES, PROOF_MATCH_WINDOW_HOURS } from '@/lib/constants';
+import type { Database, Json } from '@/types/database';
+import type { Order, OrderAttachment, OrderItem, OrderStatus, PaymentMethod, PaymentStatus, Platform } from '@/types/domain';
+
+/**
+ * Orders persistence + idempotency/abuse helpers for the create_order tool.
+ * Service-role only — writes are never exposed to the authenticated/RLS path
+ * (matches usage_logs; see docs/09-ORDERS-AND-TOOLS.md §3.2).
+ */
+
+type OrderRow = Database['public']['Tables']['orders']['Row'];
+
+function mapOrder(row: OrderRow): Order {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    sessionId: row.session_id,
+    status: row.status,
+    customerName: row.customer_name,
+    customerPhone: row.customer_phone,
+    customerAddress: row.customer_address,
+    items: (row.items as unknown as OrderItem[]) ?? [],
+    notes: row.notes,
+    platform: row.platform,
+    externalUserId: row.external_user_id,
+    ownerNotifiedAt: row.owner_notified_at,
+    attachments: (row.attachments as unknown as OrderAttachment[] | null) ?? null,
+    paymentStatus: row.payment_status,
+    paymentMethod: row.payment_method as PaymentMethod | null,
+    paymentProvider: row.payment_provider,
+    paymentReference: row.payment_reference,
+    amountTotal: row.amount_total,
+    currency: row.currency,
+    paidAt: row.paid_at,
+    paymentProof: (row.payment_proof as unknown as OrderAttachment | null) ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+export interface CreateOrderInput {
+  tenantId: string;
+  sessionId: string | null;
+  platform: Platform | null;
+  externalUserId: string | null;
+  items: OrderItem[];
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerAddress?: string | null;
+  notes?: string | null;
+  /** Server-decided (docs/10 §3.3) — never model-supplied. Defaults to 'confirmed' (existing behaviour). */
+  status?: OrderStatus;
+  /** Server-bound from the turn's downloaded media — never model-supplied (docs/10 §4.3). */
+  attachments?: OrderAttachment[] | null;
+  /** Server-resolved (docs/11 §3.3) — never model-supplied. Null when payments are disabled/no method resolves. */
+  paymentMethod?: PaymentMethod | null;
+  /** Server-computed advisory total (docs/11 §3.3.1) — null unless every item has a numeric price. */
+  amountTotal?: number | null;
+  currency?: string | null;
+}
+
+/**
+ * Normalise items + customer identity + media into a comparable fingerprint for
+ * dedupe. Includes attachment storage paths (docs/10 §8) so a retried delivery of
+ * the same media (with the same collected details) doesn't double-insert.
+ */
+export function computeFingerprint(
+  items: OrderItem[],
+  customer: { name?: string | null; phone?: string | null; address?: string | null },
+  attachments?: OrderAttachment[] | null,
+): string {
+  const normalizedItems = items
+    .map((i) => `${i.name.trim().toLowerCase()}x${i.qty}`)
+    .sort()
+    .join('|');
+  const normalizedCustomer = [customer.name, customer.phone, customer.address]
+    .map((v) => (v ?? '').trim().toLowerCase())
+    .join('|');
+  const normalizedMedia = (attachments ?? [])
+    .map((a) => a.storagePath)
+    .sort()
+    .join('|');
+  return `${normalizedItems}::${normalizedCustomer}::${normalizedMedia}`;
+}
+
+/** True if an order matching this fingerprint was already placed in this session recently. */
+export async function recentDuplicate(sessionId: string, fingerprint: string): Promise<boolean> {
+  const client = createServiceClient();
+  const since = new Date(Date.now() - ORDER_DEDUPE_WINDOW_MINUTES * 60_000).toISOString();
+  const { data, error } = await client
+    .from('orders')
+    .select('items, customer_name, customer_phone, customer_address, attachments')
+    .eq('session_id', sessionId)
+    .gte('created_at', since);
+
+  if (error) throw error;
+
+  return (data ?? []).some((row) => {
+    const items = (row.items as unknown as OrderItem[]) ?? [];
+    const rowAttachments = (row.attachments as unknown as OrderAttachment[] | null) ?? null;
+    const rowFingerprint = computeFingerprint(
+      items,
+      { name: row.customer_name, phone: row.customer_phone, address: row.customer_address },
+      rowAttachments,
+    );
+    return rowFingerprint === fingerprint;
+  });
+}
+
+/** Abuse cap: how many orders this session has placed within the cap window. */
+export async function countRecentForSession(sessionId: string): Promise<number> {
+  const client = createServiceClient();
+  const since = new Date(Date.now() - ORDER_CAP_WINDOW_MINUTES * 60_000).toISOString();
+  const { count, error } = await client
+    .from('orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('session_id', sessionId)
+    .gte('created_at', since);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function create(input: CreateOrderInput): Promise<Order> {
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from('orders')
+    .insert({
+      tenant_id: input.tenantId,
+      session_id: input.sessionId,
+      platform: input.platform,
+      external_user_id: input.externalUserId,
+      items: input.items as unknown as Json,
+      customer_name: input.customerName ?? null,
+      customer_phone: input.customerPhone ?? null,
+      customer_address: input.customerAddress ?? null,
+      notes: input.notes ?? null,
+      status: input.status ?? 'confirmed',
+      attachments: (input.attachments ?? null) as unknown as Json,
+      payment_method: input.paymentMethod ?? null,
+      amount_total: input.amountTotal ?? null,
+      currency: input.currency ?? null,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapOrder(data);
+}
+
+/** Mark the owner WhatsApp push as delivered (best-effort; never blocks the customer reply). */
+export async function markOwnerNotified(orderId: string): Promise<void> {
+  const client = createServiceClient();
+  const { error } = await client
+    .from('orders')
+    .update({ owner_notified_at: new Date().toISOString() })
+    .eq('id', orderId);
+
+  if (error) throw error;
+}
+
+/**
+ * Approve/reject writes are service-role only, like every other write here (migration
+ * 0009's comment: no authenticated write policy on `orders`). The RLS-authenticated
+ * read that gates access happens in the caller (admin/orders/actions.ts), mirroring
+ * `manualSendAction`'s "read-as-access-check" pattern — see docs/10 §3.4.
+ */
+export async function approve(orderId: string): Promise<Order> {
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from('orders')
+    .update({ status: 'confirmed' })
+    .eq('id', orderId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapOrder(data);
+}
+
+export async function reject(orderId: string, notes?: string | null): Promise<Order> {
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from('orders')
+    .update({ status: 'cancelled', ...(notes !== undefined ? { notes } : {}) })
+    .eq('id', orderId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapOrder(data);
+}
+
+/**
+ * Session-scoped order lookup for the check_order_status tool. Identity is
+ * server-bound (session id only) — never accepts a tenant/customer id from the
+ * model, so one conversation can never enumerate another customer's orders.
+ */
+export async function listForSession(sessionId: string, limit = 5): Promise<Order[]> {
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from('orders')
+    .select('*')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data ?? []).map(mapOrder);
+}
+
+export async function getById(orderId: string): Promise<Order | null> {
+  const client = createServiceClient();
+  const { data, error } = await client.from('orders').select('*').eq('id', orderId).maybeSingle();
+
+  if (error) throw error;
+  return data ? mapOrder(data) : null;
+}
+
+/**
+ * docs/11 §4.2 guard: only pending/confirmed orders are editable/cancellable by
+ * the customer — fulfilled/cancelled orders are terminal. `payment_status` isn't
+ * in the schema yet (doc 11 Stage J); once it ships, extend this to also block a
+ * `paid` order (refund becomes a human/Stage-L action, per the full guard table).
+ */
+const OPEN_STATUSES: OrderStatus[] = ['pending', 'confirmed'];
+
+export function isEditable(order: Pick<Order, 'status'>): boolean {
+  return OPEN_STATUSES.includes(order.status);
+}
+
+/** Resolve the edit_order/cancel_order target: an explicit id, or the session's most recent editable order. */
+export async function findEditableForSession(sessionId: string, orderId?: string): Promise<Order | null> {
+  const recent = await listForSession(sessionId);
+  if (orderId) return recent.find((o) => o.id === orderId) ?? null;
+  return recent.find((o) => isEditable(o)) ?? null;
+}
+
+/**
+ * K1 proof-vs-example image routing (docs/11 §3.3.1 B) — session-scoped, never
+ * model/caption-driven. The most recent open, unpaid manual-transfer order in this
+ * session with no proof attached yet, within PROOF_MATCH_WINDOW_HOURS.
+ */
+export async function findProofTarget(sessionId: string): Promise<Order | null> {
+  const client = createServiceClient();
+  const since = new Date(Date.now() - PROOF_MATCH_WINDOW_HOURS * 60 * 60_000).toISOString();
+  const { data, error } = await client
+    .from('orders')
+    .select('*')
+    .eq('session_id', sessionId)
+    .eq('payment_method', 'manual_transfer')
+    .eq('payment_status', 'unpaid')
+    .in('status', OPEN_STATUSES)
+    .is('payment_proof', null)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? mapOrder(data) : null;
+}
+
+export interface EditOrderInput {
+  items?: OrderItem[];
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerAddress?: string | null;
+  notes?: string | null;
+  /** Server-decided re-approval (docs/11 §4.3) — never model-supplied. */
+  status?: OrderStatus;
+}
+
+export async function edit(orderId: string, patch: EditOrderInput): Promise<Order> {
+  const client = createServiceClient();
+  const update: Database['public']['Tables']['orders']['Update'] = {};
+  if (patch.items !== undefined) update.items = patch.items as unknown as Json;
+  if (patch.customerName !== undefined) update.customer_name = patch.customerName;
+  if (patch.customerPhone !== undefined) update.customer_phone = patch.customerPhone;
+  if (patch.customerAddress !== undefined) update.customer_address = patch.customerAddress;
+  if (patch.notes !== undefined) update.notes = patch.notes;
+  if (patch.status !== undefined) update.status = patch.status;
+
+  const { data, error } = await client.from('orders').update(update).eq('id', orderId).select().single();
+  if (error) throw error;
+  return mapOrder(data);
+}
+
+/** Customer-initiated cancel (docs/11 §4.2) — reuses reject's write, merging `reason` into existing notes. */
+export async function cancel(orderId: string, reason?: string | null): Promise<Order> {
+  const current = await getById(orderId);
+  const mergedNotes = reason
+    ? [current?.notes, `Cancelled by customer: ${reason}`].filter(Boolean).join(' | ')
+    : (current?.notes ?? null);
+  return reject(orderId, mergedNotes);
+}
+
+/**
+ * K1 (docs/11 §3.3.1 B): attach a payment-proof media reference and flip the order
+ * into `awaiting_verification` in one write — the orchestrator's proof-routing branch
+ * never sets `paid` itself, only a human/webhook can (docs/11 §1.1).
+ */
+export async function attachProof(orderId: string, proof: OrderAttachment): Promise<Order> {
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from('orders')
+    .update({
+      payment_proof: proof as unknown as Json,
+      payment_status: 'awaiting_verification',
+    })
+    .eq('id', orderId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapOrder(data);
+}
+
+/** Server/webhook-only status transition (docs/11 §1.1) — never called from model-facing tool code. */
+export async function setPaymentStatus(orderId: string, status: PaymentStatus): Promise<Order> {
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from('orders')
+    .update({ payment_status: status })
+    .eq('id', orderId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapOrder(data);
+}
+
+/** Owner dashboard action (docs/11 §3.5) — the privileged `paid` transition. */
+export async function markPaid(orderId: string, reference?: string | null): Promise<Order> {
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from('orders')
+    .update({
+      payment_status: 'paid',
+      paid_at: new Date().toISOString(),
+      ...(reference !== undefined ? { payment_reference: reference } : {}),
+    })
+    .eq('id', orderId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapOrder(data);
+}
+
+/** Owner dashboard action (docs/11 §3.5). */
+export async function markRefunded(orderId: string): Promise<Order> {
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from('orders')
+    .update({ payment_status: 'refunded' })
+    .eq('id', orderId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapOrder(data);
+}

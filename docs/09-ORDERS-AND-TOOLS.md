@@ -378,6 +378,11 @@ what actually captures data and fires notifications. Neither works without the o
 
 ## 7. Stage D — Image / vision (DEFERRED — design sketch only)
 
+> **Superseded by [`10-CUSTOM-ORDERS-MEDIA-AND-INTAKE.md`](./10-CUSTOM-ORDERS-MEDIA-AND-INTAKE.md)**
+> (Opus, 2026-07-16), which is the full design pass this sketch asked for — and extends it to voice +
+> video, the client intake wizard, and the per-tenant approval toggle. The sketch below is kept for
+> history; build from doc 10.
+
 Not built in this pass. Captured so it isn't lost; needs its own `[OPUS]` design before implementation.
 Driving case: a phone-case client whose customers DM a screenshot of an Instagram catalogue post and say
 "I want this design, with my name on it."

@@ -4,9 +4,40 @@
  * providers is a config change, not a code change. See docs/05-AI-PIPELINE.md §3.
  */
 
+export interface LlmToolDef {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>; // JSON Schema for the args object
+}
+
+export interface LlmToolCall {
+  id: string; // provider-assigned id; echoed back on the tool-result message
+  name: string;
+  arguments: string; // RAW JSON string exactly as the model emitted it (parse + validate later)
+}
+
+/**
+ * A single piece of a multimodal message. Only USER turns ever carry these
+ * (docs/10 §2.2): images ride on the dynamic user turn so the cache-critical
+ * static prefix (system + catalogue + rules) stays a plain string and
+ * byte-identical between turns (docs/05 §2). `imageUrl` is a short-TTL signed
+ * Storage URL or a `data:` URI — never a token/CDN url (docs/10 §7).
+ */
+export type LlmContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; imageUrl: string };
+
 export interface LlmMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
+  /**
+   * A plain string (every existing call, and ALWAYS for system/assistant/tool
+   * turns) or, for a USER turn only, an array of parts carrying image(s)
+   * alongside text. Keeping non-user turns string-only preserves the cache
+   * contract — see the provider mappers.
+   */
+  content: string | LlmContentPart[];
+  toolCalls?: LlmToolCall[]; // set on an ASSISTANT turn that requests tools
+  toolCallId?: string; // set on a TOOL-result turn: which call it answers
 }
 
 export interface LlmRequest {
@@ -20,6 +51,7 @@ export interface LlmRequest {
   cachePrefixLength?: number;
   temperature?: number;
   maxTokens?: number;
+  tools?: LlmToolDef[]; // omit ⇒ no tool-calling (today's path)
 }
 
 export interface LlmUsage {
@@ -30,6 +62,7 @@ export interface LlmUsage {
 
 export interface LlmResult {
   text: string;
+  toolCalls?: LlmToolCall[]; // present when the model wants to call tools (text may be empty)
   usage: LlmUsage;
   raw?: unknown;
 }
