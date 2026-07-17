@@ -13,7 +13,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { inviteClientLoginAction, initialInviteClientState } from './actions';
+import { inviteClientLoginAction } from './actions';
+import { initialInviteClientState } from './invite-state';
 
 export function InviteClientDialog({ tenantId, businessName }: { tenantId: string; businessName: string }) {
   const [open, setOpen] = useState(false);

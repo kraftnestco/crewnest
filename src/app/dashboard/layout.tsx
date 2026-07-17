@@ -53,7 +53,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+      <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
         <div className="p-4">
           <p className="font-heading text-sm font-semibold">CrewNest</p>
           <p className="mt-1 truncate text-xs text-muted-foreground">{activeTenantName}</p>

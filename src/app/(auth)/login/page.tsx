@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getCallerContext } from '@/lib/auth/context';
 import { LoginForm } from './login-form';
 
 export default async function LoginPage({
@@ -8,11 +8,21 @@ export default async function LoginPage({
   searchParams: Promise<{ redirect?: string }>;
 }) {
   const { redirect: redirectTo } = await searchParams;
+  const ctx = await getCallerContext();
 
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getUser();
-  if (data.user) {
-    redirect(redirectTo ?? '/admin');
+  let existingAccountEmail: string | null = null;
+  if (ctx) {
+    const wantsAdmin = redirectTo?.startsWith('/admin');
+    const wantsClient = redirectTo?.startsWith('/dashboard');
+    const matchesIntent = wantsAdmin ? ctx.isPlatformAdmin : wantsClient ? !ctx.isPlatformAdmin : true;
+
+    if (matchesIntent) {
+      redirect(redirectTo ?? '/admin');
+    }
+    // The existing session is the other kind of account (e.g. an admin session
+    // lingering while "Sign in as client" was clicked) — don't honor it silently;
+    // let the form below authenticate whichever account was actually intended.
+    existingAccountEmail = ctx.email;
   }
 
   return (
@@ -20,7 +30,11 @@ export default async function LoginPage({
       <div className="w-full max-w-sm rounded-xl bg-card p-6 ring-1 ring-foreground/10">
         <div className="mb-6">
           <h1 className="font-heading text-lg font-semibold">CrewNest</h1>
-          <p className="text-sm text-muted-foreground">Sign in to the agency dashboard.</p>
+          <p className="text-sm text-muted-foreground">
+            {existingAccountEmail
+              ? `Currently signed in as ${existingAccountEmail}. Sign in below to switch accounts.`
+              : 'Sign in to the agency dashboard.'}
+          </p>
         </div>
         <LoginForm redirectTo={redirectTo ?? '/admin'} />
       </div>

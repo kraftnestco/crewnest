@@ -5,6 +5,7 @@ import { getCallerContext } from '@/lib/auth/context';
 import { createServiceClient } from '@/lib/supabase/service';
 import { env } from '@/lib/env';
 import type { Database } from '@/types/database';
+import type { InviteClientState } from './invite-state';
 
 /**
  * Admin-only client login provisioning (docs/13-CLIENT-DASHBOARD-TENANT-ACCESS.md §9).
@@ -12,13 +13,6 @@ import type { Database } from '@/types/database';
  * management; a mis-linked tenant_id here is a direct cross-tenant leak, so
  * this is the one blessed path for creating a user_tenants row.
  */
-
-export interface InviteClientState {
-  error: string | null;
-  success: boolean;
-}
-
-export const initialInviteClientState: InviteClientState = { error: null, success: false };
 
 const ROLE_VALUES = ['tenant_admin', 'tenant_agent'] as const;
 
