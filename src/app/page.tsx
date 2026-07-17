@@ -1,65 +1,137 @@
-import Image from "next/image";
+import Link from 'next/link';
+import { MessagesSquare, Sparkles, PackageCheck, UserCheck } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { Logomark } from './_landing/logomark';
+import { TiltCard } from './_landing/tilt-card';
+import { HeroVisual } from './_landing/hero-visual';
+
+const FEATURES = [
+  {
+    icon: MessagesSquare,
+    title: 'One inbox, every channel',
+    description: 'WhatsApp, Facebook & Instagram DMs, and website chat all land in a single live inbox.',
+  },
+  {
+    icon: Sparkles,
+    title: 'Grounded in your business',
+    description: 'Replies pull from your actual catalogue and brand voice — never generic, off-the-shelf answers.',
+  },
+  {
+    icon: PackageCheck,
+    title: 'Orders captured automatically',
+    description: 'Confirmed orders are logged and pushed straight to your WhatsApp — no manual data entry.',
+  },
+  {
+    icon: UserCheck,
+    title: 'Human handoff, anytime',
+    description: 'Step into any conversation the moment it needs a human touch, then hand it back.',
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-2">
+            <Logomark />
+            <span className="font-heading text-lg font-semibold">
+              Crew<span className="font-normal text-muted-foreground">Nest</span>
+            </span>
+          </div>
+          <nav className="flex items-center gap-1.5 sm:gap-2">
+            <Link href="/login?redirect=/dashboard" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
+              <span className="sm:hidden">Client</span>
+              <span className="hidden sm:inline">Client login</span>
+            </Link>
+            <Link href="/login?redirect=/admin" className={cn(buttonVariants({ size: 'sm' }))}>
+              <span className="sm:hidden">Admin</span>
+              <span className="hidden sm:inline">Admin login</span>
+            </Link>
+          </nav>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+      </header>
+
+      <main className="flex-1">
+        <section className="relative isolate overflow-hidden">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -z-10"
+            style={{
+              backgroundImage: 'radial-gradient(circle, var(--border) 1px, transparent 1px)',
+              backgroundSize: '28px 28px',
+              maskImage: 'radial-gradient(ellipse 60% 50% at 50% 0%, black 40%, transparent 80%)',
+              WebkitMaskImage: 'radial-gradient(ellipse 60% 50% at 50% 0%, black 40%, transparent 80%)',
+            }}
+          />
+
+          <div className="mx-auto grid w-full max-w-5xl items-center gap-12 px-6 py-20 lg:grid-cols-[1.1fr_1fr] lg:py-28">
+            <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
+              <Badge variant="secondary">Multi-channel AI employee</Badge>
+              <h1 className="mt-4 font-heading text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+                Your business, answered instantly.
+              </h1>
+              <p className="mt-4 max-w-xl text-lg text-muted-foreground text-balance">
+                CrewNest gives your business an AI employee that answers customers across WhatsApp, Facebook,
+                Instagram, and your website — grounded in your catalogue, with a human always one tap away.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/login?redirect=/dashboard"
+                  className={cn(buttonVariants({ size: 'lg' }), 'w-full sm:w-auto')}
+                >
+                  Sign in as client
+                </Link>
+                <Link
+                  href="/login?redirect=/admin"
+                  className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'w-full sm:w-auto')}
+                >
+                  Sign in as admin
+                </Link>
+              </div>
+            </div>
+
+            <HeroVisual />
+          </div>
+        </section>
+
+        <section id="features" className="mx-auto w-full max-w-5xl px-6 pb-24">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {FEATURES.map((feature) => (
+              <TiltCard key={feature.title} max={5}>
+                <Card className="h-full">
+                  <CardHeader>
+                    <feature.icon className="size-5 text-muted-foreground" />
+                    <CardTitle className="mt-2">{feature.title}</CardTitle>
+                    <CardDescription>{feature.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent />
+                </Card>
+              </TiltCard>
+            ))}
+          </div>
+        </section>
       </main>
+
+      <footer className="border-t border-border">
+        <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-3 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Logomark className="size-6" />
+            <p>© {new Date().getFullYear()} CrewNest</p>
+          </div>
+          <div className="flex gap-4">
+            <Link href="/login?redirect=/dashboard" className="hover:text-foreground">
+              Client login
+            </Link>
+            <Link href="/login?redirect=/admin" className="hover:text-foreground">
+              Admin login
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
