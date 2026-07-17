@@ -114,9 +114,6 @@ export const createOrderTool: ToolExecutor = {
       { name: args.customer_name, phone: args.customer_phone, address: args.customer_address },
       ctx.attachments,
     );
-    if (await orders.recentDuplicate(ctx.session.id, fingerprint)) {
-      return { orderId: null, status, duplicate: true };
-    }
 
     // Money is server-resolved end to end (docs/11 §3.3.1 A) — the model's
     // payment_preference is only ever an untrusted hint into this resolution.
@@ -126,22 +123,31 @@ export const createOrderTool: ToolExecutor = {
     const currency = paymentMethod ? ctx.tenant.defaultCurrency : null;
 
     // Identity is server-bound: tenant/session/platform/media come from ctx, never from args.
-    const order = await orders.create({
-      tenantId: ctx.tenant.id,
-      sessionId: ctx.session.id,
-      platform: ctx.session.platform,
-      externalUserId: ctx.session.externalUserId,
-      items: args.items,
-      customerName: args.customer_name,
-      customerPhone: args.customer_phone,
-      customerAddress: args.customer_address,
-      notes: args.notes ?? null,
-      status,
-      attachments: ctx.attachments?.length ? ctx.attachments : null,
-      paymentMethod,
-      amountTotal,
-      currency,
-    });
+    // The duplicate check and insert happen atomically in one RPC (migration
+    // 0021) to close a TOCTOU race between two near-simultaneous tool calls.
+    const { order, duplicate } = await orders.createDeduped(
+      {
+        tenantId: ctx.tenant.id,
+        sessionId: ctx.session.id,
+        platform: ctx.session.platform,
+        externalUserId: ctx.session.externalUserId,
+        items: args.items,
+        customerName: args.customer_name,
+        customerPhone: args.customer_phone,
+        customerAddress: args.customer_address,
+        notes: args.notes ?? null,
+        status,
+        attachments: ctx.attachments?.length ? ctx.attachments : null,
+        paymentMethod,
+        amountTotal,
+        currency,
+      },
+      fingerprint,
+    );
+
+    if (duplicate || !order) {
+      return { orderId: null, status, duplicate: true };
+    }
 
     // Best-effort owner push: awaited (survives serverless teardown after execute()
     // returns) but never lets a delivery failure block the customer's confirmation.

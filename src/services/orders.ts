@@ -84,30 +84,6 @@ export function computeFingerprint(
   return `${normalizedItems}::${normalizedCustomer}::${normalizedMedia}`;
 }
 
-/** True if an order matching this fingerprint was already placed in this session recently. */
-export async function recentDuplicate(sessionId: string, fingerprint: string): Promise<boolean> {
-  const client = createServiceClient();
-  const since = new Date(Date.now() - ORDER_DEDUPE_WINDOW_MINUTES * 60_000).toISOString();
-  const { data, error } = await client
-    .from('orders')
-    .select('items, customer_name, customer_phone, customer_address, attachments')
-    .eq('session_id', sessionId)
-    .gte('created_at', since);
-
-  if (error) throw error;
-
-  return (data ?? []).some((row) => {
-    const items = (row.items as unknown as OrderItem[]) ?? [];
-    const rowAttachments = (row.attachments as unknown as OrderAttachment[] | null) ?? null;
-    const rowFingerprint = computeFingerprint(
-      items,
-      { name: row.customer_name, phone: row.customer_phone, address: row.customer_address },
-      rowAttachments,
-    );
-    return rowFingerprint === fingerprint;
-  });
-}
-
 /** Abuse cap: how many orders this session has placed within the cap window. */
 export async function countRecentForSession(sessionId: string): Promise<number> {
   const client = createServiceClient();
@@ -122,31 +98,47 @@ export async function countRecentForSession(sessionId: string): Promise<number> 
   return count ?? 0;
 }
 
-export async function create(input: CreateOrderInput): Promise<Order> {
+/**
+ * Atomically checks-for-duplicate and inserts in one DB transaction (migration
+ * 0021). Previously the duplicate check (recentDuplicate) and the insert
+ * (create) were two separate Supabase calls — each its own implicit
+ * transaction — so two near-simultaneous create_order tool calls for the same
+ * session (e.g. a customer double-sending their confirmation) could both pass
+ * the check before either insert committed, producing duplicate orders and
+ * duplicate owner notifications. `create_order_atomic` serializes concurrent
+ * calls per session_id via a Postgres advisory lock and checks the
+ * already-computed fingerprint against a stored column, so the normalisation
+ * logic in computeFingerprint isn't duplicated in SQL.
+ */
+export async function createDeduped(
+  input: CreateOrderInput,
+  fingerprint: string,
+): Promise<{ order: Order | null; duplicate: boolean }> {
   const client = createServiceClient();
-  const { data, error } = await client
-    .from('orders')
-    .insert({
-      tenant_id: input.tenantId,
-      session_id: input.sessionId,
-      platform: input.platform,
-      external_user_id: input.externalUserId,
-      items: input.items as unknown as Json,
-      customer_name: input.customerName ?? null,
-      customer_phone: input.customerPhone ?? null,
-      customer_address: input.customerAddress ?? null,
-      notes: input.notes ?? null,
-      status: input.status ?? 'confirmed',
-      attachments: (input.attachments ?? null) as unknown as Json,
-      payment_method: input.paymentMethod ?? null,
-      amount_total: input.amountTotal ?? null,
-      currency: input.currency ?? null,
-    })
-    .select()
-    .single();
+  const { data, error } = await client.rpc('create_order_atomic', {
+    p_tenant_id: input.tenantId,
+    p_session_id: input.sessionId,
+    p_platform: input.platform,
+    p_external_user_id: input.externalUserId,
+    p_items: input.items as unknown as Json,
+    p_customer_name: input.customerName ?? null,
+    p_customer_phone: input.customerPhone ?? null,
+    p_customer_address: input.customerAddress ?? null,
+    p_notes: input.notes ?? null,
+    p_status: input.status ?? 'confirmed',
+    p_attachments: (input.attachments ?? null) as unknown as Json,
+    p_payment_method: input.paymentMethod ?? null,
+    p_amount_total: input.amountTotal ?? null,
+    p_currency: input.currency ?? null,
+    p_fingerprint: fingerprint,
+    p_dedupe_window_minutes: ORDER_DEDUPE_WINDOW_MINUTES,
+  });
 
   if (error) throw error;
-  return mapOrder(data);
+
+  const result = data as unknown as { is_duplicate: boolean } & Partial<OrderRow>;
+  if (result.is_duplicate) return { order: null, duplicate: true };
+  return { order: mapOrder(result as OrderRow), duplicate: false };
 }
 
 /** Mark the owner WhatsApp push as delivered (best-effort; never blocks the customer reply). */

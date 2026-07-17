@@ -336,6 +336,7 @@ export type Database = {
           currency: string | null;
           paid_at: string | null;
           payment_proof: Json | null;
+          dedupe_fingerprint: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -361,6 +362,7 @@ export type Database = {
           currency?: string | null;
           paid_at?: string | null;
           payment_proof?: Json | null;
+          dedupe_fingerprint?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -386,6 +388,7 @@ export type Database = {
           currency?: string | null;
           paid_at?: string | null;
           payment_proof?: Json | null;
+          dedupe_fingerprint?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -470,6 +473,27 @@ export type Database = {
       match_knowledge_chunks: {
         Args: { p_tenant: string; p_query: string; p_k: number };
         Returns: { id: string; source: string; source_ref: string | null; content: string; distance: number }[];
+      };
+      create_order_atomic: {
+        Args: {
+          p_tenant_id: string;
+          p_session_id: string | null;
+          p_platform: Database['public']['Enums']['platform'] | null;
+          p_external_user_id: string | null;
+          p_items: Json;
+          p_customer_name: string | null;
+          p_customer_phone: string | null;
+          p_customer_address: string | null;
+          p_notes: string | null;
+          p_status: Database['public']['Enums']['order_status'];
+          p_attachments: Json | null;
+          p_payment_method: string | null;
+          p_amount_total: number | null;
+          p_currency: string | null;
+          p_fingerprint: string;
+          p_dedupe_window_minutes: number;
+        };
+        Returns: Json;
       };
     };
     Enums: {
