@@ -2,6 +2,7 @@ import { type NextRequest } from 'next/server';
 import { handleInboundMessage } from '@/services/aiOrchestrator';
 import * as tenants from '@/services/tenants';
 import { checkRateLimit } from '@/services/security/rateLimit';
+import { WIDGET_TENANT_RATE_LIMIT } from '@/lib/constants';
 
 /**
  * Website chat widget endpoint. Least-privilege channel: authenticated by a
@@ -34,9 +35,12 @@ export async function POST(req: NextRequest) {
     return json({ error: 'origin not allowed' }, 403, origin);
   }
 
-  // Rate limit per (tenant, session).
+  // Rate limit per (tenant, session), plus a tenant-wide fallback bucket —
+  // sessionKey is client-supplied, so per-session alone can be dodged by
+  // rotating it on every request.
   const rl = checkRateLimit(`${tenant.id}:${sessionKey}`);
-  if (!rl.allowed) return json({ error: 'rate limited' }, 429, origin);
+  const tenantRl = checkRateLimit(`${tenant.id}`, WIDGET_TENANT_RATE_LIMIT);
+  if (!rl.allowed || !tenantRl.allowed) return json({ error: 'rate limited' }, 429, origin);
 
   try {
     const result = await handleInboundMessage({

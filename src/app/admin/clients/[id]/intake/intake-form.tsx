@@ -16,6 +16,7 @@ type IntakeTenant = Pick<
   | 'id'
   | 'system_prompt'
   | 'catalog_data'
+  | 'catalog_freeform_text'
   | 'custom_orders_enabled'
   | 'custom_orders_require_approval'
   | 'custom_order_instructions'
@@ -137,9 +138,11 @@ const PAYMENT_METHOD_OPTIONS: Array<{ value: string; label: string; hint: string
   },
 ];
 
-export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
+export function IntakeForm({ tenant, viewer }: { tenant: IntakeTenant; viewer: 'admin' | 'client' }) {
+  const isAdmin = viewer === 'admin';
   const boundAction = updateIntakeAction.bind(null, tenant.id);
   const [state, formAction, isPending] = useActionState(boundAction, initialUpdateIntakeState);
+  const [catalogFreeform, setCatalogFreeform] = useState(tenant.catalog_freeform_text ?? '');
   const [mediaHandling, setMediaHandling] = useState(tenant.media_handling ?? 'match_catalogue');
   const [businessType, setBusinessType] = useState(tenant.business_type ?? 'product');
   const [knowledge, setKnowledge] = useState<KnowledgeBaseState>(() => parseKnowledgeBase(tenant.knowledge_base));
@@ -180,7 +183,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
     <form action={formAction} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>1. Business type</CardTitle>
+          <CardTitle>{isAdmin ? '1. Business type' : 'What kind of business is this?'}</CardTitle>
           <CardDescription>Product or service — this decides how the AI handles orders vs bookings/quotes.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -222,7 +225,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>2. Business nature</CardTitle>
+          <CardTitle>{isAdmin ? '2. Business nature' : 'Tell us about your business'}</CardTitle>
           <CardDescription>
             What the business sells, its tone, and languages. Seeds the AI&apos;s system prompt.
           </CardDescription>
@@ -240,22 +243,47 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>3. Standard catalogue</CardTitle>
-          <CardDescription>Reference data the AI answers from (JSON).</CardDescription>
+          <CardTitle>{isAdmin ? '3. Standard catalogue' : 'What do you sell?'}</CardTitle>
+          <CardDescription>
+            {isAdmin
+              ? 'Reference data the AI answers from (JSON). The client’s own words, if they’ve entered any, are shown below for reference — this box is what the AI actually reads.'
+              : 'List your items, services, or packages in your own words — prices, options, whatever you’d tell a customer. We turn this into something your AI assistant can answer questions from.'}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Textarea
-            id="catalog_data"
-            name="catalog_data"
-            rows={6}
-            defaultValue={JSON.stringify(tenant.catalog_data ?? {}, null, 2)}
-          />
+        <CardContent className="space-y-4">
+          {isAdmin ? (
+            <>
+              <Textarea
+                id="catalog_data"
+                name="catalog_data"
+                rows={6}
+                defaultValue={JSON.stringify(tenant.catalog_data ?? {}, null, 2)}
+              />
+              {tenant.catalog_freeform_text && (
+                <div className="rounded-lg border border-input bg-muted/40 p-3">
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Client&apos;s own words (read-only)</p>
+                  <p className="whitespace-pre-wrap text-sm">{tenant.catalog_freeform_text}</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <Textarea
+              id="catalog_freeform"
+              name="catalog_freeform"
+              rows={8}
+              value={catalogFreeform}
+              onChange={(e) => setCatalogFreeform(e.target.value)}
+              placeholder={
+                'e.g. Chocolate cake - Rs 2500, serves 8\nRed velvet cake - Rs 3000, serves 8\nCupcakes - Rs 150 each, minimum order of 6\nFree delivery on orders over Rs 5000'
+              }
+            />
+          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>4. Custom orders</CardTitle>
+          <CardTitle>{isAdmin ? '4. Custom orders' : 'Custom orders'}</CardTitle>
           <CardDescription>Let customers ask for a customised version of one of your items.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -282,7 +310,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>5. Customer example media</CardTitle>
+          <CardTitle>{isAdmin ? '5. Customer example media' : 'Photos & voice notes from customers'}</CardTitle>
           <CardDescription>
             How should the AI handle a picture, voice note, or video a customer sends as an example?
           </CardDescription>
@@ -309,7 +337,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>6. Approval</CardTitle>
+          <CardTitle>{isAdmin ? '6. Approval' : 'Order approval'}</CardTitle>
           <CardDescription>Should custom orders need your sign-off before they&apos;re final?</CardDescription>
         </CardHeader>
         <CardContent>
@@ -329,7 +357,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>7. Knowledge & FAQ</CardTitle>
+          <CardTitle>{isAdmin ? '7. Knowledge & FAQ' : 'Common questions'}</CardTitle>
           <CardDescription>
             Answers the AI can give straight away — delivery, returns, location, and common questions, in your
             own words.
@@ -401,7 +429,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>8. Business hours</CardTitle>
+          <CardTitle>{isAdmin ? '8. Business hours' : 'Business hours'}</CardTitle>
           <CardDescription>
             So the AI can answer &quot;are you open right now?&quot; accurately. Leave a day&apos;s times blank
             for closed.
@@ -409,7 +437,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="timezone">Timezone (IANA, e.g. Asia/Karachi)</Label>
+            <Label htmlFor="timezone">{isAdmin ? 'Timezone (IANA, e.g. Asia/Karachi)' : 'Timezone (e.g. Asia/Karachi)'}</Label>
             <Input
               id="timezone"
               value={timezone}
@@ -451,7 +479,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>9. Payments</CardTitle>
+          <CardTitle>{isAdmin ? '9. Payments' : 'Payments'}</CardTitle>
           <CardDescription>How customers pay, and what the AI is allowed to tell them about it.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -538,7 +566,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
       {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 
       <Button type="submit" disabled={isPending}>
-        {isPending ? 'Saving…' : 'Save intake config'}
+        {isPending ? 'Saving…' : isAdmin ? 'Save intake config' : 'Save business details'}
       </Button>
     </form>
   );

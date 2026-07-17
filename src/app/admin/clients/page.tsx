@@ -5,14 +5,22 @@ import { buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { EditClientDialog } from './edit-client-dialog';
+import { InviteClientDialog } from './[id]/invite/invite-client-dialog';
 import { NewClientDialog } from './new-client-dialog';
+
+const CHANNEL_LABELS: Record<string, string> = {
+  whatsapp: 'WhatsApp',
+  facebook: 'Messenger',
+  instagram: 'Instagram',
+  web: 'Website chat',
+};
 
 export default async function ClientsPage() {
   const supabase = await createSupabaseServerClient();
   const { data: tenants } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, slug, meta_page_id, instagram_id, whatsapp_phone_number_id, widget_public_key, widget_allowed_origins, system_prompt, catalog_data, is_active, created_at, openai_key_secret_id, meta_token_secret_id, whatsapp_token_secret_id',
+      'id, business_name, slug, meta_page_id, instagram_id, whatsapp_phone_number_id, widget_public_key, widget_allowed_origins, system_prompt, catalog_data, is_active, created_at, openai_key_secret_id, meta_token_secret_id, whatsapp_token_secret_id, requested_platforms, platform_setup_notes, platform_setup_requested_at',
     )
     .order('created_at', { ascending: false });
 
@@ -45,11 +53,25 @@ export default async function ClientsPage() {
                   {t.slug && <span className="ml-2 text-xs text-muted-foreground">/{t.slug}</span>}
                 </TableCell>
                 <TableCell>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1">
                     {t.whatsapp_phone_number_id && <Badge variant="secondary">WhatsApp</Badge>}
                     {t.meta_page_id && <Badge variant="secondary">Messenger</Badge>}
                     {t.instagram_id && <Badge variant="secondary">Instagram</Badge>}
                     {t.widget_public_key && <Badge variant="secondary">Web</Badge>}
+                    {t.requested_platforms.length > 0 && (
+                      <Badge
+                        variant="outline"
+                        className="border-amber-500 text-amber-600"
+                        title={
+                          (t.platform_setup_notes ? `"${t.platform_setup_notes}" — ` : '') +
+                          (t.platform_setup_requested_at
+                            ? `requested ${new Date(t.platform_setup_requested_at).toLocaleDateString()}`
+                            : '')
+                        }
+                      >
+                        Setup requested: {t.requested_platforms.map((p) => CHANNEL_LABELS[p] ?? p).join(', ')}
+                      </Badge>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -67,6 +89,7 @@ export default async function ClientsPage() {
                       Intake
                     </Link>
                     <EditClientDialog tenant={t} />
+                    <InviteClientDialog tenantId={t.id} businessName={t.business_name} />
                   </div>
                 </TableCell>
               </TableRow>

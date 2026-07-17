@@ -149,6 +149,7 @@ function PendingOrderDetail({
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="Reason for rejecting (optional)"
+          aria-label="Reason for rejecting"
           className="max-w-xs"
           disabled={isActing}
         />
@@ -301,11 +302,18 @@ export function OrdersView({
   initialOrders,
   tenants,
   realtimeAccessToken,
+  showBusinessColumn = true,
+  chatBasePath = '/admin/chat',
 }: {
   initialOrders: OrderRow[];
   tenants: TenantRow[];
   realtimeAccessToken: string | null;
+  /** Hide the "Business" column for a single-tenant view (docs/13 §8). */
+  showBusinessColumn?: boolean;
+  /** Base path for the "View chat" deep link — differs between the agency and tenant dashboards. */
+  chatBasePath?: string;
 }) {
+  const columnCount = showBusinessColumn ? 10 : 9;
   const [orders, setOrders] = useState(initialOrders);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
   const [hasMore, setHasMore] = useState(initialOrders.length === 25);
@@ -408,12 +416,12 @@ export function OrdersView({
           <TableHeader>
             <TableRow>
               <TableHead>Customer</TableHead>
-              <TableHead>Business</TableHead>
+              {showBusinessColumn && <TableHead>Business</TableHead>}
               <TableHead>Items</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Payment</TableHead>
               <TableHead>Platform</TableHead>
-              <TableHead>Notified</TableHead>
+              <TableHead title="Whether the business owner was alerted about this order">Owner alert</TableHead>
               <TableHead>Placed</TableHead>
               <TableHead className="text-right">Chat</TableHead>
               <TableHead className="text-right">Review</TableHead>
@@ -429,7 +437,7 @@ export function OrdersView({
                       <div className="text-xs font-normal text-muted-foreground">{o.customer_phone}</div>
                     )}
                   </TableCell>
-                  <TableCell>{tenantMap.get(o.tenant_id) ?? 'Unknown'}</TableCell>
+                  {showBusinessColumn && <TableCell>{tenantMap.get(o.tenant_id) ?? 'Unknown'}</TableCell>}
                   <TableCell className="max-w-xs truncate">{itemsSummary(o.items)}</TableCell>
                   <TableCell>
                     <Badge variant={STATUS_BADGE[o.status]} className="capitalize">
@@ -453,7 +461,7 @@ export function OrdersView({
                   <TableCell className="text-right">
                     {o.session_id ? (
                       <Link
-                        href={`/admin/chat?session=${o.session_id}`}
+                        href={`${chatBasePath}?session=${o.session_id}`}
                         className="text-xs text-primary underline underline-offset-2"
                       >
                         View chat
@@ -478,7 +486,7 @@ export function OrdersView({
                 </TableRow>
                 {expandedId === o.id && o.status === 'pending' && (
                   <TableRow>
-                    <TableCell colSpan={10} className="bg-muted/30 p-0">
+                    <TableCell colSpan={columnCount} className="bg-muted/30 p-0">
                       <PendingOrderDetail order={o} onDone={handleActionDone} />
                     </TableCell>
                   </TableRow>
@@ -487,7 +495,7 @@ export function OrdersView({
             ))}
             {orders.length === 0 && (
               <TableRow>
-                <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={columnCount} className="py-8 text-center text-muted-foreground">
                   No orders yet.
                 </TableCell>
               </TableRow>

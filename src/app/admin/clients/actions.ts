@@ -2,6 +2,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
+import { getCallerContext } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { setTenantSecret } from '@/lib/secrets';
 import type { Database, Json } from '@/types/database';
@@ -21,6 +22,11 @@ export async function createTenantAction(
   _prev: CreateTenantState,
   formData: FormData,
 ): Promise<CreateTenantState> {
+  const ctx = await getCallerContext();
+  if (!ctx?.isPlatformAdmin) {
+    return { error: 'Forbidden.', success: false, widgetPublicKey: null };
+  }
+
   const businessName = optionalString(formData.get('business_name'));
   if (!businessName) {
     return { error: 'Business name is required.', success: false, widgetPublicKey: null };
@@ -116,6 +122,11 @@ export async function updateTenantAction(
   _prev: UpdateTenantState,
   formData: FormData,
 ): Promise<UpdateTenantState> {
+  const ctx = await getCallerContext();
+  if (!ctx?.isPlatformAdmin) {
+    return { error: 'Forbidden.', success: false };
+  }
+
   const businessName = optionalString(formData.get('business_name'));
   if (!businessName) {
     return { error: 'Business name is required.', success: false };

@@ -52,6 +52,7 @@ export type Database = {
           shopify_store_url: string | null;
           system_prompt: string;
           catalog_data: Json;
+          catalog_freeform_text: string | null;
           llm_provider: string;
           llm_model: string;
           openai_key_secret_id: string | null;
@@ -79,6 +80,9 @@ export type Database = {
           payment_key_secret_id: string | null;
           default_currency: string;
           prepaid_required: boolean;
+          requested_platforms: string[];
+          platform_setup_notes: string | null;
+          platform_setup_requested_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -93,6 +97,7 @@ export type Database = {
           shopify_store_url?: string | null;
           system_prompt?: string;
           catalog_data?: Json;
+          catalog_freeform_text?: string | null;
           llm_provider?: string;
           llm_model?: string;
           openai_key_secret_id?: string | null;
@@ -120,6 +125,9 @@ export type Database = {
           payment_key_secret_id?: string | null;
           default_currency?: string;
           prepaid_required?: boolean;
+          requested_platforms?: string[];
+          platform_setup_notes?: string | null;
+          platform_setup_requested_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -134,6 +142,7 @@ export type Database = {
           shopify_store_url?: string | null;
           system_prompt?: string;
           catalog_data?: Json;
+          catalog_freeform_text?: string | null;
           llm_provider?: string;
           llm_model?: string;
           openai_key_secret_id?: string | null;
@@ -161,6 +170,9 @@ export type Database = {
           payment_key_secret_id?: string | null;
           default_currency?: string;
           prepaid_required?: boolean;
+          requested_platforms?: string[];
+          platform_setup_notes?: string | null;
+          platform_setup_requested_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

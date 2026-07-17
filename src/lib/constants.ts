@@ -35,8 +35,15 @@ export const SIGNAL_TOKENS = {
   cancellation_risk: '[SIGNAL_CANCELLATION_RISK]',
 } as const satisfies Record<import('@/types/domain').AlertSignal, string>;
 
-/** Website widget rate limiting. */
+/** Website widget rate limiting, keyed per (tenant, session). */
 export const WIDGET_RATE_LIMIT = { windowMs: 60_000, max: 20 } as const;
+
+/**
+ * Tenant-wide fallback bucket for the website widget. sessionKey is entirely
+ * client-supplied, so a caller can rotate it per request to dodge WIDGET_RATE_LIMIT
+ * — this bounds aggregate spend per tenant regardless of how sessionKey is set.
+ */
+export const WIDGET_TENANT_RATE_LIMIT = { windowMs: 60_000, max: 120 } as const;
 
 /** Max characters accepted from a single inbound customer message (post-sanitise cap). */
 export const MAX_INBOUND_CHARS = 4000;

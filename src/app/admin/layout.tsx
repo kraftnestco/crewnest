@@ -1,23 +1,21 @@
 import { redirect } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getCallerContext } from '@/lib/auth/context';
 import { Button } from '@/components/ui/button';
 import { signOutAction } from './actions';
 import { AdminNav } from './admin-nav';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createSupabaseServerClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
+  const ctx = await getCallerContext();
+  if (!ctx) {
     redirect('/login');
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('email, full_name, is_platform_admin')
-    .eq('id', userData.user.id)
-    .single();
+  if (ctx.memberships.length > 0 && !ctx.isPlatformAdmin) {
+    // A tenant-scoped client hit an agency URL — send them to their own dashboard.
+    redirect('/dashboard');
+  }
 
-  if (!profile?.is_platform_admin) {
+  if (!ctx.isPlatformAdmin) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="w-full max-w-sm rounded-xl bg-card p-6 text-center ring-1 ring-foreground/10">
@@ -44,9 +42,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
         <AdminNav />
         <div className="border-t border-sidebar-border p-3">
-          <p className="truncate px-1 text-xs text-muted-foreground">
-            {profile.full_name || profile.email}
-          </p>
+          <p className="truncate px-1 text-xs text-muted-foreground">{ctx.fullName || ctx.email}</p>
           <form action={signOutAction} className="mt-2">
             <Button type="submit" variant="outline" size="sm" className="w-full">
               Sign out

@@ -2,9 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
+import { assertTenantAccess, getCallerContext } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import * as tenants from '@/services/tenants';
 import { ingestTenantKnowledge } from '@/services/knowledge';
+import { parseCatalogueFreeform } from '@/services/ai/catalogueParser';
 import type { Json } from '@/types/database';
 
 /**
@@ -30,8 +32,18 @@ export async function updateIntakeAction(
   _prev: UpdateIntakeState,
   formData: FormData,
 ): Promise<UpdateIntakeState> {
+  const ctx = await getCallerContext();
+  if (!ctx) return { error: 'Unauthorized.', success: false };
+  try {
+    assertTenantAccess(ctx, tenantId);
+  } catch {
+    return { error: 'Forbidden: tenant not accessible.', success: false };
+  }
+  if (!ctx.isPlatformAdmin && !ctx.memberships.some((m) => m.tenantId === tenantId && m.role === 'tenant_admin')) {
+    return { error: 'Forbidden: only a tenant admin may edit business settings.', success: false };
+  }
+
   const systemPrompt = String(formData.get('system_prompt') ?? '');
-  const catalogRaw = String(formData.get('catalog_data') ?? '').trim();
   const customOrderInstructions = String(formData.get('custom_order_instructions') ?? '').trim() || null;
   const mediaHandlingRaw = String(formData.get('media_handling') ?? 'match_catalogue');
   const mediaHandling = (MEDIA_HANDLING_VALUES as readonly string[]).includes(mediaHandlingRaw)
@@ -54,12 +66,30 @@ export async function updateIntakeAction(
   const defaultCurrency = String(formData.get('default_currency') ?? '').trim() || 'PKR';
   const prepaidRequired = formData.get('prepaid_required') === 'on';
 
+  // Admins edit catalog_data as raw JSON directly; clients describe their
+  // catalogue in plain language and we derive the JSON the AI actually reads
+  // (docs/13 §9 follow-up — clients are non-technical, JSON stays admin-only).
   let catalogData: Json = {};
-  if (catalogRaw) {
-    try {
-      catalogData = JSON.parse(catalogRaw) as Json;
-    } catch {
-      return { error: 'Catalogue must be valid JSON.', success: false };
+  let catalogFreeformText: string | null = null;
+  if (ctx.isPlatformAdmin) {
+    const catalogRaw = String(formData.get('catalog_data') ?? '').trim();
+    if (catalogRaw) {
+      try {
+        catalogData = JSON.parse(catalogRaw) as Json;
+      } catch {
+        return { error: 'Catalogue must be valid JSON.', success: false };
+      }
+    }
+  } else {
+    catalogFreeformText = String(formData.get('catalog_freeform') ?? '').trim() || null;
+    if (catalogFreeformText) {
+      const tenant = await tenants.getById(tenantId);
+      if (!tenant) return { error: 'Tenant not found.', success: false };
+      try {
+        catalogData = await parseCatalogueFreeform(tenant, catalogFreeformText);
+      } catch {
+        return { error: "Couldn't process your catalogue text — please try again.", success: false };
+      }
     }
   }
 
@@ -101,6 +131,9 @@ export async function updateIntakeAction(
       payment_instructions: paymentInstructions,
       default_currency: defaultCurrency,
       prepaid_required: prepaidRequired,
+      // Only set on the client path — an admin's JSON save must never wipe
+      // the client's stored freeform text back to null.
+      ...(ctx.isPlatformAdmin ? {} : { catalog_freeform_text: catalogFreeformText }),
     })
     .eq('id', tenantId);
 
@@ -120,5 +153,6 @@ export async function updateIntakeAction(
 
   revalidatePath('/admin/clients');
   revalidatePath(`/admin/clients/${tenantId}/intake`);
+  revalidatePath('/dashboard/business');
   return { error: null, success: true };
 }

@@ -25,6 +25,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Only guard the dashboard. Public routes, API webhooks, and the widget are unaffected.
-  matcher: ['/admin/:path*'],
+  // Guard both the agency and tenant dashboards. Public routes, API webhooks, and the widget are unaffected.
+  matcher: ['/admin/:path*', '/dashboard/:path*'],
 };

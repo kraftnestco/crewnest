@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>KraftNest Automations</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #101828;
+    background: #f7f8fb;
+  }
+  header {
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #e4e7ec;
+    background: #fff;
+  }
+  header .brand { font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
+  header nav a {
+    margin-left: 24px;
+    color: #475467;
+    text-decoration: none;
+    font-size: 14px;
+  }
+  .hero {
+    padding: 72px 32px;
+    max-width: 760px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .hero h1 { font-size: 40px; margin: 0 0 12px; letter-spacing: -0.02em; }
+  .hero p { color: #475467; font-size: 17px; line-height: 1.5; margin: 0 auto 28px; max-width: 560px; }
+  .pill {
+    display: inline-block;
+    background: #eef4ff;
+    color: #3538cd;
+    border: 1px solid #c7d7fe;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 18px;
+  }
+  .services {
+    max-width: 900px;
+    margin: 0 auto 56px;
+    padding: 0 32px;
+  }
+  .services h2 { font-size: 22px; margin-bottom: 16px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #e4e7ec;
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .card .name { font-weight: 600; font-size: 15px; margin-bottom: 6px; }
+  .card .desc { color: #475467; font-size: 13px; line-height: 1.5; }
+  .pricing {
+    max-width: 900px;
+    margin: 0 auto 56px;
+    padding: 0 32px;
+  }
+  .pricing h2 { font-size: 22px; margin-bottom: 16px; }
+  .tier {
+    background: #fff;
+    border: 1px solid #e4e7ec;
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .tier.recommended { border-color: #3538cd; box-shadow: 0 0 0 1px #3538cd; }
+  .tier .name { font-weight: 700; font-size: 15px; }
+  .tier .price { color: #3538cd; font-weight: 600; font-size: 14px; margin: 4px 0 10px; }
+  .tier ul { margin: 0; padding-left: 18px; color: #475467; font-size: 13px; line-height: 1.6; }
+  .callout {
+    max-width: 640px;
+    margin: 0 auto 80px;
+    padding: 20px 24px;
+    background: #fff;
+    border: 1px dashed #c7d7fe;
+    border-radius: 14px;
+    text-align: center;
+    color: #475467;
+    font-size: 14px;
+  }
+  .callout b { color: #101828; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">⚙️ KraftNest Automations</div>
+    <nav>
+      <a href="#services">Services</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#">Contact</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <span class="pill">CrewNest client demo</span>
+    <h1>AI employees for calls, chat, and workflows</h1>
+    <p>
+      This is a mock storefront for "KraftNest Automations" — used only to demo the CrewNest AI chat
+      widget. Click the chat bubble in the bottom-right corner and ask about services, pricing, or
+      timelines.
+    </p>
+  </div>
+
+  <div class="services" id="services">
+    <h2>Services</h2>
+    <div class="grid">
+      <div class="card"><div class="name">Web Development</div><div class="desc">Conversion-focused websites integrated with AI employees, featuring booking, payment, and API integrations.</div></div>
+      <div class="card"><div class="name">AI Voice Receptionist</div><div class="desc">Handles inbound calls 24/7, books appointments, qualifies callers, and routes urgent calls to staff.</div></div>
+      <div class="card"><div class="name">AI Sales Rep (SDR)</div><div class="desc">Engages website visitors via live chat, qualifies leads, and auto-schedules discovery meetings.</div></div>
+      <div class="card"><div class="name">AI Support Agent</div><div class="desc">Resolves customer questions across website, WhatsApp, and email; escalates complex issues to humans.</div></div>
+      <div class="card"><div class="name">AI Ops Assistant</div><div class="desc">Syncs CRM, spreadsheets, and tools; auto-updates records and sends team alerts.</div></div>
+      <div class="card"><div class="name">AI Outreach Agent</div><div class="desc">Researches prospects and executes personalized cold outreach sequences across email and LinkedIn.</div></div>
+    </div>
+  </div>
+
+  <div class="pricing" id="pricing">
+    <h2>Pricing</h2>
+    <div class="grid">
+      <div class="tier">
+        <div class="name">Starter</div>
+        <div class="price">from $999/project</div>
+        <ul>
+          <li>1 AI employee (chatbot, voice, or workflow)</li>
+          <li>Deployed on website or WhatsApp</li>
+          <li>2 tool integrations</li>
+          <li>30-day post-launch support</li>
+        </ul>
+      </div>
+      <div class="tier recommended">
+        <div class="name">Growth</div>
+        <div class="price">from $2,499/project</div>
+        <ul>
+          <li>Up to 5 automation workflows</li>
+          <li>AI agent + voice receptionist</li>
+          <li>Full CRM & tool integration</li>
+          <li>Custom web development included</li>
+          <li>90-day support & maintenance</li>
+        </ul>
+      </div>
+      <div class="tier">
+        <div class="name">Enterprise</div>
+        <div class="price">Custom</div>
+        <ul>
+          <li>Unlimited workflows & AI employees</li>
+          <li>Dedicated project manager</li>
+          <li>Priority build & deployment</li>
+          <li>Ongoing retainer support</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    Try asking the chat: <b>"How much is the Growth plan?"</b> or <b>"How long does a voice agent take
+    to launch?"</b> — the AI answers using KraftNest Automations' real system prompt and catalogue, no
+    scripting involved.
+  </div>
+
+  <script
+    src="/embed/widget.js"
+    data-crewnest-key="pk_live_c3f73b9883754e193b070ed3da6fcd0b"
+    data-crewnest-title="Chat with KraftNest Automations"
+    defer
+  ></script>
+</body>
+</html>

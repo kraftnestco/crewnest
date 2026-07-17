@@ -23,5 +23,7 @@ export async function signInAction(_prev: SignInState, formData: FormData): Prom
     return { error: 'Invalid email or password.' };
   }
 
-  redirect(redirectTo.startsWith('/') ? redirectTo : '/admin');
+  // `//host` is scheme-relative — browsers treat it as an external redirect, so
+  // a bare `startsWith('/')` check alone is an open redirect.
+  redirect(redirectTo.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/admin');
 }

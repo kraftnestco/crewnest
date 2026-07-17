@@ -1,0 +1,87 @@
+'use server';
+
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
+import { assertTenantAccess, getCallerContext } from '@/lib/auth/context';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+
+/** Switches the active tenant for a multi-membership caller. Validated server-side against ctx.memberships. */
+export async function setActiveTenantAction(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get('tenant_id') ?? '');
+  const ctx = await getCallerContext();
+  if (!ctx || !ctx.memberships.some((m) => m.tenantId === tenantId)) {
+    return;
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set('cn_active_tenant', tenantId, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    path: '/',
+  });
+  redirect('/dashboard');
+}
+
+export interface RequestPlatformSetupState {
+  error: string | null;
+  success: boolean;
+}
+
+export const initialRequestPlatformSetupState: RequestPlatformSetupState = { error: null, success: false };
+
+/** Mirrors the `platform` DB enum (Database['public']['Enums']['platform'], minus 'voice') so the
+ *  request UI can reuse the same labels/colors as the inbox. */
+export const PLATFORM_CHANNEL_VALUES = ['whatsapp', 'facebook', 'instagram', 'web'] as const;
+export type PlatformChannel = (typeof PLATFORM_CHANNEL_VALUES)[number];
+
+/**
+ * Client-initiated "please connect these channels" request — collects no
+ * secrets (CLAUDE.md locked decision #2). Writes only the three narrow
+ * columns added by migration 0019, on the caller's own tenant. Covered by
+ * the existing tenants_update_self RLS policy (0018), which is why this
+ * action — not a service-role write — is the sole writer for these columns.
+ */
+export async function requestPlatformSetupAction(
+  tenantId: string,
+  _prev: RequestPlatformSetupState,
+  formData: FormData,
+): Promise<RequestPlatformSetupState> {
+  const ctx = await getCallerContext();
+  if (!ctx) return { error: 'Unauthorized.', success: false };
+  try {
+    assertTenantAccess(ctx, tenantId);
+  } catch {
+    return { error: 'Forbidden: tenant not accessible.', success: false };
+  }
+  if (!ctx.memberships.some((m) => m.tenantId === tenantId && m.role === 'tenant_admin')) {
+    return { error: 'Forbidden: only a business owner may request channel setup.', success: false };
+  }
+
+  const requestedPlatforms = formData
+    .getAll('platforms')
+    .map(String)
+    .filter((p): p is PlatformChannel => (PLATFORM_CHANNEL_VALUES as readonly string[]).includes(p));
+  const notes = String(formData.get('notes') ?? '').trim() || null;
+
+  if (requestedPlatforms.length === 0) {
+    return { error: 'Pick at least one channel to request.', success: false };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from('tenants')
+    .update({
+      requested_platforms: requestedPlatforms,
+      platform_setup_notes: notes,
+      platform_setup_requested_at: new Date().toISOString(),
+    })
+    .eq('id', tenantId);
+
+  if (error) return { error: error.message, success: false };
+
+  revalidatePath('/dashboard/business');
+  revalidatePath('/admin/clients');
+  return { error: null, success: true };
+}
