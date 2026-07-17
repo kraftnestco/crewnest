@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import type { Database } from '@/types/database';
-import { initialUpdateIntakeState, updateIntakeAction } from './actions';
+import { updateIntakeAction } from './actions';
+import { initialUpdateIntakeState } from './intake-state';
 
 type IntakeTenant = Pick<
   Database['public']['Tables']['tenants']['Row'],

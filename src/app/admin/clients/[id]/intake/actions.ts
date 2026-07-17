@@ -8,19 +8,13 @@ import * as tenants from '@/services/tenants';
 import { ingestTenantKnowledge } from '@/services/knowledge';
 import { parseCatalogueFreeform } from '@/services/ai/catalogueParser';
 import type { Json } from '@/types/database';
+import type { UpdateIntakeState } from './intake-state';
 
 /**
  * Writes the Stage-E intake wizard fields (docs/10-CUSTOM-ORDERS-MEDIA-AND-INTAKE.md §3.1).
  * Agency-operated today; the same action becomes the client's self-serve save
  * once Phase-2 client logins land — no rewrite (docs/10 §9).
  */
-
-export interface UpdateIntakeState {
-  error: string | null;
-  success: boolean;
-}
-
-export const initialUpdateIntakeState: UpdateIntakeState = { error: null, success: false };
 
 const MEDIA_HANDLING_VALUES = ['match_catalogue', 'accept_any', 'reject'] as const;
 const BUSINESS_TYPE_VALUES = ['product', 'service'] as const;

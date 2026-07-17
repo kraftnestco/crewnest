@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { assertTenantAccess, getCallerContext } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { PLATFORM_CHANNEL_VALUES, type PlatformChannel, type RequestPlatformSetupState } from './action-state';
 
 /** Switches the active tenant for a multi-membership caller. Validated server-side against ctx.memberships. */
 export async function setActiveTenantAction(formData: FormData): Promise<void> {
@@ -23,18 +24,6 @@ export async function setActiveTenantAction(formData: FormData): Promise<void> {
   });
   redirect('/dashboard');
 }
-
-export interface RequestPlatformSetupState {
-  error: string | null;
-  success: boolean;
-}
-
-export const initialRequestPlatformSetupState: RequestPlatformSetupState = { error: null, success: false };
-
-/** Mirrors the `platform` DB enum (Database['public']['Enums']['platform'], minus 'voice') so the
- *  request UI can reuse the same labels/colors as the inbox. */
-export const PLATFORM_CHANNEL_VALUES = ['whatsapp', 'facebook', 'instagram', 'web'] as const;
-export type PlatformChannel = (typeof PLATFORM_CHANNEL_VALUES)[number];
 
 /**
  * Client-initiated "please connect these channels" request — collects no
