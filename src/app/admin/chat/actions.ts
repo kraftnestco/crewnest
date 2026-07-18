@@ -80,19 +80,33 @@ export async function manualSendAction(sessionId: string, text: string): Promise
     throw new Error(sessionError?.message ?? 'Session not found.');
   }
 
-  const { error: insertError } = await supabase.from('chat_messages').insert({
-    session_id: session.id,
-    tenant_id: session.tenant_id,
-    role: 'assistant',
-    content: trimmed,
-  });
+  const { data: inserted, error: insertError } = await supabase
+    .from('chat_messages')
+    .insert({
+      session_id: session.id,
+      tenant_id: session.tenant_id,
+      role: 'assistant',
+      content: trimmed,
+    })
+    .select('id')
+    .single();
 
   if (insertError) throw new Error(insertError.message);
 
   if (session.platform !== 'web') {
     const tenant = await tenants.getById(session.tenant_id);
     if (tenant) {
-      await sendText({ tenant, platform: session.platform, to: session.external_user_id, text: trimmed });
+      try {
+        await sendText({ tenant, platform: session.platform, to: session.external_user_id, text: trimmed });
+      } catch (err) {
+        console.error('[chat] manual send failed', {
+          sessionId: session.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        if (inserted?.id) {
+          await supabase.from('chat_messages').update({ delivery_failed: true }).eq('id', inserted.id);
+        }
+      }
     }
   }
 }

@@ -17,12 +17,16 @@ const CHANNEL_LABELS: Record<string, string> = {
 
 export default async function ClientsPage() {
   const supabase = await createSupabaseServerClient();
-  const { data: tenants } = await supabase
+  const { data: tenants, error } = await supabase
     .from('tenants')
     .select(
       'id, business_name, slug, meta_page_id, instagram_id, whatsapp_phone_number_id, widget_public_key, widget_allowed_origins, system_prompt, catalog_data, is_active, created_at, openai_key_secret_id, meta_token_secret_id, whatsapp_token_secret_id, requested_platforms, platform_setup_notes, platform_setup_requested_at',
     )
     .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[admin/clients] tenants lookup failed', error.message);
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -94,7 +98,14 @@ export default async function ClientsPage() {
                 </TableCell>
               </TableRow>
             ))}
-            {(!tenants || tenants.length === 0) && (
+            {error && (
+              <TableRow>
+                <TableCell colSpan={5} className="py-8 text-center text-destructive">
+                  Couldn&apos;t load clients — please refresh and try again.
+                </TableCell>
+              </TableRow>
+            )}
+            {!error && (!tenants || tenants.length === 0) && (
               <TableRow>
                 <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                   No clients yet — create your first one.

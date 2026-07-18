@@ -41,13 +41,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const activeMembership = ctx.memberships.find((m) => m.tenantId === activeTenantId);
 
   const supabase = await createSupabaseServerClient();
-  const { data: memberTenants } = await supabase
+  const { data: memberTenants, error: tenantsError } = await supabase
     .from('tenants')
     .select('id, business_name')
     .in(
       'id',
       ctx.memberships.map((m) => m.tenantId),
     );
+  if (tenantsError) {
+    console.error('[dashboard/layout] member tenants lookup failed', { userId: ctx.userId, error: tenantsError.message });
+  }
   const tenantNameMap = new Map((memberTenants ?? []).map((t) => [t.id, t.business_name]));
   const activeTenantName = activeTenantId ? (tenantNameMap.get(activeTenantId) ?? 'My Business') : 'My Business';
 

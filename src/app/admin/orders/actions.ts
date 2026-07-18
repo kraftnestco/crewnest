@@ -124,17 +124,33 @@ export async function approveOrderAction(orderId: string): Promise<void> {
 
   // Customer confirmation — mirrors manualSendAction's chat_messages insert + sendText pattern.
   const confirmText = `Your order is confirmed — order #${order.id}.`;
+  let confirmMessageId: string | null = null;
   if (order.session_id) {
-    const { error: insertError } = await supabase.from('chat_messages').insert({
-      session_id: order.session_id,
-      tenant_id: order.tenant_id,
-      role: 'assistant',
-      content: confirmText,
-    });
+    const { data: inserted, error: insertError } = await supabase
+      .from('chat_messages')
+      .insert({
+        session_id: order.session_id,
+        tenant_id: order.tenant_id,
+        role: 'assistant',
+        content: confirmText,
+      })
+      .select('id')
+      .single();
     if (insertError) throw new Error(insertError.message);
+    confirmMessageId = inserted?.id ?? null;
   }
   if (tenant && order.platform && order.platform !== 'web' && order.external_user_id) {
-    await sendText({ tenant, platform: order.platform, to: order.external_user_id, text: confirmText });
+    try {
+      await sendText({ tenant, platform: order.platform, to: order.external_user_id, text: confirmText });
+    } catch (err) {
+      console.error('[orders] customer confirm send failed (approve)', {
+        orderId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      if (confirmMessageId) {
+        await supabase.from('chat_messages').update({ delivery_failed: true }).eq('id', confirmMessageId);
+      }
+    }
   }
 
   revalidatePath('/admin/orders');

@@ -37,6 +37,7 @@ export async function getLlmKey(
   if (tenant.openaiKeySecretId) {
     const key = await getTenantSecret(tenant.openaiKeySecretId);
     if (key) return { key, usedByok: true };
+    console.warn(`[secrets] BYOK secret ${tenant.openaiKeySecretId} configured but unreadable — falling back to master LLM key`);
   }
   if (tenant.llmProvider === 'openrouter') {
     if (!env.MASTER_OPENROUTER_KEY) {
@@ -57,6 +58,7 @@ export async function getTranscriptionKey(
   if (tenant.openaiKeySecretId) {
     const key = await getTenantSecret(tenant.openaiKeySecretId);
     if (key) return { key, usedByok: true };
+    console.warn(`[secrets] BYOK secret ${tenant.openaiKeySecretId} configured but unreadable — falling back to master OpenAI key`);
   }
   return { key: env.MASTER_OPENAI_KEY, usedByok: false };
 }

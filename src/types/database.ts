@@ -245,6 +245,7 @@ export type Database = {
           provider_msg_id: string | null;
           token_count: number | null;
           attachments: Json | null;
+          delivery_failed: boolean;
           created_at: string;
         };
         Insert: {
@@ -256,6 +257,7 @@ export type Database = {
           provider_msg_id?: string | null;
           token_count?: number | null;
           attachments?: Json | null;
+          delivery_failed?: boolean;
           created_at?: string;
         };
         Update: {
@@ -267,6 +269,7 @@ export type Database = {
           provider_msg_id?: string | null;
           token_count?: number | null;
           attachments?: Json | null;
+          delivery_failed?: boolean;
           created_at?: string;
         };
         Relationships: [];

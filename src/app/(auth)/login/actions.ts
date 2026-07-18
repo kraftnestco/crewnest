@@ -31,11 +31,22 @@ export async function signInAction(_prev: SignInState, formData: FormData): Prom
   const wantsAdmin = redirectTo.startsWith('/admin');
   const wantsClient = redirectTo.startsWith('/dashboard');
   if (wantsAdmin || wantsClient) {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('is_platform_admin')
       .eq('id', signIn.user?.id ?? '')
       .single();
+
+    // Don't let a failed lookup read as "confirmed not an admin" — that produces a
+    // specific, wrong-sounding rejection for what's actually a DB/lookup error.
+    if (profileError) {
+      console.error('[auth] signInAction profile lookup failed', {
+        userId: signIn.user?.id,
+        error: profileError.message,
+      });
+      await supabase.auth.signOut();
+      return { error: 'Something went wrong verifying your account. Please try again.' };
+    }
     const isAdmin = profile?.is_platform_admin ?? false;
 
     if (wantsAdmin && !isAdmin) {

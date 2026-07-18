@@ -7,11 +7,15 @@ import { Badge } from '@/components/ui/badge';
 
 export default async function SettingsPage() {
   const supabase = await createSupabaseServerClient();
-  const { data: admins } = await supabase
+  const { data: admins, error } = await supabase
     .from('profiles')
     .select('id, email, full_name, is_platform_admin, created_at')
     .eq('is_platform_admin', true)
     .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('[admin/settings] platform admins lookup failed', error.message);
+  }
 
   const systemInfo = [
     { label: 'Default LLM provider / model', value: `${DEFAULT_LLM_PROVIDER} / ${DEFAULT_LLM_MODEL}` },
@@ -71,7 +75,14 @@ export default async function SettingsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {(!admins || admins.length === 0) && (
+              {error && (
+                <TableRow>
+                  <TableCell colSpan={3} className="py-8 text-center text-destructive">
+                    Couldn&apos;t load platform admins — please refresh and try again.
+                  </TableCell>
+                </TableRow>
+              )}
+              {!error && (!admins || admins.length === 0) && (
                 <TableRow>
                   <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
                     No platform admins found.

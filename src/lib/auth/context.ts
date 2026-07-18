@@ -24,11 +24,27 @@ export const getCallerContext = cache(async (): Promise<CallerContext | null> =>
   } = await supabase.auth.getUser(); // getUser, not getSession — verified server-side
   if (!user) return null;
 
-  const [{ data: profile }, { data: memberships }] = await Promise.all([
+  const [
+    { data: profile, error: profileError },
+    { data: memberships, error: membershipsError },
+  ] = await Promise.all([
     supabase.from('profiles').select('email, full_name, is_platform_admin').eq('id', user.id).single(),
     // user_tenants_select RLS already returns only the caller's own rows.
     supabase.from('user_tenants').select('tenant_id, role').eq('user_id', user.id),
   ]);
+
+  // A failed lookup here must never be read as "confirmed not an admin, no
+  // memberships" — that's indistinguishable from a real unprivileged user and
+  // silently locks a real admin/client out with a misleading "Forbidden"/
+  // "Access pending" screen instead of a visible error. Throw so it surfaces.
+  if (profileError || membershipsError) {
+    console.error('[auth] getCallerContext lookup failed', {
+      userId: user.id,
+      profileError: profileError?.message,
+      membershipsError: membershipsError?.message,
+    });
+    throw new Error('Failed to resolve account access. Please try again.');
+  }
 
   return {
     userId: user.id,

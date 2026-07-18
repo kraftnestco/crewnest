@@ -134,6 +134,14 @@ export function ConversationPane({
           setMessages((prev) => [...prev, payload.new as MessageRow]);
         },
       )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'chat_messages', filter: `session_id=eq.${session.id}` },
+        (payload) => {
+          const updated = payload.new as MessageRow;
+          setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+        },
+      )
       .subscribe();
 
     return () => {
@@ -225,6 +233,9 @@ export function ConversationPane({
                       </div>
                     )}
                     {m.content}
+                    {m.delivery_failed && (
+                      <p className="mt-1 text-xs font-medium text-destructive">Not delivered — customer may not have received this.</p>
+                    )}
                   </div>
                 </div>
               );

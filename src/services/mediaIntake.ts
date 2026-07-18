@@ -60,7 +60,13 @@ export async function processInboundMedia(
     if (raw.kind === 'image') {
       if (tenant.mediaHandling === 'reject') continue;
       const downloaded = await media.download(raw, tenant, session.id, session.platform);
-      if (!downloaded) continue;
+      if (!downloaded) {
+        textNotes.push(
+          '[System note: the customer sent an image but it failed to download — tell them it didn\'t come ' +
+            'through and ask them to resend it.]',
+        );
+        continue;
+      }
       attachments.push({ kind: 'image', storagePath: downloaded.storagePath, mimeType: downloaded.mimeType });
 
       // K1 (docs/11 §3.3.1 B): proof beats example — a session-scoped, server-decided
@@ -92,7 +98,13 @@ export async function processInboundMedia(
     if (raw.kind === 'audio') {
       const { key } = await getTranscriptionKey(tenant);
       const result = await transcribeService.transcribe(raw, tenant, session.id, session.platform, key);
-      if (!result) continue;
+      if (!result) {
+        textNotes.push(
+          '[System note: the customer sent a voice note but it could not be transcribed — tell them it ' +
+            "didn't come through and ask them to resend it or type their message.]",
+        );
+        continue;
+      }
       attachments.push({ kind: 'audio', storagePath: result.storagePath, mimeType: result.mimeType });
       textNotes.push(sanitizeInbound(result.transcript));
       continue;
@@ -101,7 +113,13 @@ export async function processInboundMedia(
     if (raw.kind === 'video') {
       if (tenant.mediaHandling === 'reject') continue;
       const downloaded = await media.download(raw, tenant, session.id, session.platform);
-      if (!downloaded) continue;
+      if (!downloaded) {
+        textNotes.push(
+          '[System note: the customer sent a video but it failed to download — tell them it didn\'t come ' +
+            'through and ask them to resend it.]',
+        );
+        continue;
+      }
       attachments.push({ kind: 'video', storagePath: downloaded.storagePath, mimeType: downloaded.mimeType });
       textNotes.push(
         '[System note: the customer sent a video. Video is not analysed automatically — ask them ' +
