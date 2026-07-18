@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,17 +15,24 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [forgotState, forgotAction, forgotPending] = useActionState(requestPasswordResetAction, initialForgotState);
   const [mode, setMode] = useState<'sign-in' | 'forgot' | 'invite'>('sign-in');
   const [forgotEmail, setForgotEmail] = useState('');
+  // Tracks whether to show the code-entry step, separately from
+  // forgotState.sent — that flag never resets once true, which would
+  // otherwise strand the user on the code screen with no way to request a
+  // fresh one (e.g. after the first code expires or they left and came back).
+  const [codeRequested, setCodeRequested] = useState(false);
+
+  useEffect(() => {
+    if (forgotState.sent) setCodeRequested(true);
+  }, [forgotState]);
+
+  function backToSignIn() {
+    setMode('sign-in');
+    setCodeRequested(false);
+  }
 
   if (mode === 'forgot') {
-    if (forgotState.sent) {
-      return (
-        <VerifyCodeForm
-          type="recovery"
-          email={forgotEmail}
-          redirectTo={redirectTo}
-          onBack={() => setMode('sign-in')}
-        />
-      );
+    if (codeRequested) {
+      return <VerifyCodeForm type="recovery" email={forgotEmail} redirectTo={redirectTo} onBack={backToSignIn} />;
     }
 
     return (
@@ -51,7 +58,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
 
         <button
           type="button"
-          onClick={() => setMode('sign-in')}
+          onClick={backToSignIn}
           className="text-sm text-muted-foreground underline underline-offset-2"
         >
           Back to sign in
