@@ -22,6 +22,10 @@ export default function AuthCallbackPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
+  // One client for the whole page — setSession and the later updateUser() call
+  // must share the same in-memory session state rather than each reading
+  // storage fresh from a brand-new instance.
+  const [supabase] = useState(() => createSupabaseBrowserClient());
 
   useEffect(() => {
     const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
@@ -39,7 +43,6 @@ export default function AuthCallbackPage() {
       return;
     }
 
-    const supabase = createSupabaseBrowserClient();
     supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken }).then(({ error: sessionError }) => {
       if (sessionError) {
         setError('This link is invalid or has expired.');
@@ -64,7 +67,7 @@ export default function AuthCallbackPage() {
       // re-reads the real cookies.
       window.location.assign(resolvedNext);
     });
-  }, []);
+  }, [supabase]);
 
   async function handleSetPassword(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -80,7 +83,6 @@ export default function AuthCallbackPage() {
     }
 
     setSaving(true);
-    const supabase = createSupabaseBrowserClient();
     const { error: updateError } = await supabase.auth.updateUser({ password });
     setSaving(false);
 

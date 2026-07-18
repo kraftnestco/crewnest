@@ -2,9 +2,45 @@
 
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { env } from '@/lib/env';
 
 export interface SignInState {
   error: string | null;
+}
+
+export interface ForgotPasswordState {
+  error: string | null;
+  sent: boolean;
+}
+
+/**
+ * Self-serve password reset, triggered by the account holder themselves from
+ * the login page — not by an admin on their behalf (see invite/actions.ts).
+ * Always reports success regardless of whether the email is registered, so
+ * this can't be used to enumerate accounts.
+ */
+export async function requestPasswordResetAction(
+  _prev: ForgotPasswordState,
+  formData: FormData,
+): Promise<ForgotPasswordState> {
+  const email = String(formData.get('email') ?? '').trim().toLowerCase();
+  if (!email) return { error: 'Email is required.', sent: false };
+
+  const redirectRaw = String(formData.get('redirect') ?? '/dashboard');
+  const next = redirectRaw.startsWith('/') && !redirectRaw.startsWith('//') ? redirectRaw : '/dashboard';
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent(next)}`,
+  });
+
+  // GoTrue itself doesn't reveal whether the email exists (it "succeeds" either
+  // way); only report an error for genuine failures (rate limit, bad config).
+  if (error) {
+    return { error: 'Something went wrong sending the reset link. Please try again shortly.', sent: false };
+  }
+
+  return { error: null, sent: true };
 }
 
 export async function signInAction(_prev: SignInState, formData: FormData): Promise<SignInState> {

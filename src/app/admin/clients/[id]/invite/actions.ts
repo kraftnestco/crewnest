@@ -23,11 +23,11 @@ export async function inviteClientLoginAction(
 ): Promise<InviteClientState> {
   const ctx = await getCallerContext();
   if (!ctx?.isPlatformAdmin) {
-    return { error: 'Forbidden.', success: false, resent: false };
+    return { error: 'Forbidden.', success: false, alreadyRegistered: false };
   }
 
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
-  if (!email) return { error: 'Email is required.', success: false, resent: false };
+  if (!email) return { error: 'Email is required.', success: false, alreadyRegistered: false };
 
   const roleRaw = String(formData.get('role') ?? 'tenant_admin');
   const role = (
@@ -35,43 +35,37 @@ export async function inviteClientLoginAction(
   ) as Database['public']['Enums']['member_role'];
 
   const svc = createServiceClient();
-  const redirectTo = `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/dashboard`;
 
   // A client may already have a login (e.g. staff added to a second tenant, or
-  // a prior invite link expired unused) — look up by profiles.email (populated
-  // by the on_auth_user_created trigger) before inviting, since inviteUserByEmail
-  // errors on an existing address.
+  // they signed up under this email some other way) — look up by profiles.email
+  // (populated by the on_auth_user_created trigger) before inviting, since
+  // inviteUserByEmail errors on an existing address.
   const { data: existing } = await svc.from('profiles').select('id').eq('email', email).maybeSingle();
 
   let userId = existing?.id ?? null;
-  let resent = false;
+  const alreadyRegistered = userId !== null;
 
   if (!userId) {
+    const redirectTo = `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/dashboard`;
     const { data: invited, error: inviteError } = await svc.auth.admin.inviteUserByEmail(email, { redirectTo });
     if (inviteError || !invited.user) {
-      return { error: inviteError?.message ?? 'Invite failed.', success: false, resent: false };
+      return { error: inviteError?.message ?? 'Invite failed.', success: false, alreadyRegistered: false };
     }
     userId = invited.user.id;
-  } else {
-    // Existing profile: inviteUserByEmail would just error, so this is a
-    // resend — send a fresh password-recovery link instead. It hits the same
-    // /auth/callback set-password step, so an expired first invite is
-    // recoverable without a separate "resend" affordance.
-    const { error: resendError } = await svc.auth.resetPasswordForEmail(email, { redirectTo });
-    if (resendError) {
-      return { error: resendError.message, success: false, resent: false };
-    }
-    resent = true;
   }
+  // Existing profile: this is just a link-to-tenant action, not a resend — the
+  // admin isn't the right party to be pushing password-reset emails at a
+  // client's inbox on their behalf. If they've lost access to their password,
+  // "Forgot password" on the login page is the self-serve path for that.
 
   const { error: linkError } = await svc
     .from('user_tenants')
     .upsert({ user_id: userId, tenant_id: tenantId, role }, { onConflict: 'user_id,tenant_id' });
 
   if (linkError) {
-    return { error: linkError.message, success: false, resent: false };
+    return { error: linkError.message, success: false, alreadyRegistered };
   }
 
   revalidatePath('/admin/clients');
-  return { error: null, success: true, resent };
+  return { error: null, success: true, alreadyRegistered };
 }
