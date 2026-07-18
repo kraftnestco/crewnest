@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache';
 import { getCallerContext } from '@/lib/auth/context';
 import { createServiceClient } from '@/lib/supabase/service';
-import { env } from '@/lib/env';
 import type { Database } from '@/types/database';
 import type { InviteClientState } from './invite-state';
 
@@ -46,8 +45,10 @@ export async function inviteClientLoginAction(
   const alreadyRegistered = userId !== null;
 
   if (!userId) {
-    const redirectTo = `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/dashboard`;
-    const { data: invited, error: inviteError } = await svc.auth.admin.inviteUserByEmail(email, { redirectTo });
+    // No redirectTo: the "Invite user" email template sends a typed code
+    // ({{ .Token }}), not a clickable link, so there's no link-back page to
+    // point at (see verify-code-form.tsx).
+    const { data: invited, error: inviteError } = await svc.auth.admin.inviteUserByEmail(email);
     if (inviteError || !invited.user) {
       return { error: inviteError?.message ?? 'Invite failed.', success: false, alreadyRegistered: false };
     }

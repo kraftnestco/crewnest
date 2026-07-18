@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signInAction, requestPasswordResetAction, type SignInState, type ForgotPasswordState } from './actions';
+import { VerifyCodeForm } from './verify-code-form';
 
 const initialState: SignInState = { error: null };
 const initialForgotState: ForgotPasswordState = { error: null, sent: false };
@@ -12,29 +13,41 @@ const initialForgotState: ForgotPasswordState = { error: null, sent: false };
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [state, formAction, isPending] = useActionState(signInAction, initialState);
   const [forgotState, forgotAction, forgotPending] = useActionState(requestPasswordResetAction, initialForgotState);
-  const [mode, setMode] = useState<'sign-in' | 'forgot'>('sign-in');
+  const [mode, setMode] = useState<'sign-in' | 'forgot' | 'invite'>('sign-in');
+  const [forgotEmail, setForgotEmail] = useState('');
 
   if (mode === 'forgot') {
+    if (forgotState.sent) {
+      return (
+        <VerifyCodeForm
+          type="recovery"
+          email={forgotEmail}
+          redirectTo={redirectTo}
+          onBack={() => setMode('sign-in')}
+        />
+      );
+    }
+
     return (
       <form action={forgotAction} className="flex flex-col gap-4">
         <input type="hidden" name="redirect" value={redirectTo} />
 
-        {forgotState.sent ? (
-          <p className="text-sm text-muted-foreground">
-            If an account exists for that email, a reset link is on its way — check the inbox.
-          </p>
-        ) : (
-          <>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="forgot-email">Email</Label>
-              <Input id="forgot-email" name="email" type="email" autoComplete="email" required />
-            </div>
-            {forgotState.error && <p className="text-sm text-destructive">{forgotState.error}</p>}
-            <Button type="submit" disabled={forgotPending} className="mt-2">
-              {forgotPending ? 'Sending…' : 'Send reset link'}
-            </Button>
-          </>
-        )}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="forgot-email">Email</Label>
+          <Input
+            id="forgot-email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={forgotEmail}
+            onChange={(e) => setForgotEmail(e.target.value)}
+          />
+        </div>
+        {forgotState.error && <p className="text-sm text-destructive">{forgotState.error}</p>}
+        <Button type="submit" disabled={forgotPending} className="mt-2">
+          {forgotPending ? 'Sending…' : 'Send code'}
+        </Button>
 
         <button
           type="button"
@@ -44,6 +57,12 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
           Back to sign in
         </button>
       </form>
+    );
+  }
+
+  if (mode === 'invite') {
+    return (
+      <VerifyCodeForm type="invite" email="" redirectTo="/dashboard" onBack={() => setMode('sign-in')} />
     );
   }
 
@@ -67,13 +86,22 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         {isPending ? 'Signing in…' : 'Sign in'}
       </Button>
 
-      <button
-        type="button"
-        onClick={() => setMode('forgot')}
-        className="text-sm text-muted-foreground underline underline-offset-2"
-      >
-        Forgot password?
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setMode('forgot')}
+          className="text-sm text-muted-foreground underline underline-offset-2"
+        >
+          Forgot password?
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('invite')}
+          className="text-sm text-muted-foreground underline underline-offset-2"
+        >
+          Have an invite code?
+        </button>
+      </div>
     </form>
   );
 }
