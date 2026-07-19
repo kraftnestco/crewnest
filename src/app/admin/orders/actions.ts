@@ -180,6 +180,27 @@ export async function rejectOrderAction(orderId: string, reason?: string): Promi
   revalidatePath('/admin/orders');
 }
 
+/** Mark fulfilled: owner-only manual close-out for a confirmed order/service. Same access-check pattern as approve/reject. */
+export async function fulfillOrderAction(orderId: string): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('id, status')
+    .eq('id', orderId)
+    .single();
+
+  if (orderError || !order) {
+    throw new Error(orderError?.message ?? 'Order not found.');
+  }
+  if (order.status !== 'confirmed') {
+    throw new Error('Only confirmed orders can be marked fulfilled.');
+  }
+
+  await orderService.fulfill(orderId);
+  revalidatePath('/admin/orders');
+}
+
 /**
  * Mark paid/refunded (docs/11 §3.5) — the privileged human `payment_status` transition
  * (§1.3). Same read-as-access-check → service-role write pattern as approve/reject;

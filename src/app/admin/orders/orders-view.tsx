@@ -12,6 +12,7 @@ import type { Database } from '@/types/database';
 import type { OrderAttachment } from '@/types/domain';
 import {
   approveOrderAction,
+  fulfillOrderAction,
   getOrderMediaUrlAction,
   getOrdersPageAction,
   markPaidAction,
@@ -158,6 +159,34 @@ function PendingOrderDetail({
         </Button>
       </div>
     </div>
+  );
+}
+
+/** Manual close-out for a confirmed order/service — no external fulfillment signal exists yet, so this is owner-driven. */
+function FulfillAction({
+  orderId,
+  onDone,
+}: {
+  orderId: string;
+  onDone: (message: string, isError?: boolean) => void;
+}) {
+  const [isActing, startActing] = useTransition();
+
+  function handleFulfill() {
+    startActing(async () => {
+      try {
+        await fulfillOrderAction(orderId);
+        onDone('Order marked as fulfilled.');
+      } catch (err) {
+        onDone(err instanceof Error ? err.message : 'Failed to mark fulfilled.', true);
+      }
+    });
+  }
+
+  return (
+    <Button size="sm" variant="outline" onClick={handleFulfill} disabled={isActing}>
+      Mark fulfilled
+    </Button>
   );
 }
 
@@ -479,6 +508,8 @@ export function OrdersView({
                       >
                         {expandedId === o.id ? 'Close' : 'Review'}
                       </Button>
+                    ) : o.status === 'confirmed' ? (
+                      <FulfillAction orderId={o.id} onDone={handleActionDone} />
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}

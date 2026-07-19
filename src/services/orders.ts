@@ -184,6 +184,20 @@ export async function reject(orderId: string, notes?: string | null): Promise<Or
   return mapOrder(data);
 }
 
+/** Owner dashboard action: manually mark a confirmed order/service as done. */
+export async function fulfill(orderId: string): Promise<Order> {
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from('orders')
+    .update({ status: 'fulfilled' })
+    .eq('id', orderId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapOrder(data);
+}
+
 /**
  * Session-scoped order lookup for the check_order_status tool. Identity is
  * server-bound (session id only) — never accepts a tenant/customer id from the
