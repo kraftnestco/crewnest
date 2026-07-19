@@ -437,6 +437,18 @@ password handed to the agency. Do **not** build custom invite-acceptance pages, 
 management now — that is Phase-2 billing-adjacent scope. The default role for a client owner is
 `tenant_admin`; extra staff are `tenant_agent` (inbox + orders, no business editing).
 
+> **Update, post-ship:** production surfaced a real bug in the `redirectTo` link this section
+> originally specified — email security scanners (Gmail/Outlook link pre-fetching) were visiting and
+> consuming the one-time link before the real user clicked it, so invite/recovery links died almost
+> instantly. The fix (confirmed with the user) replaces the clickable link with a typed one-time code
+> (`{{ .Token }}`), verified client-side via `supabase.auth.verifyOtp()` on `/login` — see
+> `verify-code-form.tsx`. `inviteUserByEmail` is called with **no** `redirectTo`. This *is* the custom
+> invite-acceptance UI this section said not to build; it turned out to be required to fix the link bug,
+> not optional scope. A narrow resend exception was also added: a stale, never-accepted invite (no
+> `confirmed_at`, no `user_tenants` rows yet) is deleted and reissued automatically, since
+> `inviteUserByEmail` otherwise refuses to resend to an existing address and the client would be
+> permanently stuck. Seat management/revoke remain out of scope as originally stated.
+
 ---
 
 ## 10. Two-tenant isolation test (must pass before ship)
