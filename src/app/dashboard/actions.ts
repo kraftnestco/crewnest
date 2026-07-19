@@ -5,6 +5,8 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { assertTenantAccess, getCallerContext } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { notify } from '@/services/notifications';
+import * as tenants from '@/services/tenants';
 import { PLATFORM_CHANNEL_VALUES, type PlatformChannel, type RequestPlatformSetupState } from './action-state';
 
 /** Switches the active tenant for a multi-membership caller. Validated server-side against ctx.memberships. */
@@ -69,6 +71,20 @@ export async function requestPlatformSetupAction(
     .eq('id', tenantId);
 
   if (error) return { error: error.message, success: false };
+
+  const tenant = await tenants.getById(tenantId);
+  await notify({
+    scope: 'agency',
+    tenantId,
+    type: 'channel_request',
+    entityType: 'tenant',
+    entityId: tenantId,
+    title: 'Channel setup requested',
+    body: tenant
+      ? `${tenant.businessName} — ${requestedPlatforms.join(', ')}`
+      : requestedPlatforms.join(', '),
+    link: `/admin/clients/${tenantId}`,
+  });
 
   revalidatePath('/dashboard/business');
   revalidatePath('/admin/clients');

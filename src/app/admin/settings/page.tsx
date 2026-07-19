@@ -4,6 +4,7 @@ import { DEFAULT_LLM_MODEL, DEFAULT_LLM_PROVIDER, WIDGET_RATE_LIMIT } from '@/li
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/page-header';
 
 export default async function SettingsPage() {
   const supabase = await createSupabaseServerClient();
@@ -26,10 +27,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="font-heading text-xl font-semibold">Settings</h1>
-        <p className="text-sm text-muted-foreground">Agency-level configuration and access.</p>
-      </div>
+      <PageHeader title="Settings" description="Agency-level configuration and access." />
 
       <Card>
         <CardHeader>

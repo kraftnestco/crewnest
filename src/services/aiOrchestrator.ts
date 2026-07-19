@@ -20,6 +20,7 @@ import { estimateCostUsd } from './ai/pricing';
 import { getEnabledTools, executeTool } from './tools/registry';
 import { getLlmKey } from '@/lib/secrets';
 import { sendText } from './meta/send';
+import { notifyBoth } from '@/services/notifications';
 import {
   sanitizeInbound,
   stripHandoffToken,
@@ -176,6 +177,22 @@ export async function handleInboundMessage(
   // validation) — hand off rather than leaving the customer without a reply.
   if (!finalText) {
     await sessions.setHandoff(session.id, true);
+    await notifyBoth({
+      tenantId: tenant.id,
+      type: 'handoff',
+      entityType: 'session',
+      entityId: session.id,
+      agency: {
+        title: 'Handoff needed',
+        body: `${tenant.businessName} — assistant couldn't complete a reply`,
+        link: `/admin/chat?session=${session.id}`,
+      },
+      tenant: {
+        title: 'A conversation needs you',
+        body: "The assistant couldn't complete a reply",
+        link: `/dashboard/chat?session=${session.id}`,
+      },
+    });
     return { sessionId: session.id, replyText: null, handoff: true };
   }
 
@@ -185,14 +202,51 @@ export async function handleInboundMessage(
 
   // 10b. Live Inbox alert signal (docs/08 GUARDRAIL_RULES) — sticky until a human
   // acts on it; only ever SET here, never auto-cleared by a calmer follow-up turn,
-  // so a flagged conversation can't quietly drop off staff's radar.
+  // so a flagged conversation can't quietly drop off staff's radar. Notify only on
+  // the transition (docs/14 §3.3) so a long flagged conversation doesn't spam N
+  // identical alerts.
   const signal = extractSignal(finalText);
   if (signal) {
-    await sessions.setAlertSignal(session.id, signal);
+    const changed = await sessions.setAlertSignal(session.id, signal);
+    if (changed) {
+      const signalLabel = signal.replace(/_/g, ' ');
+      await notifyBoth({
+        tenantId: tenant.id,
+        type: 'alert_signal',
+        entityType: 'session',
+        entityId: session.id,
+        agency: {
+          title: 'Conversation flagged',
+          body: `${tenant.businessName} — ${signalLabel}`,
+          link: `/admin/chat?session=${session.id}`,
+        },
+        tenant: {
+          title: 'A conversation was flagged',
+          body: signalLabel,
+          link: `/dashboard/chat?session=${session.id}`,
+        },
+      });
+    }
   }
 
   if (handoff) {
     await sessions.setHandoff(session.id, true);
+    await notifyBoth({
+      tenantId: tenant.id,
+      type: 'handoff',
+      entityType: 'session',
+      entityId: session.id,
+      agency: {
+        title: 'Handoff requested',
+        body: `${tenant.businessName} — customer asked for a human`,
+        link: `/admin/chat?session=${session.id}`,
+      },
+      tenant: {
+        title: 'A customer needs you',
+        body: 'They asked to speak with a human',
+        link: `/dashboard/chat?session=${session.id}`,
+      },
+    });
     // Do not auto-reply; a human takes over. Inbox turns red via realtime.
     return { sessionId: session.id, replyText: null, handoff: true };
   }

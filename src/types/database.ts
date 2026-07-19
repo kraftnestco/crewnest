@@ -22,6 +22,7 @@ export type Database = {
           email: string | null;
           full_name: string | null;
           is_platform_admin: boolean;
+          notification_prefs: Json;
           created_at: string;
         };
         Insert: {
@@ -29,6 +30,7 @@ export type Database = {
           email?: string | null;
           full_name?: string | null;
           is_platform_admin?: boolean;
+          notification_prefs?: Json;
           created_at?: string;
         };
         Update: {
@@ -36,6 +38,7 @@ export type Database = {
           email?: string | null;
           full_name?: string | null;
           is_platform_admin?: boolean;
+          notification_prefs?: Json;
           created_at?: string;
         };
         Relationships: [];
@@ -451,6 +454,48 @@ export type Database = {
           provider_msg_id?: string;
           tenant_id?: string | null;
           received_at?: string;
+        };
+        Relationships: [];
+      };
+      notifications: {
+        Row: {
+          id: string;
+          scope: string;
+          tenant_id: string | null;
+          type: string;
+          title: string;
+          body: string | null;
+          entity_type: string | null;
+          entity_id: string | null;
+          link: string;
+          is_read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          scope: string;
+          tenant_id?: string | null;
+          type: string;
+          title: string;
+          body?: string | null;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          link: string;
+          is_read?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          scope?: string;
+          tenant_id?: string | null;
+          type?: string;
+          title?: string;
+          body?: string | null;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          link?: string;
+          is_read?: boolean;
+          created_at?: string;
         };
         Relationships: [];
       };

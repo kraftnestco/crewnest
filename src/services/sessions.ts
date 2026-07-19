@@ -76,13 +76,29 @@ export async function setHandoff(sessionId: string, value: boolean): Promise<voi
   if (error) throw error;
 }
 
-/** Persist the Live Inbox alert signal detected from the assistant's reply (or clear it with null). */
-export async function setAlertSignal(sessionId: string, signal: AlertSignal | null): Promise<void> {
+/**
+ * Persist the Live Inbox alert signal detected from the assistant's reply (or clear it
+ * with null). Returns whether the value actually changed — `.neq()` can't express a
+ * NULL→value transition correctly, so this reads-then-compares-then-writes, letting
+ * callers notify only on a real transition rather than every qualifying turn.
+ */
+export async function setAlertSignal(sessionId: string, signal: AlertSignal | null): Promise<boolean> {
   const client = createServiceClient();
+
+  const { data: current, error: readError } = await client
+    .from('chat_sessions')
+    .select('alert_signal')
+    .eq('id', sessionId)
+    .single();
+  if (readError) throw readError;
+
+  const changed = current.alert_signal !== signal;
+
   const { error } = await client
     .from('chat_sessions')
     .update({ alert_signal: signal })
     .eq('id', sessionId);
-
   if (error) throw error;
+
+  return changed;
 }

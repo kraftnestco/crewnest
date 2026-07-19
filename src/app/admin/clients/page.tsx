@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/page-header';
 import { EditClientDialog } from './edit-client-dialog';
 import { InviteClientDialog } from './[id]/invite/invite-client-dialog';
 import { NewClientDialog } from './new-client-dialog';
@@ -30,13 +31,11 @@ export default async function ClientsPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-xl font-semibold">Clients</h1>
-          <p className="text-sm text-muted-foreground">Manage tenant businesses and their channels.</p>
-        </div>
-        <NewClientDialog />
-      </div>
+      <PageHeader
+        title="Clients"
+        description="Manage tenant businesses and their channels."
+        actions={<NewClientDialog />}
+      />
 
       <div className="rounded-xl bg-card ring-1 ring-foreground/10">
         <Table>

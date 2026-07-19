@@ -3,6 +3,7 @@ import * as media from './meta/media';
 import * as transcribeService from './ai/transcribe';
 import * as messages from './messages';
 import * as orders from './orders';
+import { notifyBoth } from '@/services/notifications';
 import { getTranscriptionKey } from '@/lib/secrets';
 import { sanitizeInbound } from './security/sanitize';
 import { MAX_MEDIA_PER_SESSION_WINDOW, MEDIA_CAP_WINDOW_MINUTES } from '@/lib/constants';
@@ -81,6 +82,22 @@ export async function processInboundMedia(
           mimeType: downloaded.mimeType,
         });
         await orders.setPaymentStatus(proofTarget.id, 'awaiting_verification');
+        await notifyBoth({
+          tenantId: proofTarget.tenantId,
+          type: 'payment_proof',
+          entityType: 'order',
+          entityId: proofTarget.id,
+          agency: {
+            title: 'Payment proof received',
+            body: `Order ${proofTarget.id} — awaiting verification`,
+            link: '/admin/orders',
+          },
+          tenant: {
+            title: 'Payment proof received',
+            body: 'A customer sent proof of payment — please verify it',
+            link: '/dashboard/orders',
+          },
+        });
         textNotes.push(
           '[System note: the customer sent a payment receipt/screenshot, recorded as proof of payment for ' +
             `order ${proofTarget.id}. Tell them it was received and the business will verify it shortly — do ` +

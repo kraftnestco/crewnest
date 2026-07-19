@@ -2,6 +2,7 @@ import 'server-only';
 import { z } from 'zod';
 import * as orders from '@/services/orders';
 import { sendTemplate } from '@/services/meta/send';
+import { notifyBoth } from '@/services/notifications';
 import { MAX_ORDERS_PER_SESSION_WINDOW, PAYMENT_METHOD_PRIORITY } from '@/lib/constants';
 import type { PaymentMethod, Tenant } from '@/types/domain';
 import type { ToolContext, ToolExecutor } from './registry';
@@ -148,6 +149,23 @@ export const createOrderTool: ToolExecutor = {
     if (duplicate || !order) {
       return { orderId: null, status, duplicate: true };
     }
+
+    await notifyBoth({
+      tenantId: ctx.tenant.id,
+      type: 'new_order',
+      entityType: 'order',
+      entityId: order.id,
+      agency: {
+        title: status === 'pending' ? 'Order awaiting approval' : 'New order',
+        body: `${ctx.tenant.businessName} — ${args.customer_name}`,
+        link: status === 'pending' ? '/admin/orders?status=pending' : '/admin/orders',
+      },
+      tenant: {
+        title: status === 'pending' ? 'New order — awaiting your approval' : 'New order received',
+        body: args.customer_name,
+        link: '/dashboard/orders',
+      },
+    });
 
     // Best-effort owner push: awaited (survives serverless teardown after execute()
     // returns) but never lets a delivery failure block the customer's confirmation.

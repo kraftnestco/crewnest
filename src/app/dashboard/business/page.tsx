@@ -4,6 +4,7 @@ import { Store } from 'lucide-react';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { IntakeForm } from '@/app/admin/clients/[id]/intake/intake-form';
+import { PageHeader } from '@/components/page-header';
 import { ChannelSetup } from './channel-setup';
 
 export default async function DashboardBusinessPage() {
@@ -32,13 +33,10 @@ export default async function DashboardBusinessPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 p-6">
-      <div>
-        <h1 className="font-heading text-xl font-semibold">My Business</h1>
-        <p className="text-sm text-muted-foreground">
-          Tell your AI assistant about {tenant.business_name} and manage which channels it talks to
-          customers on. Technical setup (API keys, tokens) is always handled by our team.
-        </p>
-      </div>
+      <PageHeader
+        title="My Business"
+        description={`Tell your AI assistant about ${tenant.business_name} and manage which channels it talks to customers on. Technical setup (API keys, tokens) is always handled by our team.`}
+      />
 
       <ChannelSetup
         tenantId={activeTenantId}

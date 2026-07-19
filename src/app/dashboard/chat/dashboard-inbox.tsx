@@ -102,7 +102,7 @@ export function DashboardInbox({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+    <div className="flex h-full overflow-hidden bg-background text-foreground">
       <div className="flex min-h-0 w-80 shrink-0 flex-col border-r bg-muted/20">
         <div className="flex h-14 shrink-0 items-center border-b px-4">
           <div>

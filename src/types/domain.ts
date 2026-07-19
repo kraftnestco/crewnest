@@ -117,6 +117,31 @@ export interface Order {
   createdAt: string;
 }
 
+export type NotificationScope = 'agency' | 'tenant';
+export type NotificationType = 'new_order' | 'handoff' | 'alert_signal' | 'channel_request' | 'payment_proof';
+export type NotificationEntityType = 'order' | 'session' | 'tenant';
+
+/** A live notification-feed row (docs/14). Writes are service-role only; reads are RLS-scoped per audience. */
+export interface Notification {
+  id: string;
+  scope: NotificationScope;
+  tenantId: string | null;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  entityType: NotificationEntityType | null;
+  entityId: string | null;
+  link: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+/** `profiles.notification_prefs` shape (app-validated JSONB, all keys optional). See docs/14 §2.3. */
+export interface NotificationPrefs {
+  emailEnabled?: boolean;
+  mutedTypes?: NotificationType[];
+}
+
 export type AttachmentKind = 'image' | 'audio' | 'video';
 
 /**

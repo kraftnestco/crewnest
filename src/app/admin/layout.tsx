@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getCallerContext } from '@/lib/auth/context';
 import { Button } from '@/components/ui/button';
+import { AppTopbar } from '@/components/app-topbar';
 import { signOutAction } from './actions';
 import { AdminNav } from './admin-nav';
 
@@ -50,7 +51,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </form>
         </div>
       </aside>
-      <main className="min-w-0 flex-1">{children}</main>
+      <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
+        <AppTopbar accountHref="/admin/account" />
+        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
+      </div>
     </div>
   );
 }

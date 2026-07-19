@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PageHeader } from '@/components/page-header';
+import { StatusLegend, ORDER_STATUS_LEGEND } from '@/components/status-legend';
 import type { Database } from '@/types/database';
 import type { OrderAttachment } from '@/types/domain';
 import {
@@ -143,7 +145,7 @@ function PendingOrderDetail({
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        <Button size="sm" onClick={handleApprove} disabled={isActing}>
+        <Button size="sm" onClick={handleApprove} disabled={isActing} title="Confirm this order and notify the customer">
           Approve
         </Button>
         <Input
@@ -154,7 +156,13 @@ function PendingOrderDetail({
           className="max-w-xs"
           disabled={isActing}
         />
-        <Button size="sm" variant="destructive" onClick={handleReject} disabled={isActing}>
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={handleReject}
+          disabled={isActing}
+          title="Decline this order and notify the customer"
+        >
           Reject
         </Button>
       </div>
@@ -297,7 +305,14 @@ function PaymentCell({
         )}
         {order.payment_status === 'awaiting_verification' && (
           <>
-            <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={handleMarkPaid} disabled={isActing}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-xs"
+              onClick={handleMarkPaid}
+              disabled={isActing}
+              title="Confirm the submitted payment proof is valid"
+            >
               Verify
             </Button>
             <Button
@@ -306,6 +321,7 @@ function PaymentCell({
               className="h-6 px-2 text-xs"
               onClick={handleReject}
               disabled={isActing}
+              title="Reject the submitted payment proof and ask the customer to resubmit"
             >
               Reject
             </Button>
@@ -333,6 +349,7 @@ export function OrdersView({
   realtimeAccessToken,
   showBusinessColumn = true,
   chatBasePath = '/admin/chat',
+  initialStatus = 'all',
 }: {
   initialOrders: OrderRow[];
   tenants: TenantRow[];
@@ -341,10 +358,12 @@ export function OrdersView({
   showBusinessColumn?: boolean;
   /** Base path for the "View chat" deep link — differs between the agency and tenant dashboards. */
   chatBasePath?: string;
+  /** Pre-filter from a `?status=` deep link (docs/14 §5.1 "Needs attention" cards); the server already fetched a matching first page. */
+  initialStatus?: OrderStatus | 'all';
 }) {
   const columnCount = showBusinessColumn ? 10 : 9;
   const [orders, setOrders] = useState(initialOrders);
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>(initialStatus);
   const [hasMore, setHasMore] = useState(initialOrders.length === 25);
   const [isPending, startTransition] = useTransition();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -419,25 +438,26 @@ export function OrdersView({
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="font-heading text-xl font-semibold">Orders</h1>
-        <p className="text-sm text-muted-foreground">
-          New orders appear instantly below; scroll down for full history.
-        </p>
-      </div>
+      <PageHeader
+        title="Orders"
+        description="New orders appear instantly below; scroll down for full history."
+      />
 
-      <div className="flex gap-1">
-        {STATUS_FILTERS.map((f) => (
-          <Button
-            key={f.value}
-            size="sm"
-            variant={statusFilter === f.value ? 'default' : 'outline'}
-            onClick={() => handleFilterChange(f.value)}
-            disabled={isPending}
-          >
-            {f.label}
-          </Button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-1">
+          {STATUS_FILTERS.map((f) => (
+            <Button
+              key={f.value}
+              size="sm"
+              variant={statusFilter === f.value ? 'default' : 'outline'}
+              onClick={() => handleFilterChange(f.value)}
+              disabled={isPending}
+            >
+              {f.label}
+            </Button>
+          ))}
+        </div>
+        <StatusLegend items={ORDER_STATUS_LEGEND} />
       </div>
 
       <div className="rounded-xl bg-card ring-1 ring-foreground/10">
