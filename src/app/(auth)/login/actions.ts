@@ -44,7 +44,14 @@ export async function requestPasswordResetAction(
 export async function signInAction(_prev: SignInState, formData: FormData): Promise<SignInState> {
   const email = String(formData.get('email') ?? '').trim();
   const password = String(formData.get('password') ?? '');
-  const redirectTo = String(formData.get('redirect') ?? '/admin');
+  const rawRedirect = String(formData.get('redirect') ?? '');
+  // `//host` is scheme-relative — browsers treat it as an external redirect, so a
+  // bare `startsWith('/')` check alone is an open redirect. No explicit target
+  // (e.g. arriving at bare /login after signing out) is not the same as "wants
+  // admin" — that used to default to /admin and produced a wrong-account-type
+  // rejection for a client re-logging in with no destination in mind.
+  const explicitRedirect =
+    rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : null;
 
   if (!email || !password) {
     return { error: 'Email and password are required.' };
@@ -57,43 +64,42 @@ export async function signInAction(_prev: SignInState, formData: FormData): Prom
     return { error: 'Invalid email or password.' };
   }
 
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('is_platform_admin')
+    .eq('id', signIn.user?.id ?? '')
+    .single();
+
+  // Don't let a failed lookup read as "confirmed not an admin" — that produces a
+  // specific, wrong-sounding rejection for what's actually a DB/lookup error.
+  if (profileError) {
+    console.error('[auth] signInAction profile lookup failed', {
+      userId: signIn.user?.id,
+      error: profileError.message,
+    });
+    await supabase.auth.signOut();
+    return { error: 'Something went wrong verifying your account. Please try again.' };
+  }
+  const isAdmin = profile?.is_platform_admin ?? false;
+
   // Keep the two login entry points separate: an agency-admin credential must not
   // complete a client login, nor a client credential an admin login — even though
   // both authenticate identically. The layout guards already prevent cross-access,
   // but rejecting here (rather than signing in then bouncing) is what the entry
-  // points imply. Role lives on profiles.is_platform_admin (see getCallerContext).
-  const wantsAdmin = redirectTo.startsWith('/admin');
-  const wantsClient = redirectTo.startsWith('/dashboard');
-  if (wantsAdmin || wantsClient) {
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('is_platform_admin')
-      .eq('id', signIn.user?.id ?? '')
-      .single();
+  // points imply. This only applies when a destination was actually requested —
+  // a bare /login has no intent to enforce, so it just routes to whichever
+  // portal this account actually has.
+  const wantsAdmin = explicitRedirect?.startsWith('/admin') ?? false;
+  const wantsClient = explicitRedirect?.startsWith('/dashboard') ?? false;
 
-    // Don't let a failed lookup read as "confirmed not an admin" — that produces a
-    // specific, wrong-sounding rejection for what's actually a DB/lookup error.
-    if (profileError) {
-      console.error('[auth] signInAction profile lookup failed', {
-        userId: signIn.user?.id,
-        error: profileError.message,
-      });
-      await supabase.auth.signOut();
-      return { error: 'Something went wrong verifying your account. Please try again.' };
-    }
-    const isAdmin = profile?.is_platform_admin ?? false;
-
-    if (wantsAdmin && !isAdmin) {
-      await supabase.auth.signOut();
-      return { error: 'This isn’t an agency admin account. Use “Sign in as client” instead.' };
-    }
-    if (wantsClient && isAdmin) {
-      await supabase.auth.signOut();
-      return { error: 'This is an agency admin account. Use “Sign in as admin” instead.' };
-    }
+  if (wantsAdmin && !isAdmin) {
+    await supabase.auth.signOut();
+    return { error: 'This isn’t an agency admin account. Use “Sign in as client” instead.' };
+  }
+  if (wantsClient && isAdmin) {
+    await supabase.auth.signOut();
+    return { error: 'This is an agency admin account. Use “Sign in as admin” instead.' };
   }
 
-  // `//host` is scheme-relative — browsers treat it as an external redirect, so
-  // a bare `startsWith('/')` check alone is an open redirect.
-  redirect(redirectTo.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/admin');
+  redirect(explicitRedirect ?? (isAdmin ? '/admin' : '/dashboard'));
 }

@@ -10,6 +10,16 @@ export const META_GRAPH_BASE = 'https://graph.facebook.com';
 export const DEFAULT_LLM_PROVIDER = 'openai';
 export const DEFAULT_LLM_MODEL = 'gpt-4o-mini';
 
+/**
+ * Stopgap (2026-07-20): MASTER_OPENAI_KEY in Vercel Production is a placeholder,
+ * so the public demo (which always runs on the master key, never BYOK) is routed
+ * through OpenRouter's master key instead until a real OpenAI key is set. Model id
+ * is OpenRouter's vendor-prefixed format — same underlying model, tool-calling
+ * capable. Scoped to the demo route only; real tenants are untouched.
+ */
+export const DEMO_LLM_PROVIDER = 'openrouter';
+export const DEMO_LLM_MODEL = 'openai/gpt-4o-mini';
+
 /** Short-term memory: how many prior messages to load, and the dynamic-tail token budget. */
 export const MEMORY_WINDOW_MESSAGES = 16;
 export const MEMORY_TOKEN_BUDGET = 4000;

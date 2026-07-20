@@ -17,7 +17,7 @@ export default async function LoginPage({
     const matchesIntent = wantsAdmin ? ctx.isPlatformAdmin : wantsClient ? !ctx.isPlatformAdmin : true;
 
     if (matchesIntent) {
-      redirect(redirectTo ?? '/admin');
+      redirect(redirectTo ?? (ctx.isPlatformAdmin ? '/admin' : '/dashboard'));
     }
     // The existing session is the other kind of account (e.g. an admin session
     // lingering while "Sign in as client" was clicked) — don't honor it silently;
@@ -33,10 +33,12 @@ export default async function LoginPage({
           <p className="text-sm text-muted-foreground">
             {existingAccountEmail
               ? `Currently signed in as ${existingAccountEmail}. Sign in below to switch accounts.`
-              : 'Sign in to the agency dashboard.'}
+              : redirectTo?.startsWith('/dashboard')
+                ? 'Sign in to your business dashboard.'
+                : 'Sign in to the agency dashboard.'}
           </p>
         </div>
-        <LoginForm redirectTo={redirectTo ?? '/admin'} />
+        <LoginForm redirectTo={redirectTo ?? ''} />
       </div>
     </div>
   );

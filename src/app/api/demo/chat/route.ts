@@ -4,17 +4,17 @@ import { getProvider } from '@/services/ai/provider';
 import type { LlmMessage, LlmToolDef } from '@/services/ai/provider';
 import { sanitizeInbound } from '@/services/security/sanitize';
 import { env } from '@/lib/env';
-import { DEFAULT_LLM_MODEL, MAX_TOOL_ROUNDS } from '@/lib/constants';
+import { DEMO_LLM_PROVIDER, DEMO_LLM_MODEL, MAX_TOOL_ROUNDS } from '@/lib/constants';
 import { demoChatRequestSchema } from '@/services/demo/schema';
 
 /**
  * Stateless public-demo chat endpoint (docs: "try it for your business" plan,
  * Phase B). No DB, no session, no tenant row — the entire "tenant" is the
  * visitor's own wizard answers, re-validated here (never trusted as-is). Runs
- * the SAME promptBuilder + provider as the real orchestrator, always on the
- * master OpenAI key and the platform-default model — a demo visitor can never
- * select a model or spend a real tenant's key. `create_order` is intercepted
- * to synthesise a simulated order card; nothing is written anywhere.
+ * the SAME promptBuilder as the real orchestrator, always on a master key (see
+ * DEMO_LLM_PROVIDER/DEMO_LLM_MODEL in lib/constants.ts) — a demo visitor can
+ * never select a model or spend a real tenant's key. `create_order` is
+ * intercepted to synthesise a simulated order card; nothing is written anywhere.
  */
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -104,7 +104,12 @@ export async function POST(req: NextRequest) {
     userText,
   });
 
-  const provider = getProvider('openai');
+  if (!env.MASTER_OPENROUTER_KEY) {
+    console.error('[demo/chat] MASTER_OPENROUTER_KEY is not configured');
+    return json({ error: 'The demo assistant is unavailable right now — please try again shortly.' }, 502);
+  }
+
+  const provider = getProvider(DEMO_LLM_PROVIDER);
   const conversation: LlmMessage[] = [...built.messages];
   let finalText = '';
   let orderCard: DemoOrderCard | null = null;
@@ -114,12 +119,12 @@ export async function POST(req: NextRequest) {
     try {
       result = await provider.chat(
         {
-          model: DEFAULT_LLM_MODEL,
+          model: DEMO_LLM_MODEL,
           messages: conversation,
           cachePrefixLength: built.cachePrefixLength,
           tools: [DEMO_ORDER_TOOL],
         },
-        env.MASTER_OPENAI_KEY,
+        env.MASTER_OPENROUTER_KEY,
       );
     } catch (err) {
       console.error('[demo/chat] provider call failed', { error: err instanceof Error ? err.message : String(err) });
