@@ -86,6 +86,9 @@ export type Database = {
           requested_platforms: string[];
           platform_setup_notes: string | null;
           platform_setup_requested_at: string | null;
+          intake_completed_at: string | null;
+          plan: string;
+          plan_status: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -131,6 +134,9 @@ export type Database = {
           requested_platforms?: string[];
           platform_setup_notes?: string | null;
           platform_setup_requested_at?: string | null;
+          intake_completed_at?: string | null;
+          plan?: string;
+          plan_status?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -176,6 +182,9 @@ export type Database = {
           requested_platforms?: string[];
           platform_setup_notes?: string | null;
           platform_setup_requested_at?: string | null;
+          intake_completed_at?: string | null;
+          plan?: string;
+          plan_status?: string | null;
           created_at?: string;
           updated_at?: string;
         };

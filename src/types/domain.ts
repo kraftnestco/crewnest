@@ -55,6 +55,10 @@ export interface Tenant {
   paymentKeySecretId: string | null;
   defaultCurrency: string;
   prepaidRequired: boolean;
+  /** App-validated tier id ('free'/'starter'/'pro', docs: self-serve signup Phase C) — not a DB enum. */
+  plan: string;
+  /** Non-null only while a self-serve paid selection awaits agency activation (docs Phase C). */
+  planStatus: string | null;
 }
 
 export interface ChatSession {
@@ -118,7 +122,13 @@ export interface Order {
 }
 
 export type NotificationScope = 'agency' | 'tenant';
-export type NotificationType = 'new_order' | 'handoff' | 'alert_signal' | 'channel_request' | 'payment_proof';
+export type NotificationType =
+  | 'new_order'
+  | 'handoff'
+  | 'alert_signal'
+  | 'channel_request'
+  | 'payment_proof'
+  | 'upgrade_request';
 export type NotificationEntityType = 'order' | 'session' | 'tenant';
 
 /** A live notification-feed row (docs/14). Writes are service-role only; reads are RLS-scoped per audience. */

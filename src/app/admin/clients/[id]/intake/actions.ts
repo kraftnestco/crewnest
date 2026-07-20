@@ -126,8 +126,10 @@ export async function updateIntakeAction(
       default_currency: defaultCurrency,
       prepaid_required: prepaidRequired,
       // Only set on the client path — an admin's JSON save must never wipe
-      // the client's stored freeform text back to null.
-      ...(ctx.isPlatformAdmin ? {} : { catalog_freeform_text: catalogFreeformText }),
+      // the client's stored freeform text back to null. Same reasoning for
+      // intake_completed_at: only the client's own wizard save marks it done
+      // (docs: "try it for your business" plan, Phase A).
+      ...(ctx.isPlatformAdmin ? {} : { catalog_freeform_text: catalogFreeformText, intake_completed_at: new Date().toISOString() }),
     })
     .eq('id', tenantId);
 

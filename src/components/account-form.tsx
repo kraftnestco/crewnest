@@ -17,10 +17,18 @@ const TYPE_LABELS: Record<NotificationType, string> = {
   alert_signal: 'Flagged conversations',
   channel_request: 'Channel connection requests',
   payment_proof: 'Payment proof submitted',
+  upgrade_request: 'Upgrade requests',
 };
 
-/** channel_request is agency-only (a tenant asking the agency for a new channel) — never emitted to a tenant's own feed, so it has nothing to mute on the client side (docs/14 §7.3). */
-const ADMIN_TYPES: NotificationType[] = ['new_order', 'handoff', 'alert_signal', 'channel_request', 'payment_proof'];
+/** channel_request and upgrade_request are agency-only (a tenant asking the agency for a new channel or a paid-plan upgrade) — never emitted to a tenant's own feed, so they have nothing to mute on the client side (docs/14 §7.3). */
+const ADMIN_TYPES: NotificationType[] = [
+  'new_order',
+  'handoff',
+  'alert_signal',
+  'channel_request',
+  'payment_proof',
+  'upgrade_request',
+];
 const DASHBOARD_TYPES: NotificationType[] = ['new_order', 'handoff', 'alert_signal', 'payment_proof'];
 
 export function AccountForm({
@@ -181,7 +189,7 @@ export function AccountForm({
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Email me</p>
-              <p className="text-xs text-muted-foreground">Requires email delivery — contact us to enable.</p>
+              <p className="text-xs text-muted-foreground">Also send these notifications to your email.</p>
             </div>
             <Switch checked={emailEnabled} onCheckedChange={handleToggleEmail} disabled={isSavingPrefs} />
           </div>

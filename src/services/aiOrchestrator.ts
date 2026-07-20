@@ -28,15 +28,20 @@ import {
   extractSignal,
   stripSignalTokens,
 } from './security/sanitize';
-import { MEMORY_TOKEN_BUDGET, MAX_TOOL_ROUNDS } from '@/lib/constants';
+import { MEMORY_TOKEN_BUDGET, MAX_TOOL_ROUNDS, FREE_PLAN_DAILY_SESSION_CAP } from '@/lib/constants';
 import type { InboundMessage } from '@/types/domain';
 
 export interface OrchestratorResult {
-  sessionId: string;
+  /** Null only when a free-plan tenant's daily new-conversation cap blocked the session itself. */
+  sessionId: string | null;
   /** The reply to show/send; null when muted (handoff) or dropped. */
   replyText: string | null;
   handoff: boolean;
 }
+
+/** Shown to the customer, and returned to the web widget, when Phase D's free-plan cap blocks a NEW conversation. */
+const FREE_PLAN_LIMIT_REACHED_TEXT =
+  "Thanks for reaching out! We've reached today's conversation limit on our free plan — please try again tomorrow, or the business will get back to you soon.";
 
 export async function handleInboundMessage(
   input: InboundMessage,
@@ -54,12 +59,29 @@ export async function handleInboundMessage(
     return null;
   }
 
-  // 2. Session (one per customer per channel).
-  const session = await sessions.findOrCreate(
+  // 2. Session (one per customer per channel). Free-plan tenants cap NEW
+  // conversations/day (docs: self-serve signup plan, Phase D); existing
+  // sessions are unaffected — see sessions.findOrCreate's doc comment.
+  const sessionOrCap = await sessions.findOrCreate(
     tenant.id,
     input.platform,
     input.externalUserId,
+    tenant.plan === 'free' ? FREE_PLAN_DAILY_SESSION_CAP : undefined,
   );
+
+  if (sessionOrCap === 'cap_reached') {
+    if (input.platform !== 'web') {
+      await sendText({
+        tenant,
+        platform: input.platform,
+        to: input.externalUserId,
+        text: FREE_PLAN_LIMIT_REACHED_TEXT,
+      });
+      return { sessionId: null, replyText: null, handoff: false };
+    }
+    return { sessionId: null, replyText: FREE_PLAN_LIMIT_REACHED_TEXT, handoff: false };
+  }
+  const session = sessionOrCap;
 
   // 3. Sanitise untrusted customer text (prompt-injection guardrail).
   let userText = sanitizeInbound(input.text);

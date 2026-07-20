@@ -39,6 +39,13 @@ export const SIGNAL_TOKENS = {
 export const WIDGET_RATE_LIMIT = { windowMs: 60_000, max: 20 } as const;
 
 /**
+ * Public demo session cap (docs: "try it for your business" plan, Phase B),
+ * keyed per visitor IP. One check per demo session start (email-capture
+ * submit), not per chat message — the demo chat route itself is unmetered.
+ */
+export const DEMO_SESSION_RATE_LIMIT = { windowMs: 24 * 60 * 60 * 1000, max: 6 } as const;
+
+/**
  * Tenant-wide fallback bucket for the website widget. sessionKey is entirely
  * client-supplied, so a caller can rotate it per request to dodge WIDGET_RATE_LIMIT
  * — this bounds aggregate spend per tenant regardless of how sessionKey is set.
@@ -93,3 +100,11 @@ export const CHUNK_TOKEN_CAP = 400;
 /** Stage N (docs/12 §5.5.5) — retrieval breadth and the dynamic-tail token budget for retrieved chunks. */
 export const RETRIEVAL_TOP_K = 8;
 export const RETRIEVED_CONTEXT_TOKEN_BUDGET = 2000;
+
+/**
+ * Free-plan daily cap on NEW distinct customer conversations per tenant (docs:
+ * self-serve signup plan, Phase D). Resets at UTC midnight. Existing sessions
+ * already counted for the day keep replying normally — only a brand-new
+ * (tenant, platform, external user) session is gated.
+ */
+export const FREE_PLAN_DAILY_SESSION_CAP = 5;

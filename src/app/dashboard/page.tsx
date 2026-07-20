@@ -5,6 +5,8 @@ import { Rocket } from 'lucide-react';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getTenantNeedsAttention } from '@/services/overview';
+import { countSessionsToday } from '@/services/sessions';
+import { FREE_PLAN_DAILY_SESSION_CAP } from '@/lib/constants';
 import { PageHeader } from '@/components/page-header';
 import { EmptyState } from '@/components/empty-state';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,11 +58,12 @@ export default async function DashboardHomePage() {
     { count: conversationsHandled30d },
     { count: activeConversations },
     { count: ordersThisMonth },
+    conversationsToday,
   ] = await Promise.all([
     getTenantNeedsAttention(activeTenantId),
     supabase
       .from('tenants')
-      .select('business_name, whatsapp_phone_number_id, meta_page_id, instagram_id, widget_public_key')
+      .select('business_name, whatsapp_phone_number_id, meta_page_id, instagram_id, widget_public_key, plan')
       .eq('id', activeTenantId)
       .single(),
     supabase
@@ -78,7 +81,11 @@ export default async function DashboardHomePage() {
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', activeTenantId)
       .gte('created_at', monthStart),
+    countSessionsToday(activeTenantId),
   ]);
+
+  const isFreePlan = tenant?.plan === 'free';
+  const freeQuotaRemaining = Math.max(0, FREE_PLAN_DAILY_SESSION_CAP - conversationsToday);
 
   const channelConnected: Record<string, boolean> = {
     whatsapp: Boolean(tenant?.whatsapp_phone_number_id),
@@ -104,6 +111,21 @@ export default async function DashboardHomePage() {
         title={`Welcome back${tenant ? `, ${tenant.business_name}` : ''}`}
         description="Here's what's happening with your AI assistant."
       />
+
+      {isFreePlan && (
+        <div
+          className={`rounded-xl p-4 text-sm ring-1 ${
+            freeQuotaRemaining === 0
+              ? 'bg-destructive/10 text-destructive ring-destructive/20'
+              : 'bg-card ring-foreground/10'
+          }`}
+        >
+          <span className="font-medium">Free plan:</span>{' '}
+          {freeQuotaRemaining === 0
+            ? "You've used all of today's new-conversation slots. New customers won't get a reply until tomorrow."
+            : `${freeQuotaRemaining} of ${FREE_PLAN_DAILY_SESSION_CAP} new conversations left today.`}
+        </div>
+      )}
 
       {!hasActivity ? (
         <EmptyState

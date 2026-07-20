@@ -3,9 +3,9 @@ import { redirect } from 'next/navigation';
 import { Store } from 'lucide-react';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { IntakeForm } from '@/app/admin/clients/[id]/intake/intake-form';
 import { PageHeader } from '@/components/page-header';
 import { ChannelSetup } from './channel-setup';
+import { BusinessIntake } from './business-intake';
 
 export default async function DashboardBusinessPage() {
   const ctx = await getCallerContext(); // layout already gated; re-derive (React cache dedupes)
@@ -24,7 +24,7 @@ export default async function DashboardBusinessPage() {
   const { data: tenant } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, system_prompt, catalog_data, catalog_freeform_text, custom_orders_enabled, custom_orders_require_approval, custom_order_instructions, media_handling, business_type, booking_link, knowledge_base, business_hours, timezone, payments_enabled, payment_methods, payment_instructions, default_currency, prepaid_required, whatsapp_phone_number_id, meta_page_id, instagram_id, widget_public_key, requested_platforms, platform_setup_notes, platform_setup_requested_at',
+      'id, business_name, system_prompt, catalog_data, catalog_freeform_text, custom_orders_enabled, custom_orders_require_approval, custom_order_instructions, media_handling, business_type, booking_link, knowledge_base, business_hours, timezone, payments_enabled, payment_methods, payment_instructions, default_currency, prepaid_required, whatsapp_phone_number_id, meta_page_id, instagram_id, widget_public_key, requested_platforms, platform_setup_notes, platform_setup_requested_at, intake_completed_at',
     )
     .eq('id', activeTenantId)
     .single();
@@ -60,7 +60,7 @@ export default async function DashboardBusinessPage() {
           This is what your AI assistant uses to talk to customers — save any time and our team sees
           the update instantly.
         </p>
-        <IntakeForm tenant={tenant} viewer="client" />
+        <BusinessIntake tenant={tenant} />
       </div>
     </div>
   );

@@ -1,5 +1,7 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
+import { env } from '@/lib/env';
+import { sendEmail } from '@/services/email';
 import type { Database } from '@/types/database';
 import type { Notification, NotificationEntityType, NotificationType } from '@/types/domain';
 
@@ -60,6 +62,73 @@ export async function notify(input: NotifyInput): Promise<void> {
     if (error) throw error;
   } catch (err) {
     console.error('[notifications] emit failed', {
+      type: input.type,
+      tenantId: input.tenantId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
+
+  await emitEmailFanOut(input);
+}
+
+interface RecipientRow {
+  email: string | null;
+  notification_prefs: Database['public']['Tables']['profiles']['Row']['notification_prefs'];
+}
+
+function emailEligible(row: RecipientRow, type: NotificationType): boolean {
+  const prefs = (row.notification_prefs ?? {}) as { email_enabled?: boolean; muted_types?: string[] };
+  return prefs.email_enabled === true && !(prefs.muted_types ?? []).includes(type);
+}
+
+/**
+ * docs/14 §3.4 — agency recipients are every platform admin; tenant recipients
+ * are that tenant's user_tenants members. Both are filtered by the recipient's
+ * own notification_prefs (email_enabled + muted_types) before we ever send.
+ */
+async function resolveEmailRecipients(client: ReturnType<typeof createServiceClient>, input: NotifyInput): Promise<string[]> {
+  if (input.scope === 'agency') {
+    const { data } = await client
+      .from('profiles')
+      .select('email, notification_prefs')
+      .eq('is_platform_admin', true);
+    return (data ?? [])
+      .filter((row) => emailEligible(row, input.type))
+      .map((row) => row.email)
+      .filter((email): email is string => email !== null);
+  }
+
+  const { data: members } = await client
+    .from('user_tenants')
+    .select('user_id')
+    .eq('tenant_id', input.tenantId);
+  const userIds = (members ?? []).map((m) => m.user_id);
+  if (userIds.length === 0) return [];
+
+  const { data: profiles } = await client
+    .from('profiles')
+    .select('email, notification_prefs')
+    .in('id', userIds);
+  return (profiles ?? [])
+    .filter((row) => emailEligible(row, input.type))
+    .map((row) => row.email)
+    .filter((email): email is string => email !== null);
+}
+
+/**
+ * Email is a bolt-on, not a dependency (docs/14 §3.4/§9, Stage O7): a no-op
+ * whenever RESEND_API_KEY is unset, and best-effort (never throws) once it is.
+ */
+async function emitEmailFanOut(input: NotifyInput): Promise<void> {
+  if (!env.RESEND_API_KEY) return;
+  try {
+    const client = createServiceClient();
+    const recipients = await resolveEmailRecipients(client, input);
+    if (recipients.length === 0) return;
+    await sendEmail({ to: recipients, subject: input.title, text: input.body ?? input.title });
+  } catch (err) {
+    console.error('[notifications] email fan-out failed', {
       type: input.type,
       tenantId: input.tenantId,
       error: err instanceof Error ? err.message : String(err),

@@ -20,6 +20,9 @@ const schema = z.object({
   META_APP_SECRET: z.string().min(1),
   META_GRAPH_VERSION: z.string().default('v21.0'),
   NEXT_PUBLIC_APP_URL: z.string().url().default('http://localhost:3000'),
+  // Optional — email fan-out (docs/14 §3.4, Stage O7) is a no-op until this is set.
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

@@ -48,6 +48,8 @@ function mapTenant(row: TenantRow): Tenant {
     paymentKeySecretId: row.payment_key_secret_id,
     defaultCurrency: row.default_currency,
     prepaidRequired: row.prepaid_required,
+    plan: row.plan,
+    planStatus: row.plan_status,
   };
 }
 

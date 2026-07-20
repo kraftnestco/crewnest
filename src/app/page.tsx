@@ -43,11 +43,14 @@ export default function Home() {
             </span>
           </div>
           <nav className="flex items-center gap-1.5 sm:gap-2">
+            <Link href="/try" className={cn(buttonVariants({ size: 'sm' }))}>
+              Try it free
+            </Link>
             <Link href="/login?redirect=/dashboard" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
               <span className="sm:hidden">Client</span>
               <span className="hidden sm:inline">Client login</span>
             </Link>
-            <Link href="/login?redirect=/admin" className={cn(buttonVariants({ size: 'sm' }))}>
+            <Link href="/login?redirect=/admin" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
               <span className="sm:hidden">Admin</span>
               <span className="hidden sm:inline">Admin login</span>
             </Link>
@@ -79,17 +82,14 @@ export default function Home() {
                 Instagram, and your website — grounded in your catalogue, with a human always one tap away.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/login?redirect=/dashboard"
-                  className={cn(buttonVariants({ size: 'lg' }), 'w-full sm:w-auto')}
-                >
-                  Sign in as client
+                <Link href="/try" className={cn(buttonVariants({ size: 'lg' }), 'w-full sm:w-auto')}>
+                  Try it for your business — free
                 </Link>
                 <Link
-                  href="/login?redirect=/admin"
+                  href="/login?redirect=/dashboard"
                   className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'w-full sm:w-auto')}
                 >
-                  Sign in as admin
+                  Sign in as client
                 </Link>
               </div>
             </div>

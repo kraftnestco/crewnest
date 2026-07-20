@@ -21,12 +21,40 @@ function mapSession(row: ChatSessionRow): ChatSession {
   };
 }
 
-/** Find the session for (tenant, platform, external user), or create it. */
+/**
+ * Count sessions created since UTC midnight for a tenant — the denominator for
+ * the free-plan daily new-conversation cap (docs: self-serve signup plan, Phase D).
+ */
+export async function countSessionsToday(tenantId: string): Promise<number> {
+  const client = createServiceClient();
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+
+  const { count, error } = await client
+    .from('chat_sessions')
+    .select('*', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .gte('created_at', startOfDay.toISOString());
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
+ * Find the session for (tenant, platform, external user), or create it.
+ *
+ * `dailyCap`, when passed (free-plan tenants only), bounds how many NEW
+ * conversations may start per UTC day — an existing session is always
+ * returned regardless of the cap, since it was already counted the day it
+ * was created. Returns the literal `'cap_reached'` instead of creating a row
+ * when a brand-new conversation would exceed it.
+ */
 export async function findOrCreate(
   tenantId: string,
   platform: Platform,
   externalUserId: string,
-): Promise<ChatSession> {
+  dailyCap?: number,
+): Promise<ChatSession | 'cap_reached'> {
   const client = createServiceClient();
 
   const { data: existing, error: selectError } = await client
@@ -39,6 +67,11 @@ export async function findOrCreate(
 
   if (selectError) throw selectError;
   if (existing) return mapSession(existing);
+
+  if (dailyCap !== undefined) {
+    const todayCount = await countSessionsToday(tenantId);
+    if (todayCount >= dailyCap) return 'cap_reached';
+  }
 
   const { data: inserted, error: insertError } = await client
     .from('chat_sessions')

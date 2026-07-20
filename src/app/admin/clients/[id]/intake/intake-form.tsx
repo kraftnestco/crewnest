@@ -8,142 +8,25 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import type { Database } from '@/types/database';
+import {
+  BUSINESS_TYPE_OPTIONS,
+  MEDIA_HANDLING_OPTIONS,
+  PAYMENT_METHOD_OPTIONS,
+  parseBusinessHours,
+  parseKnowledgeBase,
+  type BusinessHoursState,
+  type FaqEntry,
+  type IntakeTenant,
+  type KnowledgeBaseState,
+} from '@/components/intake/intake-shared';
 import { updateIntakeAction } from './actions';
 import { initialUpdateIntakeState } from './intake-state';
 
-type IntakeTenant = Pick<
-  Database['public']['Tables']['tenants']['Row'],
-  | 'id'
-  | 'system_prompt'
-  | 'catalog_data'
-  | 'catalog_freeform_text'
-  | 'custom_orders_enabled'
-  | 'custom_orders_require_approval'
-  | 'custom_order_instructions'
-  | 'media_handling'
-  | 'business_type'
-  | 'booking_link'
-  | 'knowledge_base'
-  | 'business_hours'
-  | 'timezone'
-  | 'payments_enabled'
-  | 'payment_methods'
-  | 'payment_instructions'
-  | 'default_currency'
-  | 'prepaid_required'
->;
-
-interface FaqEntry {
-  q: string;
-  a: string;
-}
-
-interface KnowledgeBaseState {
-  faq: FaqEntry[];
-  delivery: string;
-  returns: string;
-  location: string;
-  note: string;
-}
-
-interface HourRow {
-  day: string;
-  open: string;
-  close: string;
-}
-
-interface BusinessHoursState {
-  week: HourRow[];
-  note: string;
-}
-
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null;
-}
-
-function parseKnowledgeBase(raw: unknown): KnowledgeBaseState {
-  const obj = isRecord(raw) ? raw : {};
-  const faqRaw = Array.isArray(obj.faq) ? obj.faq.filter(isRecord) : [];
-  return {
-    faq: faqRaw.map((e) => ({ q: typeof e.q === 'string' ? e.q : '', a: typeof e.a === 'string' ? e.a : '' })),
-    delivery: typeof obj.delivery === 'string' ? obj.delivery : '',
-    returns: typeof obj.returns === 'string' ? obj.returns : '',
-    location: typeof obj.location === 'string' ? obj.location : '',
-    note: typeof obj.note === 'string' ? obj.note : '',
-  };
-}
-
-function parseBusinessHours(raw: unknown): BusinessHoursState {
-  const obj = isRecord(raw) ? raw : {};
-  const weekRaw = Array.isArray(obj.week) ? obj.week.filter(isRecord) : [];
-  const byDay = new Map(weekRaw.map((e) => [String(e.day ?? ''), e]));
-  return {
-    week: DAYS.map((day) => {
-      const e = byDay.get(day);
-      return {
-        day,
-        open: e && typeof e.open === 'string' ? e.open : '',
-        close: e && typeof e.close === 'string' ? e.close : '',
-      };
-    }),
-    note: typeof obj.note === 'string' ? obj.note : '',
-  };
-}
-
-const MEDIA_HANDLING_OPTIONS: Array<{ value: string; label: string; hint: string }> = [
-  {
-    value: 'match_catalogue',
-    label: 'Match to my catalogue',
-    hint: 'Try to identify the closest catalogue item and capture the delta. (Default)',
-  },
-  {
-    value: 'accept_any',
-    label: 'Accept any',
-    hint: "Take the request even if it isn't in the catalogue.",
-  },
-  {
-    value: 'reject',
-    label: 'Reject',
-    hint: 'Politely decline media, ask for a text description instead.',
-  },
-];
-
-const BUSINESS_TYPE_OPTIONS: Array<{ value: string; label: string; hint: string }> = [
-  {
-    value: 'product',
-    label: 'Product-based',
-    hint: 'Sells physical items customers order from a catalogue. (Default)',
-  },
-  {
-    value: 'service',
-    label: 'Service-based',
-    hint: 'Offers services — appointments/bookings, or custom quotes your team prices.',
-  },
-];
-
-const PAYMENT_METHOD_OPTIONS: Array<{ value: string; label: string; hint: string; disabled?: boolean }> = [
-  { value: 'cod', label: 'Cash on Delivery', hint: 'No prepayment needed; confirmed on delivery.' },
-  {
-    value: 'manual_transfer',
-    label: 'Bank/Wallet Transfer',
-    hint: 'Share your account details; the customer sends a receipt screenshot after paying.',
-  },
-  {
-    value: 'gateway',
-    label: 'Card/Online Payment',
-    hint: 'Coming soon — needs a payment provider connected first.',
-    disabled: true,
-  },
-];
-
-export function IntakeForm({ tenant, viewer }: { tenant: IntakeTenant; viewer: 'admin' | 'client' }) {
-  const isAdmin = viewer === 'admin';
+/** Agency-only editor: raw JSON catalogue, no wizard steps. The client's own
+ * step-by-step flow is `components/intake/intake-wizard.tsx`. */
+export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
   const boundAction = updateIntakeAction.bind(null, tenant.id);
   const [state, formAction, isPending] = useActionState(boundAction, initialUpdateIntakeState);
-  const [catalogFreeform, setCatalogFreeform] = useState(tenant.catalog_freeform_text ?? '');
   const [mediaHandling, setMediaHandling] = useState(tenant.media_handling ?? 'match_catalogue');
   const [businessType, setBusinessType] = useState(tenant.business_type ?? 'product');
   const [knowledge, setKnowledge] = useState<KnowledgeBaseState>(() => parseKnowledgeBase(tenant.knowledge_base));
@@ -172,7 +55,7 @@ export function IntakeForm({ tenant, viewer }: { tenant: IntakeTenant; viewer: '
     setKnowledge((k) => ({ ...k, faq: k.faq.filter((_, i) => i !== index) }));
   }
 
-  function updateHourRow(day: string, patch: Partial<HourRow>) {
+  function updateHourRow(day: string, patch: Partial<{ open: string; close: string }>) {
     setHours((h) => ({ ...h, week: h.week.map((r) => (r.day === day ? { ...r, ...patch } : r)) }));
   }
 
@@ -184,7 +67,7 @@ export function IntakeForm({ tenant, viewer }: { tenant: IntakeTenant; viewer: '
     <form action={formAction} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>{isAdmin ? '1. Business type' : 'What kind of business is this?'}</CardTitle>
+          <CardTitle>1. Business type</CardTitle>
           <CardDescription>Product or service — this decides how the AI handles orders vs bookings/quotes.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -226,7 +109,7 @@ export function IntakeForm({ tenant, viewer }: { tenant: IntakeTenant; viewer: '
 
       <Card>
         <CardHeader>
-          <CardTitle>{isAdmin ? '2. Business nature' : 'Tell us about your business'}</CardTitle>
+          <CardTitle>2. Business nature</CardTitle>
           <CardDescription>
             What the business sells, its tone, and languages. Seeds the AI&apos;s system prompt.
           </CardDescription>
@@ -244,47 +127,31 @@ export function IntakeForm({ tenant, viewer }: { tenant: IntakeTenant; viewer: '
 
       <Card>
         <CardHeader>
-          <CardTitle>{isAdmin ? '3. Standard catalogue' : 'What do you sell?'}</CardTitle>
+          <CardTitle>3. Standard catalogue</CardTitle>
           <CardDescription>
-            {isAdmin
-              ? 'Reference data the AI answers from (JSON). The client’s own words, if they’ve entered any, are shown below for reference — this box is what the AI actually reads.'
-              : 'List your items, services, or packages in your own words — prices, options, whatever you’d tell a customer. We turn this into something your AI assistant can answer questions from.'}
+            Reference data the AI answers from (JSON). The client’s own words, if they’ve entered any, are shown
+            below for reference — this box is what the AI actually reads.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isAdmin ? (
-            <>
-              <Textarea
-                id="catalog_data"
-                name="catalog_data"
-                rows={6}
-                defaultValue={JSON.stringify(tenant.catalog_data ?? {}, null, 2)}
-              />
-              {tenant.catalog_freeform_text && (
-                <div className="rounded-lg border border-input bg-muted/40 p-3">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">Client&apos;s own words (read-only)</p>
-                  <p className="whitespace-pre-wrap text-sm">{tenant.catalog_freeform_text}</p>
-                </div>
-              )}
-            </>
-          ) : (
-            <Textarea
-              id="catalog_freeform"
-              name="catalog_freeform"
-              rows={8}
-              value={catalogFreeform}
-              onChange={(e) => setCatalogFreeform(e.target.value)}
-              placeholder={
-                'e.g. Chocolate cake - Rs 2500, serves 8\nRed velvet cake - Rs 3000, serves 8\nCupcakes - Rs 150 each, minimum order of 6\nFree delivery on orders over Rs 5000'
-              }
-            />
+          <Textarea
+            id="catalog_data"
+            name="catalog_data"
+            rows={6}
+            defaultValue={JSON.stringify(tenant.catalog_data ?? {}, null, 2)}
+          />
+          {tenant.catalog_freeform_text && (
+            <div className="rounded-lg border border-input bg-muted/40 p-3">
+              <p className="mb-1 text-xs font-medium text-muted-foreground">Client&apos;s own words (read-only)</p>
+              <p className="whitespace-pre-wrap text-sm">{tenant.catalog_freeform_text}</p>
+            </div>
           )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>{isAdmin ? '4. Custom orders' : 'Custom orders'}</CardTitle>
+          <CardTitle>4. Custom orders</CardTitle>
           <CardDescription>Let customers ask for a customised version of one of your items.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -311,7 +178,7 @@ export function IntakeForm({ tenant, viewer }: { tenant: IntakeTenant; viewer: '
 
       <Card>
         <CardHeader>
-          <CardTitle>{isAdmin ? '5. Customer example media' : 'Photos & voice notes from customers'}</CardTitle>
+          <CardTitle>5. Customer example media</CardTitle>
           <CardDescription>
             How should the AI handle a picture, voice note, or video a customer sends as an example?
           </CardDescription>
@@ -338,7 +205,7 @@ export function IntakeForm({ tenant, viewer }: { tenant: IntakeTenant; viewer: '
 
       <Card>
         <CardHeader>
-          <CardTitle>{isAdmin ? '6. Approval' : 'Order approval'}</CardTitle>
+          <CardTitle>6. Approval</CardTitle>
           <CardDescription>Should custom orders need your sign-off before they&apos;re final?</CardDescription>
         </CardHeader>
         <CardContent>
@@ -358,7 +225,7 @@ export function IntakeForm({ tenant, viewer }: { tenant: IntakeTenant; viewer: '
 
       <Card>
         <CardHeader>
-          <CardTitle>{isAdmin ? '7. Knowledge & FAQ' : 'Common questions'}</CardTitle>
+          <CardTitle>7. Knowledge & FAQ</CardTitle>
           <CardDescription>
             Answers the AI can give straight away — delivery, returns, location, and common questions, in your
             own words.
@@ -430,7 +297,7 @@ export function IntakeForm({ tenant, viewer }: { tenant: IntakeTenant; viewer: '
 
       <Card>
         <CardHeader>
-          <CardTitle>{isAdmin ? '8. Business hours' : 'Business hours'}</CardTitle>
+          <CardTitle>8. Business hours</CardTitle>
           <CardDescription>
             So the AI can answer &quot;are you open right now?&quot; accurately. Leave a day&apos;s times blank
             for closed.
@@ -438,7 +305,7 @@ export function IntakeForm({ tenant, viewer }: { tenant: IntakeTenant; viewer: '
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="timezone">{isAdmin ? 'Timezone (IANA, e.g. Asia/Karachi)' : 'Timezone (e.g. Asia/Karachi)'}</Label>
+            <Label htmlFor="timezone">Timezone (IANA, e.g. Asia/Karachi)</Label>
             <Input
               id="timezone"
               value={timezone}
@@ -480,7 +347,7 @@ export function IntakeForm({ tenant, viewer }: { tenant: IntakeTenant; viewer: '
 
       <Card>
         <CardHeader>
-          <CardTitle>{isAdmin ? '9. Payments' : 'Payments'}</CardTitle>
+          <CardTitle>9. Payments</CardTitle>
           <CardDescription>How customers pay, and what the AI is allowed to tell them about it.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -567,7 +434,7 @@ export function IntakeForm({ tenant, viewer }: { tenant: IntakeTenant; viewer: '
       {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 
       <Button type="submit" disabled={isPending}>
-        {isPending ? 'Saving…' : isAdmin ? 'Save intake config' : 'Save business details'}
+        {isPending ? 'Saving…' : 'Save intake config'}
       </Button>
     </form>
   );

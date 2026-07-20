@@ -28,7 +28,7 @@ export default async function ClientIntakePage({ params }: { params: Promise<{ i
           customer-sent example media.
         </p>
       </div>
-      <IntakeForm tenant={tenant} viewer="admin" />
+      <IntakeForm tenant={tenant} />
     </div>
   );
 }
