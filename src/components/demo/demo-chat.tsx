@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { PlatformBadge, type PlatformId } from '@/app/_landing/platform-icons';
 import type { DemoTenantInput } from '@/services/demo/schema';
 import type { DemoOrderCard } from '@/app/api/demo/chat/route';
 
@@ -46,6 +47,12 @@ const SKIN_META: Record<
     userBubble: 'bg-[#0084FF] text-white',
     assistantBubble: 'bg-muted text-foreground',
   },
+};
+
+const SKIN_PLATFORM: Record<Skin, PlatformId> = {
+  whatsapp: 'whatsapp',
+  instagram: 'instagram',
+  messenger: 'messenger',
 };
 
 export function DemoChat({ demoTenant, businessName }: { demoTenant: DemoTenantInput; businessName: string }) {
@@ -120,16 +127,20 @@ export function DemoChat({ demoTenant, businessName }: { demoTenant: DemoTenantI
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
       <Card className="overflow-hidden py-0">
-        <div className={`flex items-center justify-between px-4 py-3 ${meta.headerBg}`}>
-          <div>
-            <p className="text-sm font-semibold">{businessName || 'Your business'}</p>
-            <p className="text-xs opacity-80">{sending ? 'typing…' : 'online'}</p>
+        <div className={`flex items-center justify-between gap-2 px-4 py-3 ${meta.headerBg}`}>
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <PlatformBadge platform={SKIN_PLATFORM[skin]} className="shrink-0 shadow-none ring-2 ring-white/25" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{businessName || 'Your business'}</p>
+              <p className="text-xs opacity-80">{sending ? 'typing…' : 'online'}</p>
+            </div>
           </div>
-          <Tabs value={skin} onValueChange={(v) => setSkin(v as Skin)}>
+          <Tabs value={skin} onValueChange={(v) => setSkin(v as Skin)} className="shrink-0">
             <TabsList>
               {(Object.keys(SKIN_META) as Skin[]).map((s) => (
-                <TabsTrigger key={s} value={s}>
-                  {SKIN_META[s].label}
+                <TabsTrigger key={s} value={s} title={SKIN_META[s].label}>
+                  <PlatformBadge platform={SKIN_PLATFORM[s]} className="size-5 rounded-md shadow-none" iconClassName="size-3" />
+                  <span className="sr-only">{SKIN_META[s].label}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -139,11 +150,14 @@ export function DemoChat({ demoTenant, businessName }: { demoTenant: DemoTenantI
         <div ref={scrollRef} className={`h-[420px] space-y-2 overflow-y-auto px-4 py-4 ${meta.chatBg}`}>
           {turns.map((t, i) =>
             t.role === 'note' ? (
-              <div key={i} className="mx-auto max-w-[85%] rounded-md bg-black/10 px-3 py-1.5 text-center text-xs text-foreground/70 dark:bg-white/10">
+              <div
+                key={i}
+                className="animate-in fade-in slide-in-from-bottom-1 mx-auto max-w-[85%] rounded-md bg-black/10 px-3 py-1.5 text-center text-xs text-foreground/70 duration-300 dark:bg-white/10"
+              >
                 {t.content}
               </div>
             ) : (
-              <div key={i} className={`flex ${t.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={i} className={`animate-in fade-in slide-in-from-bottom-1 flex duration-300 ${t.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div
                   className={`max-w-[75%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm shadow-sm ${
                     t.role === 'user' ? meta.userBubble : meta.assistantBubble
@@ -153,6 +167,15 @@ export function DemoChat({ demoTenant, businessName }: { demoTenant: DemoTenantI
                 </div>
               </div>
             ),
+          )}
+          {sending && (
+            <div className="animate-in fade-in flex justify-start duration-300">
+              <div className={`flex items-center gap-1 rounded-lg px-3 py-2.5 shadow-sm ${meta.assistantBubble}`}>
+                <span className="size-1.5 animate-bounce rounded-full bg-current opacity-50 [animation-delay:-0.3s]" />
+                <span className="size-1.5 animate-bounce rounded-full bg-current opacity-50 [animation-delay:-0.15s]" />
+                <span className="size-1.5 animate-bounce rounded-full bg-current opacity-50" />
+              </div>
+            </div>
           )}
         </div>
 

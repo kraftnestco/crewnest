@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { displayFont } from '@/app/_landing/fonts';
 import { PAYWALL_PLANS, type PlanOption } from '@/services/demo/plans';
 
 /**
@@ -25,17 +27,23 @@ export function PaywallModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Keep this AI for your business</DialogTitle>
+          <DialogTitle className={cn(displayFont.className, 'text-xl')}>Keep this AI for your business</DialogTitle>
           <DialogDescription>Pick a plan to create your account — we&apos;ll set up the tenant from what you just built.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-3">
           {PAYWALL_PLANS.map((plan) => (
-            <Card key={plan.id} className={plan.id === 'starter' ? 'ring-1 ring-primary' : undefined}>
+            <Card
+              key={plan.id}
+              className={cn(
+                'relative',
+                plan.id === 'starter' && 'ring-2 ring-primary shadow-lg sm:-my-1 sm:scale-[1.03]',
+              )}
+            >
+              {plan.id === 'starter' && (
+                <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2">Popular</Badge>
+              )}
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">{plan.name}</CardTitle>
-                  {plan.id === 'starter' && <Badge>Popular</Badge>}
-                </div>
+                <CardTitle className="text-base">{plan.name}</CardTitle>
                 <p className="text-lg font-semibold">{plan.price}</p>
                 <CardDescription>{plan.tagline}</CardDescription>
               </CardHeader>

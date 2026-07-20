@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import { Logomark } from '@/app/_landing/logomark';
+import { displayFont } from '@/app/_landing/fonts';
 import { TryDemo } from '@/components/demo/try-demo';
 
 export const metadata = {
@@ -16,7 +17,7 @@ export default function TryPage() {
         <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link href="/" className="flex items-center gap-2">
             <Logomark />
-            <span className="font-heading text-lg font-semibold">
+            <span className={cn(displayFont.className, 'text-lg font-semibold')}>
               Crew<span className="font-normal text-muted-foreground">Nest</span>
             </span>
           </Link>
@@ -28,7 +29,7 @@ export default function TryPage() {
 
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:px-6">
         <div className="mb-8 text-center">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+          <h1 className={cn(displayFont.className, 'text-3xl tracking-tight text-balance sm:text-4xl')}>
             See your AI employee in action
           </h1>
           <p className="mt-2 text-muted-foreground text-balance">

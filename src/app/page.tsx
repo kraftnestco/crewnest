@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { Logomark } from './_landing/logomark';
 import { TiltCard } from './_landing/tilt-card';
 import { HeroVisual } from './_landing/hero-visual';
+import { displayFont } from './_landing/fonts';
 
 const FEATURES = [
   {
@@ -38,7 +39,7 @@ export default function Home() {
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
             <Logomark />
-            <span className="font-heading text-lg font-semibold">
+            <span className={cn(displayFont.className, 'text-lg font-semibold')}>
               Crew<span className="font-normal text-muted-foreground">Nest</span>
             </span>
           </div>
@@ -74,7 +75,7 @@ export default function Home() {
           <div className="mx-auto grid w-full max-w-5xl items-center gap-12 px-6 py-20 lg:grid-cols-[1.1fr_1fr] lg:py-28">
             <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
               <Badge variant="secondary">Multi-channel AI employee</Badge>
-              <h1 className="mt-4 font-heading text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+              <h1 className={cn(displayFont.className, 'mt-4 text-4xl tracking-tight text-balance sm:text-5xl')}>
                 Your business, answered instantly.
               </h1>
               <p className="mt-4 max-w-xl text-lg text-muted-foreground text-balance">
@@ -104,8 +105,10 @@ export default function Home() {
               <TiltCard key={feature.title} max={5}>
                 <Card className="h-full">
                   <CardHeader>
-                    <feature.icon className="size-5 text-muted-foreground" />
-                    <CardTitle className="mt-2">{feature.title}</CardTitle>
+                    <span className="inline-flex size-9 items-center justify-center rounded-xl bg-foreground text-background shadow-sm">
+                      <feature.icon className="size-4" />
+                    </span>
+                    <CardTitle className={cn(displayFont.className, 'mt-2 font-semibold')}>{feature.title}</CardTitle>
                     <CardDescription>{feature.description}</CardDescription>
                   </CardHeader>
                   <CardContent />
