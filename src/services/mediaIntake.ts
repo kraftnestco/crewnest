@@ -11,19 +11,19 @@ import type { ChatSession, InboundAttachment, OrderAttachment, Tenant } from '@/
 
 /**
  * Turns this turn's raw inbound attachments into persisted media + the extra text/
- * image parts the orchestrator folds into the prompt (docs/10 §4/§5/§6.1). Gated
- * entirely on `tenant.customOrdersEnabled` — this whole feature exists to service
- * custom orders (docs/10 §1 intro); a tenant that hasn't opted in behaves exactly as
- * the doc-09 text-only order-taker (acceptance criterion #1).
+ * image parts the orchestrator folds into the prompt (docs/10 §4/§5/§6.1, docs/11
+ * §3.3.1 B). Entry gate is `customOrdersEnabled OR paymentsEnabled` — NOT
+ * `customOrdersEnabled` alone (fixed 2026-07-20; a payments-only tenant used to
+ * never reach the proof-routing check below at all).
  *
- * - image: downloaded + a short-TTL signed URL minted for the multimodal turn.
- *   Skipped when `mediaHandling === 'reject'` (§4.2).
- * - audio (voice note): downloaded + transcribed; the transcript folds into the
- *   turn's text like typed input (§5). NOT gated on `mediaHandling` — a voice note
- *   is spoken text, not a visual "example" the reject directive is about.
- * - video: MVP "persist + ask" (§6.1, H1 frozen) — no decode. Persisted for owner
- *   review; a server-authored note steers the model to ask for a photo instead.
- *   Skipped when `mediaHandling === 'reject'`, same as image.
+ * - image: always downloaded + checked against `orders.findProofTarget` first
+ *   (payment-proof routing, gated only on `paymentsEnabled`, independent of custom
+ *   orders). Only once that comes back empty does the CUSTOM-ORDERS-only "vision
+ *   example" path run — gated on `customOrdersEnabled` and skipped when
+ *   `mediaHandling === 'reject'` (§4.2).
+ * - audio (voice note) / video: doc-10 custom-order media only, still gated on
+ *   `customOrdersEnabled` — a payments-only tenant's voice notes/videos are left
+ *   untouched (not part of the payment-proof feature).
  */
 
 export interface MediaIntakeResult {
@@ -42,11 +42,18 @@ export async function processInboundMedia(
   rawAttachments: InboundAttachment[] | undefined,
   tenant: Pick<
     Tenant,
-    'id' | 'customOrdersEnabled' | 'mediaHandling' | 'metaTokenSecretId' | 'whatsappTokenSecretId' | 'openaiKeySecretId'
+    | 'id'
+    | 'customOrdersEnabled'
+    | 'paymentsEnabled'
+    | 'mediaHandling'
+    | 'metaTokenSecretId'
+    | 'whatsappTokenSecretId'
+    | 'openaiKeySecretId'
   >,
   session: Pick<ChatSession, 'id' | 'platform'>,
 ): Promise<MediaIntakeResult> {
-  if (!rawAttachments?.length || !tenant.customOrdersEnabled) return EMPTY;
+  if (!rawAttachments?.length) return EMPTY;
+  if (!tenant.customOrdersEnabled && !tenant.paymentsEnabled) return EMPTY;
 
   const used = await messages.countRecentAttachments(session.id, MEDIA_CAP_WINDOW_MINUTES);
   if (used >= MAX_MEDIA_PER_SESSION_WINDOW) {
@@ -59,7 +66,6 @@ export async function processInboundMedia(
 
   for (const raw of rawAttachments) {
     if (raw.kind === 'image') {
-      if (tenant.mediaHandling === 'reject') continue;
       const downloaded = await media.download(raw, tenant, session.id, session.platform);
       if (!downloaded) {
         textNotes.push(
@@ -71,9 +77,9 @@ export async function processInboundMedia(
       attachments.push({ kind: 'image', storagePath: downloaded.storagePath, mimeType: downloaded.mimeType });
 
       // K1 (docs/11 §3.3.1 B): proof beats example — a session-scoped, server-decided
-      // route, never the model's or the untrusted caption's call. An open unpaid
-      // manual-transfer order routes this image as a payment receipt instead of a
-      // custom-order example; the vision/example flow is skipped entirely for it.
+      // route, never the model's or the untrusted caption's call. Checked BEFORE the
+      // customOrdersEnabled/mediaHandling gate below so a payments-only tenant (no
+      // custom orders) still gets its payment proofs routed correctly.
       const proofTarget = await orders.findProofTarget(session.id);
       if (proofTarget) {
         await orders.attachProof(proofTarget.id, {
@@ -106,6 +112,11 @@ export async function processInboundMedia(
         continue;
       }
 
+      // Not a payment proof — only a custom-orders tenant treats an image as a
+      // vision example; a payments-only tenant's non-proof images are persisted
+      // above (for the inbox/order-history record) but otherwise left alone.
+      if (!tenant.customOrdersEnabled || tenant.mediaHandling === 'reject') continue;
+
       const signedUrl = await media.getSignedUrl(downloaded.storagePath);
       if (signedUrl) imageUrls.push(signedUrl);
       if (raw.caption?.trim()) textNotes.push(sanitizeInbound(raw.caption));
@@ -113,6 +124,7 @@ export async function processInboundMedia(
     }
 
     if (raw.kind === 'audio') {
+      if (!tenant.customOrdersEnabled) continue;
       const { key } = await getTranscriptionKey(tenant);
       const result = await transcribeService.transcribe(raw, tenant, session.id, session.platform, key);
       if (!result) {
@@ -128,7 +140,7 @@ export async function processInboundMedia(
     }
 
     if (raw.kind === 'video') {
-      if (tenant.mediaHandling === 'reject') continue;
+      if (!tenant.customOrdersEnabled || tenant.mediaHandling === 'reject') continue;
       const downloaded = await media.download(raw, tenant, session.id, session.platform);
       if (!downloaded) {
         textNotes.push(
