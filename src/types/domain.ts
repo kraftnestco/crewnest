@@ -68,6 +68,7 @@ export interface ChatSession {
   externalUserId: string;
   isHumanHandoff: boolean;
   alertSignal: AlertSignal | null;
+  pendingReviewOrderId: string | null;
 }
 
 export interface ChatMessage {
@@ -95,6 +96,12 @@ export interface OrderAttachment {
   mimeType: string;
 }
 
+/** One entry in `Order.statusHistory` — an append-only audit trail of status/payment transitions. */
+export interface OrderStatusEvent {
+  event: string;
+  at: string;
+}
+
 /** A confirmed (or, per docs/10 §3.3, pending-approval) customer order captured by the create_order tool. */
 export interface Order {
   id: string;
@@ -118,6 +125,11 @@ export interface Order {
   currency: string | null;
   paidAt: string | null;
   paymentProof: OrderAttachment | null;
+  statusHistory: OrderStatusEvent[];
+  reviewRating: number | null;
+  reviewText: string | null;
+  reviewRequestedAt: string | null;
+  reviewSubmittedAt: string | null;
   createdAt: string;
 }
 
@@ -128,7 +140,9 @@ export type NotificationType =
   | 'alert_signal'
   | 'channel_request'
   | 'payment_proof'
-  | 'upgrade_request';
+  | 'upgrade_request'
+  | 'review'
+  | 'order_updated';
 export type NotificationEntityType = 'order' | 'session' | 'tenant';
 
 /** A live notification-feed row (docs/14). Writes are service-role only; reads are RLS-scoped per audience. */

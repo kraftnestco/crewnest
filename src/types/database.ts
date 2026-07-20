@@ -221,6 +221,7 @@ export type Database = {
           alert_signal: string | null;
           last_message_at: string;
           unread_count: number;
+          pending_review_order_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -232,6 +233,7 @@ export type Database = {
           alert_signal?: string | null;
           last_message_at?: string;
           unread_count?: number;
+          pending_review_order_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -243,6 +245,7 @@ export type Database = {
           alert_signal?: string | null;
           last_message_at?: string;
           unread_count?: number;
+          pending_review_order_id?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -352,6 +355,11 @@ export type Database = {
           paid_at: string | null;
           payment_proof: Json | null;
           dedupe_fingerprint: string | null;
+          status_history: Json;
+          review_rating: number | null;
+          review_text: string | null;
+          review_requested_at: string | null;
+          review_submitted_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -378,6 +386,11 @@ export type Database = {
           paid_at?: string | null;
           payment_proof?: Json | null;
           dedupe_fingerprint?: string | null;
+          status_history?: Json;
+          review_rating?: number | null;
+          review_text?: string | null;
+          review_requested_at?: string | null;
+          review_submitted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -404,6 +417,11 @@ export type Database = {
           paid_at?: string | null;
           payment_proof?: Json | null;
           dedupe_fingerprint?: string | null;
+          status_history?: Json;
+          review_rating?: number | null;
+          review_text?: string | null;
+          review_requested_at?: string | null;
+          review_submitted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

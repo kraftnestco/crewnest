@@ -254,6 +254,24 @@ export function buildPaymentBlock(tenant: Pick<Tenant, 'paymentMethods' | 'payme
   return parts.join('\n');
 }
 
+/**
+ * Dynamic (NOT cached) per-turn nudge, present only the turns a fulfilled order in
+ * this session is awaiting a rating. Spliced into build()'s dynamic tail rather than
+ * the static prefix, since `pendingReviewOrderId` changes turn-to-turn and must never
+ * bust the cache (docs: order-event-messaging plan, Phase B). The model does the
+ * "transcribe concisely" work itself, as the `feedback` arg on the submit_review call.
+ */
+export function buildReviewBlock(pendingReview: { orderId: string; itemsSummary: string }, isService: boolean): string {
+  const noun = isService ? 'request' : 'order';
+  return [
+    '## PENDING REVIEW',
+    `The customer's ${noun} #${pendingReview.orderId} (${pendingReview.itemsSummary}) was just completed and is awaiting their feedback.`,
+    'If their next message gives or clearly implies a rating out of 5 (a number, stars, or an unambiguous sentiment you can map to 1-5), call submit_review with that rating and, as the feedback argument, a concise 1-2 sentence transcription of any comments they gave.',
+    'Only call submit_review once you have an explicit or clearly-implied 1-5 rating — if their message is about something else, help with that first and return to asking for the rating naturally rather than ignoring what they said.',
+    "Don't ask more than once — if they decline, ignore the ask, or seem uninterested, drop it and move on normally.",
+  ].join('\n');
+}
+
 /** Crude chars-per-token estimate — mirrors services/messages.ts; no tokenizer library in this codebase. */
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 
@@ -455,6 +473,8 @@ export interface BuildArgs {
    * Rides the dynamic user turn only — the static prefix stays text and unaffected.
    */
   imageUrls?: string[];
+  /** Set when this session has a fulfilled order awaiting a rating (docs: order-event-messaging plan, Phase B). */
+  pendingReview?: { orderId: string; itemsSummary: string };
 }
 
 export interface BuiltPrompt {
@@ -465,7 +485,7 @@ export interface BuiltPrompt {
   retrievalNeeded: boolean;
 }
 
-export function build({ tenant, history, userText, imageUrls }: BuildArgs): BuiltPrompt {
+export function build({ tenant, history, userText, imageUrls, pendingReview }: BuildArgs): BuiltPrompt {
   const userContent: LlmMessage['content'] = imageUrls?.length
     ? [
         { type: 'text', text: userText },
@@ -478,6 +498,9 @@ export function build({ tenant, history, userText, imageUrls }: BuildArgs): Buil
   const messages: LlmMessage[] = [
     { role: 'system', content: systemPrefix.text }, // [0] STATIC prefix
     ...history.map((m) => ({ role: m.role, content: m.content })), // DYNAMIC
+    ...(pendingReview
+      ? [{ role: 'system' as const, content: buildReviewBlock(pendingReview, tenant.businessType === 'service') }]
+      : []),
     { role: 'user', content: userContent }, // DYNAMIC, always last
   ];
   return { messages, cachePrefixLength: 1, retrievalNeeded: systemPrefix.retrievalNeeded };

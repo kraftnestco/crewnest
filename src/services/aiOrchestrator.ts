@@ -9,6 +9,7 @@
  */
 import * as tenants from './tenants';
 import * as sessions from './sessions';
+import * as orders from './orders';
 import * as messages from './messages';
 import * as mediaIntake from './mediaIntake';
 import * as promptBuilder from './ai/promptBuilder';
@@ -120,8 +121,21 @@ export async function handleInboundMessage(
   // 6. Short-term memory (chronological, token-budgeted).
   const history = await messages.loadWindow(session.id, MEMORY_TOKEN_BUDGET);
 
+  // 6b. Pending post-fulfillment review (docs: order-event-messaging plan, Phase B) — only
+  // built when the order still needs a rating; submitReview.ts clears the pointer on
+  // success, but re-checking reviewSubmittedAt here guards a stale pointer surviving a
+  // crash mid-turn.
+  let pendingReview: { orderId: string; itemsSummary: string } | undefined;
+  if (session.pendingReviewOrderId) {
+    const reviewOrder = await orders.getById(session.pendingReviewOrderId);
+    if (reviewOrder && !reviewOrder.reviewSubmittedAt) {
+      const itemsSummary = reviewOrder.items.map((i) => `${i.name} x${i.qty}`).join(', ') || 'their order';
+      pendingReview = { orderId: reviewOrder.id, itemsSummary };
+    }
+  }
+
   // 7. Cache-ordered prompt: [static prefix] ++ history ++ new user msg (+ images, §4.2).
-  const built = promptBuilder.build({ tenant, history, userText, imageUrls: media.imageUrls });
+  const built = promptBuilder.build({ tenant, history, userText, imageUrls: media.imageUrls, pendingReview });
 
   // 7b. Dynamic "open now" line — server-computed, injected AFTER the cache prefix so it
   // never touches the byte-identical static block (docs/12 §4.3). Only emitted when the
@@ -151,7 +165,7 @@ export async function handleInboundMessage(
   // no enabled tools gets an empty list, which behaves identically to the old
   // single-call path (provider.chat with tools: undefined).
   const provider = getProvider(tenant.llmProvider);
-  const tools = getEnabledTools(tenant);
+  const tools = getEnabledTools(tenant, session);
   const conversation: LlmMessage[] = [...built.messages];
   let finalText = '';
   let finalCompletionTokens = 0;

@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import * as orders from '@/services/orders';
+import { notifyBoth } from '@/services/notifications';
 import type { ToolContext, ToolExecutor } from './registry';
 
 /**
@@ -93,6 +94,23 @@ export const editOrderTool: ToolExecutor = {
       customerAddress: args.customer_address,
       notes: args.notes,
       status: reapprove ? 'pending' : undefined,
+    });
+
+    await notifyBoth({
+      tenantId: ctx.tenant.id,
+      type: 'order_updated',
+      entityType: 'order',
+      entityId: updated.id,
+      agency: {
+        title: reapprove ? 'Order edited — awaiting your approval' : 'Order edited by AI',
+        body: `${ctx.tenant.businessName} — ${updated.customerName ?? 'Customer'}`,
+        link: reapprove ? '/admin/orders?status=pending' : '/admin/orders',
+      },
+      tenant: {
+        title: reapprove ? 'Order edited — awaiting your approval' : 'An order was edited',
+        body: updated.customerName ?? 'Customer',
+        link: '/dashboard/orders',
+      },
     });
 
     return { orderId: updated.id, status: updated.status };

@@ -60,6 +60,31 @@ export async function takeOverAction(sessionId: string, value: boolean): Promise
     .eq('id', sessionId);
 
   if (error) throw new Error(error.message);
+
+  // Resume-context nudge (docs: order-event-messaging plan, Phase D) — only on the
+  // human -> AI handback ("Resume AI"), and best-effort: a failed insert must never
+  // block the toggle itself.
+  if (!value) {
+    try {
+      const { data: session } = await supabase.from('chat_sessions').select('tenant_id').eq('id', sessionId).single();
+      if (session) {
+        await supabase.from('chat_messages').insert({
+          session_id: sessionId,
+          tenant_id: session.tenant_id,
+          role: 'system',
+          content:
+            '[context] A human agent handled the conversation above. If an order was clearly agreed but not yet ' +
+            'recorded, call create_order now using the details already discussed instead of re-asking the customer.',
+        });
+      }
+    } catch (err) {
+      console.error('[chat] resume-context nudge failed', {
+        sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   revalidatePath('/admin/chat');
 }
 

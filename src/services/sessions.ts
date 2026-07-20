@@ -18,6 +18,7 @@ function mapSession(row: ChatSessionRow): ChatSession {
     externalUserId: row.external_user_id,
     isHumanHandoff: row.is_human_handoff,
     alertSignal: (row.alert_signal as AlertSignal | null) ?? null,
+    pendingReviewOrderId: row.pending_review_order_id,
   };
 }
 
@@ -134,4 +135,20 @@ export async function setAlertSignal(sessionId: string, signal: AlertSignal | nu
   if (error) throw error;
 
   return changed;
+}
+
+/**
+ * Set (or clear, with null) the order this session owes a post-fulfillment review
+ * for — the session-scoped pointer submit_review's registry gate and executor both
+ * check (docs: order-event-messaging plan, Phase B). Cleared on submission and on a
+ * fresh order being placed in the same session, so a stale prompt never lingers.
+ */
+export async function setPendingReview(sessionId: string, orderId: string | null): Promise<void> {
+  const client = createServiceClient();
+  const { error } = await client
+    .from('chat_sessions')
+    .update({ pending_review_order_id: orderId })
+    .eq('id', sessionId);
+
+  if (error) throw error;
 }

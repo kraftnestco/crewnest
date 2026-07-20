@@ -18,6 +18,8 @@ const TYPE_LABELS: Record<NotificationType, string> = {
   channel_request: 'Channel connection requests',
   payment_proof: 'Payment proof submitted',
   upgrade_request: 'Upgrade requests',
+  review: 'Low customer ratings',
+  order_updated: 'AI-made order edits/cancellations',
 };
 
 /** channel_request and upgrade_request are agency-only (a tenant asking the agency for a new channel or a paid-plan upgrade) — never emitted to a tenant's own feed, so they have nothing to mute on the client side (docs/14 §7.3). */
@@ -28,8 +30,10 @@ const ADMIN_TYPES: NotificationType[] = [
   'channel_request',
   'payment_proof',
   'upgrade_request',
+  'review',
+  'order_updated',
 ];
-const DASHBOARD_TYPES: NotificationType[] = ['new_order', 'handoff', 'alert_signal', 'payment_proof'];
+const DASHBOARD_TYPES: NotificationType[] = ['new_order', 'handoff', 'alert_signal', 'payment_proof', 'review', 'order_updated'];
 
 export function AccountForm({
   profile,

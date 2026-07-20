@@ -2,7 +2,16 @@ import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
 import { ORDER_DEDUPE_WINDOW_MINUTES, ORDER_CAP_WINDOW_MINUTES, PROOF_MATCH_WINDOW_HOURS } from '@/lib/constants';
 import type { Database, Json } from '@/types/database';
-import type { Order, OrderAttachment, OrderItem, OrderStatus, PaymentMethod, PaymentStatus, Platform } from '@/types/domain';
+import type {
+  Order,
+  OrderAttachment,
+  OrderItem,
+  OrderStatus,
+  OrderStatusEvent,
+  PaymentMethod,
+  PaymentStatus,
+  Platform,
+} from '@/types/domain';
 
 /**
  * Orders persistence + idempotency/abuse helpers for the create_order tool.
@@ -35,6 +44,11 @@ function mapOrder(row: OrderRow): Order {
     currency: row.currency,
     paidAt: row.paid_at,
     paymentProof: (row.payment_proof as unknown as OrderAttachment | null) ?? null,
+    statusHistory: (row.status_history as unknown as OrderStatusEvent[]) ?? [],
+    reviewRating: row.review_rating,
+    reviewText: row.review_text,
+    reviewRequestedAt: row.review_requested_at,
+    reviewSubmittedAt: row.review_submitted_at,
     createdAt: row.created_at,
   };
 }
@@ -184,12 +198,59 @@ export async function reject(orderId: string, notes?: string | null): Promise<Or
   return mapOrder(data);
 }
 
-/** Owner dashboard action: manually mark a confirmed order/service as done. */
+/** Owner dashboard action: manually mark a confirmed order/service as done; seeds the post-fulfillment review ask. */
 export async function fulfill(orderId: string): Promise<Order> {
   const client = createServiceClient();
   const { data, error } = await client
     .from('orders')
-    .update({ status: 'fulfilled' })
+    .update({ status: 'fulfilled', review_requested_at: new Date().toISOString() })
+    .eq('id', orderId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapOrder(data);
+}
+
+/**
+ * Append-only status/payment transition log (docs: order-event-messaging plan,
+ * Phase A). Read-modify-write since supabase-js has no `jsonb ||` update
+ * expression — acceptable here as these calls are sequential, human-triggered
+ * dashboard actions, not high-concurrency writes.
+ */
+export async function appendStatusEvent(orderId: string, event: string): Promise<void> {
+  const client = createServiceClient();
+  const { data: current, error: readError } = await client
+    .from('orders')
+    .select('status_history')
+    .eq('id', orderId)
+    .single();
+  if (readError) throw readError;
+
+  const history = (current.status_history as unknown as OrderStatusEvent[]) ?? [];
+  const next = [...history, { event, at: new Date().toISOString() }];
+
+  const { error } = await client
+    .from('orders')
+    .update({ status_history: next as unknown as Json })
+    .eq('id', orderId);
+  if (error) throw error;
+}
+
+/**
+ * Customer-facing review submission (submit_review tool). Callers must have
+ * already verified `session.pendingReviewOrderId` matches `orderId` and belongs
+ * to the calling tenant — this function trusts its caller, like `edit`/`cancel`.
+ */
+export async function submitReview(orderId: string, rating: number, text: string | null): Promise<Order> {
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from('orders')
+    .update({
+      review_rating: rating,
+      review_text: text,
+      review_submitted_at: new Date().toISOString(),
+    })
     .eq('id', orderId)
     .select()
     .single();

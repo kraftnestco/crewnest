@@ -170,6 +170,34 @@ function PendingOrderDetail({
   );
 }
 
+/** Post-fulfillment customer rating/feedback — read-only, distinct from PendingOrderDetail's approval "Review". */
+function FulfilledOrderDetail({ order }: { order: OrderRow }) {
+  const rating = order.review_rating ?? 0;
+  return (
+    <div className="space-y-2 p-4">
+      <div>
+        <p className="text-xs font-medium text-muted-foreground">Rating</p>
+        <p className="mt-1 text-sm" aria-label={`${rating} out of 5 stars`}>
+          <span aria-hidden="true">
+            {'★'.repeat(rating)}
+            {'☆'.repeat(5 - rating)}
+          </span>
+          <span className="ml-1 text-xs text-muted-foreground">{rating}/5</span>
+        </p>
+      </div>
+      {order.review_text && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground">Feedback</p>
+          <p className="text-sm">{order.review_text}</p>
+        </div>
+      )}
+      {order.review_submitted_at && (
+        <p className="text-xs text-muted-foreground">Submitted {new Date(order.review_submitted_at).toLocaleString()}</p>
+      )}
+    </div>
+  );
+}
+
 /** Manual close-out for a confirmed order/service — no external fulfillment signal exists yet, so this is owner-driven. */
 function FulfillAction({
   orderId,
@@ -530,6 +558,14 @@ export function OrdersView({
                       </Button>
                     ) : o.status === 'confirmed' ? (
                       <FulfillAction orderId={o.id} onDone={handleActionDone} />
+                    ) : o.status === 'fulfilled' && o.review_rating !== null ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setExpandedId((cur) => (cur === o.id ? null : o.id))}
+                      >
+                        {expandedId === o.id ? 'Close' : 'Rating'}
+                      </Button>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
@@ -539,6 +575,13 @@ export function OrdersView({
                   <TableRow>
                     <TableCell colSpan={columnCount} className="bg-muted/30 p-0">
                       <PendingOrderDetail order={o} onDone={handleActionDone} />
+                    </TableCell>
+                  </TableRow>
+                )}
+                {expandedId === o.id && o.status === 'fulfilled' && o.review_rating !== null && (
+                  <TableRow>
+                    <TableCell colSpan={columnCount} className="bg-muted/30 p-0">
+                      <FulfilledOrderDetail order={o} />
                     </TableCell>
                   </TableRow>
                 )}

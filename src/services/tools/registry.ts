@@ -14,6 +14,7 @@ import { createOrderTool } from './createOrder';
 import { checkOrderStatusTool } from './checkOrderStatus';
 import { editOrderTool } from './editOrder';
 import { cancelOrderTool } from './cancelOrder';
+import { submitReviewTool } from './submitReview';
 
 export interface ToolContext {
   tenant: Tenant;
@@ -29,14 +30,19 @@ export interface ToolExecutor {
 }
 
 /** Registered here as each tool ships (empty ⇒ identical to the pre-tool-calling path). */
-const ALL_TOOLS: ToolExecutor[] = [createOrderTool, checkOrderStatusTool, editOrderTool, cancelOrderTool];
+const ALL_TOOLS: ToolExecutor[] = [createOrderTool, checkOrderStatusTool, editOrderTool, cancelOrderTool, submitReviewTool];
 
-/** Tenant-scoped: which tools this tenant may use, gated by tenant flags. */
-export function getEnabledTools(tenant: Tenant): ToolExecutor[] {
-  return ALL_TOOLS.filter((tool) => isToolEnabledForTenant(tool.def.name, tenant));
+/**
+ * Tenant-scoped (and, for the review flow, session-scoped): which tools this
+ * tenant/session may use right now. `session` is optional so every other call
+ * site (e.g. tenant-level checks with no session in hand) keeps working — it's
+ * only required to ever see `submit_review` advertised.
+ */
+export function getEnabledTools(tenant: Tenant, session?: ChatSession): ToolExecutor[] {
+  return ALL_TOOLS.filter((tool) => isToolEnabledForTenant(tool.def.name, tenant, session));
 }
 
-function isToolEnabledForTenant(toolName: string, tenant: Tenant): boolean {
+function isToolEnabledForTenant(toolName: string, tenant: Tenant, session?: ChatSession): boolean {
   // customOrdersEnabled implies order-taking too (docs/10 rides on the doc-09 order-taker,
   // but the intake wizard never exposes a separate ordersEnabled toggle — fixed 2026-07-20;
   // a custom-orders/payments tenant with ordersEnabled still false could never actually get
@@ -46,6 +52,9 @@ function isToolEnabledForTenant(toolName: string, tenant: Tenant): boolean {
   if (toolName === 'check_order_status') return ordersOn;
   if (toolName === 'edit_order') return ordersOn;
   if (toolName === 'cancel_order') return ordersOn;
+  // Only advertised the one turn it's legitimately usable — defense in depth on
+  // top of submitReview.ts's own server-side re-check, not a replacement for it.
+  if (toolName === 'submit_review') return ordersOn && Boolean(session?.pendingReviewOrderId);
   return false;
 }
 

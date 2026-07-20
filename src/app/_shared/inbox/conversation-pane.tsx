@@ -9,19 +9,20 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import type { Database } from '@/types/database';
-import type { OrderAttachment } from '@/types/domain';
+import type { OrderAttachment, PaymentMethod } from '@/types/domain';
 import {
   getMessageMediaUrlAction,
   getMessagesAction,
   manualSendAction,
   takeOverAction,
 } from '@/app/admin/chat/actions';
+import { OrderSummaryDialog } from './order-summary-dialog';
 
 export type SessionRow = Database['public']['Tables']['chat_sessions']['Row'];
 export type MessageRow = Database['public']['Tables']['chat_messages']['Row'];
 export type TenantRow = Pick<
   Database['public']['Tables']['tenants']['Row'],
-  'id' | 'business_name' | 'system_prompt' | 'catalog_data'
+  'id' | 'business_name' | 'system_prompt' | 'catalog_data' | 'payments_enabled' | 'payment_methods'
 >;
 
 export interface SessionWithTenant extends SessionRow {
@@ -197,6 +198,10 @@ export function ConversationPane({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-3">
+            <OrderSummaryDialog
+              sessionId={session.id}
+              paymentMethods={tenant?.payments_enabled ? ((tenant.payment_methods as PaymentMethod[] | null) ?? []) : []}
+            />
             <div className="flex items-center gap-2" title={session.is_human_handoff ? 'The AI has stopped replying — you’re answering this chat yourself' : 'The AI is currently replying to this customer'}>
               <span className="text-xs font-medium text-muted-foreground">Human takeover</span>
               <Switch checked={session.is_human_handoff} onCheckedChange={handleTakeOver} disabled={isPending} />
@@ -215,6 +220,15 @@ export function ConversationPane({
         <ScrollArea className="min-h-0 flex-1">
           <div className="flex flex-col gap-2 px-4 py-3">
             {messages.map((m) => {
+              if (m.role === 'system') {
+                return (
+                  <div key={m.id} className="flex justify-center">
+                    <span className="max-w-[85%] rounded-full bg-muted-foreground/10 px-3 py-1 text-center text-xs text-muted-foreground">
+                      {m.content}
+                    </span>
+                  </div>
+                );
+              }
               const attachments = (m.attachments as unknown as OrderAttachment[] | null) ?? [];
               return (
                 <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-start' : 'justify-end'}`}>

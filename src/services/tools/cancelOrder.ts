@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import * as orders from '@/services/orders';
+import { notifyBoth } from '@/services/notifications';
 import type { ToolContext, ToolExecutor } from './registry';
 
 /**
@@ -47,6 +48,24 @@ export const cancelOrderTool: ToolExecutor = {
     }
 
     const updated = await orders.cancel(target.id, args.reason ?? null);
+
+    await notifyBoth({
+      tenantId: ctx.tenant.id,
+      type: 'order_updated',
+      entityType: 'order',
+      entityId: updated.id,
+      agency: {
+        title: 'Order cancelled by AI',
+        body: `${ctx.tenant.businessName} — ${updated.customerName ?? 'Customer'}${args.reason ? `: ${args.reason}` : ''}`,
+        link: '/admin/orders',
+      },
+      tenant: {
+        title: 'An order was cancelled',
+        body: updated.customerName ?? 'Customer',
+        link: '/dashboard/orders',
+      },
+    });
+
     return { orderId: updated.id, status: updated.status };
   },
 };

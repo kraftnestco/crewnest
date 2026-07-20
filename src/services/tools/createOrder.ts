@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import * as orders from '@/services/orders';
+import * as sessions from '@/services/sessions';
 import { sendTemplate } from '@/services/meta/send';
 import { notifyBoth } from '@/services/notifications';
 import { MAX_ORDERS_PER_SESSION_WINDOW, PAYMENT_METHOD_PRIORITY } from '@/lib/constants';
@@ -148,6 +149,19 @@ export const createOrderTool: ToolExecutor = {
 
     if (duplicate || !order) {
       return { orderId: null, status, duplicate: true };
+    }
+
+    // A new order in this session makes any earlier pending review pointer stale —
+    // it would otherwise keep nudging the customer to rate a DIFFERENT, older order.
+    if (ctx.session.pendingReviewOrderId) {
+      try {
+        await sessions.setPendingReview(ctx.session.id, null);
+      } catch (err) {
+        console.error('[orders] failed to clear stale review pointer', {
+          sessionId: ctx.session.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
     await notifyBoth({

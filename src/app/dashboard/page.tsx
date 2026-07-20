@@ -59,6 +59,7 @@ export default async function DashboardHomePage() {
     { count: activeConversations },
     { count: ordersThisMonth },
     conversationsToday,
+    { data: ratingRows },
   ] = await Promise.all([
     getTenantNeedsAttention(activeTenantId),
     supabase
@@ -82,7 +83,11 @@ export default async function DashboardHomePage() {
       .eq('tenant_id', activeTenantId)
       .gte('created_at', monthStart),
     countSessionsToday(activeTenantId),
+    supabase.from('orders').select('review_rating').eq('tenant_id', activeTenantId).not('review_rating', 'is', null),
   ]);
+
+  const ratings = (ratingRows ?? []).map((r) => r.review_rating).filter((r): r is number => r !== null);
+  const avgRating = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : null;
 
   const isFreePlan = tenant?.plan === 'free';
   const freeQuotaRemaining = Math.max(0, FREE_PLAN_DAILY_SESSION_CAP - conversationsToday);
@@ -175,7 +180,7 @@ export default async function DashboardHomePage() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {teaser.map((t) => (
               <Card key={t.label}>
                 <CardHeader>
@@ -186,6 +191,24 @@ export default async function DashboardHomePage() {
                 </CardContent>
               </Card>
             ))}
+            {avgRating !== null && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-normal text-muted-foreground">
+                    Average rating ({ratings.length} review{ratings.length === 1 ? '' : 's'})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-semibold">
+                    {avgRating.toFixed(1)}/5{' '}
+                    <span className="text-base text-amber-500">
+                      {'★'.repeat(Math.round(avgRating))}
+                      {'☆'.repeat(5 - Math.round(avgRating))}
+                    </span>
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </>
       )}
