@@ -37,10 +37,15 @@ export function getEnabledTools(tenant: Tenant): ToolExecutor[] {
 }
 
 function isToolEnabledForTenant(toolName: string, tenant: Tenant): boolean {
-  if (toolName === 'create_order') return tenant.ordersEnabled;
-  if (toolName === 'check_order_status') return tenant.ordersEnabled;
-  if (toolName === 'edit_order') return tenant.ordersEnabled;
-  if (toolName === 'cancel_order') return tenant.ordersEnabled;
+  // customOrdersEnabled implies order-taking too (docs/10 rides on the doc-09 order-taker,
+  // but the intake wizard never exposes a separate ordersEnabled toggle — fixed 2026-07-20;
+  // a custom-orders/payments tenant with ordersEnabled still false could never actually get
+  // create_order/etc. advertised, so the model was told to call a tool it never had).
+  const ordersOn = tenant.ordersEnabled || tenant.customOrdersEnabled;
+  if (toolName === 'create_order') return ordersOn;
+  if (toolName === 'check_order_status') return ordersOn;
+  if (toolName === 'edit_order') return ordersOn;
+  if (toolName === 'cancel_order') return ordersOn;
   return false;
 }
 
