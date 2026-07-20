@@ -508,6 +508,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      demo_leads: {
+        Row: {
+          id: string;
+          email: string;
+          business_name: string;
+          business_type: string;
+          intake_snapshot: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          business_name: string;
+          business_type: string;
+          intake_snapshot: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          business_name?: string;
+          business_type?: string;
+          intake_snapshot?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

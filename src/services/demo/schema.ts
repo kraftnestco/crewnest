@@ -49,3 +49,10 @@ export const demoChatRequestSchema = z.object({
 });
 
 export type DemoChatRequest = z.infer<typeof demoChatRequestSchema>;
+
+export const demoLeadRequestSchema = z.object({
+  email: z.string().trim().email().max(200),
+  demoTenant: demoTenantSchema,
+});
+
+export type DemoLeadRequest = z.infer<typeof demoLeadRequestSchema>;

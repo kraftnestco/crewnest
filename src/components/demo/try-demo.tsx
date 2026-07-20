@@ -17,10 +17,9 @@ import { DEMO_HANDOFF_KEY, type DemoHandoff } from '@/services/demo/handoff';
 
 /**
  * Public demo funnel orchestrator (docs: "try it for your business" plan,
- * Phase B): wizard -> soft email capture -> live chat. Nothing here is
- * persisted server-side except the once-per-session rate-limit check —
- * lead capture stays client-state-only pending the [OPUS]-flagged
- * `demo_leads` RLS review, so no email/business-name is written anywhere yet.
+ * Phase B): wizard -> soft email capture -> live chat. The email-capture
+ * submit both checks the per-IP rate limit and (best-effort) records a
+ * `demo_leads` row via /api/demo/start — see migration 0026.
  */
 
 const BLANK_TENANT: IntakeTenant = {
@@ -94,13 +93,17 @@ export function TryDemo() {
 
     setGateSubmitting(true);
     try {
-      const res = await fetch('/api/demo/start', { method: 'POST' });
+      const tenant = parseDemoIntakeFormData(pendingFormData, businessName.trim());
+      const res = await fetch('/api/demo/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, demoTenant: tenant }),
+      });
       const data = await res.json().catch(() => ({ allowed: false }));
       if (!res.ok || !data.allowed) {
         setPhase('blocked');
         return;
       }
-      const tenant = parseDemoIntakeFormData(pendingFormData, businessName.trim());
       setDemoTenant(tenant);
       setPhase('chat');
     } catch {
