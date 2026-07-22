@@ -49,6 +49,21 @@ export interface OrchestratorResult {
 const FREE_PLAN_LIMIT_REACHED_TEXT =
   "Thanks for reaching out! We've reached today's conversation limit on our free plan — please try again tomorrow, or the business will get back to you soon.";
 
+/** True if any message carries an image part (vision content) — used for the text-only retry. */
+function conversationHasImages(msgs: LlmMessage[]): boolean {
+  return msgs.some((m) => Array.isArray(m.content) && m.content.some((p) => p.type === 'image_url'));
+}
+
+/** Collapse a message's content to text only, dropping image parts (for a text-only retry). */
+function stripImageParts(msg: LlmMessage): LlmMessage {
+  if (!Array.isArray(msg.content)) return msg;
+  const text = msg.content
+    .filter((p) => p.type === 'text')
+    .map((p) => (p as { type: 'text'; text: string }).text)
+    .join('\n');
+  return { ...msg, content: text };
+}
+
 export async function handleInboundMessage(
   input: InboundMessage,
 ): Promise<OrchestratorResult | null> {
@@ -166,10 +181,18 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
   let effectiveImageUrls = imageUrls;
   let reattachedRecentImage = false;
   if ((!imageUrls || imageUrls.length === 0) && userText) {
-    const recent = await mediaIntake.getRecentImageUrl(session, tenant, RECENT_IMAGE_REATTACH_WINDOW_MINUTES);
-    if (recent) {
-      effectiveImageUrls = [recent];
-      reattachedRecentImage = true;
+    try {
+      const recent = await mediaIntake.getRecentImageUrl(session, tenant, RECENT_IMAGE_REATTACH_WINDOW_MINUTES);
+      if (recent) {
+        effectiveImageUrls = [recent];
+        reattachedRecentImage = true;
+      }
+    } catch (err) {
+      // Best-effort: re-attaching a PAST image is a nicety and must never block the reply.
+      console.warn('[orchestrator] recent-image re-attach failed', {
+        tenantId: tenant.id,
+        error: err instanceof Error ? err.message : 'unknown',
+      });
     }
   }
 
@@ -221,17 +244,35 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
   const conversation: LlmMessage[] = [...built.messages];
   let finalText = '';
   let finalCompletionTokens = 0;
+  let strippedImages = false;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const result = await provider.chat(
-      {
-        model: tenant.llmModel,
-        messages: conversation,
-        cachePrefixLength: built.cachePrefixLength,
-        tools: tools.length ? tools.map((t) => t.def) : undefined,
-      },
-      key,
-    );
+    const chatArgs = {
+      model: tenant.llmModel,
+      cachePrefixLength: built.cachePrefixLength,
+      tools: tools.length ? tools.map((t) => t.def) : undefined,
+    };
+    // Vision resilience: a model that can't accept images (e.g. a text-only OpenRouter
+    // model) throws on a request carrying image parts. Rather than dropping the whole
+    // turn — leaving the customer with silence — strip images from the conversation and
+    // retry text-only ONCE, so a reply still goes out. Added 2026-07-22 after a vision
+    // failure caused total non-response.
+    let result;
+    try {
+      result = await provider.chat({ ...chatArgs, messages: conversation }, key);
+    } catch (err) {
+      if (!strippedImages && conversationHasImages(conversation)) {
+        console.warn('[orchestrator] chat failed with images — retrying text-only', {
+          tenantId: tenant.id,
+          error: err instanceof Error ? err.message : 'unknown',
+        });
+        for (let i = 0; i < conversation.length; i++) conversation[i] = stripImageParts(conversation[i]);
+        strippedImages = true;
+        result = await provider.chat({ ...chatArgs, messages: conversation }, key);
+      } else {
+        throw err;
+      }
+    }
     // NOTE: `key` is intentionally not referenced again and never logged.
 
     // Metering — every round is a billable call, so log each one.
