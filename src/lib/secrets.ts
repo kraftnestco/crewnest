@@ -1,6 +1,11 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
 import { env } from '@/lib/env';
+import {
+  OPENROUTER_BASE_URL,
+  TRANSCRIBE_MODEL_OPENAI,
+  TRANSCRIBE_MODEL_OPENROUTER,
+} from '@/lib/constants';
 import type { Tenant } from '@/types/domain';
 
 /**
@@ -48,11 +53,46 @@ export async function getLlmKey(
   return { key: env.MASTER_OPENAI_KEY, usedByok: false };
 }
 
+export interface TranscriptionConfig {
+  apiKey: string;
+  /** Set for OpenRouter's OpenAI-compatible endpoint; undefined = OpenAI default base. */
+  baseURL?: string;
+  model: string;
+  usedByok: boolean;
+}
+
 /**
- * Resolve the API key for OpenAI's transcription endpoint (docs/10 §5). Always OpenAI,
- * independent of the tenant's chat `llmProvider` — OpenRouter has no transcription API.
+ * Resolve the endpoint + key + model for voice-note transcription (docs/10 §5).
+ * Provider-aware (as of 2026, OpenRouter has an OpenAI-compatible /audio/transcriptions
+ * endpoint): a tenant's own OpenAI BYOK key always uses OpenAI; otherwise an OpenRouter
+ * tenant transcribes via OpenRouter's master key (so voice works with NO funded OpenAI
+ * key — the master OpenAI key is a placeholder in prod), and everyone else uses the
+ * master OpenAI key.
  */
-export async function getTranscriptionKey(
+export async function getTranscriptionConfig(
+  tenant: Pick<Tenant, 'openaiKeySecretId' | 'llmProvider'>,
+): Promise<TranscriptionConfig> {
+  if (tenant.openaiKeySecretId) {
+    const key = await getTenantSecret(tenant.openaiKeySecretId);
+    if (key) return { apiKey: key, model: TRANSCRIBE_MODEL_OPENAI, usedByok: true };
+    console.warn(`[secrets] BYOK secret ${tenant.openaiKeySecretId} configured but unreadable — falling back to master transcription`);
+  }
+  if (tenant.llmProvider === 'openrouter' && env.MASTER_OPENROUTER_KEY) {
+    return {
+      apiKey: env.MASTER_OPENROUTER_KEY,
+      baseURL: OPENROUTER_BASE_URL,
+      model: TRANSCRIBE_MODEL_OPENROUTER,
+      usedByok: false,
+    };
+  }
+  return { apiKey: env.MASTER_OPENAI_KEY, model: TRANSCRIBE_MODEL_OPENAI, usedByok: false };
+}
+
+/**
+ * Resolve the API key for OpenAI's embeddings endpoint (docs/12 §5.2). Always OpenAI,
+ * independent of the tenant's chat llmProvider (OpenRouter embeddings support is spotty).
+ */
+export async function getEmbeddingKey(
   tenant: Pick<Tenant, 'openaiKeySecretId'>,
 ): Promise<{ key: string; usedByok: boolean }> {
   if (tenant.openaiKeySecretId) {
@@ -61,16 +101,6 @@ export async function getTranscriptionKey(
     console.warn(`[secrets] BYOK secret ${tenant.openaiKeySecretId} configured but unreadable — falling back to master OpenAI key`);
   }
   return { key: env.MASTER_OPENAI_KEY, usedByok: false };
-}
-
-/**
- * Resolve the API key for OpenAI's embeddings endpoint (docs/12 §5.2). Always
- * OpenAI, independent of the tenant's chat llmProvider — same rule as transcription.
- */
-export async function getEmbeddingKey(
-  tenant: Pick<Tenant, 'openaiKeySecretId'>,
-): Promise<{ key: string; usedByok: boolean }> {
-  return getTranscriptionKey(tenant);
 }
 
 /** Resolve the Meta channel token (page / whatsapp) for outbound sends. */

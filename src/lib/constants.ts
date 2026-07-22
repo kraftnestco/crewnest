@@ -20,6 +20,25 @@ export const DEFAULT_LLM_MODEL = 'gpt-4o-mini';
 export const DEMO_LLM_PROVIDER = 'openrouter';
 export const DEMO_LLM_MODEL = 'openai/gpt-4o-mini';
 
+/**
+ * Voice-note transcription models + endpoint. OpenAI tenants (and any tenant with an
+ * OpenAI BYOK key) use OpenAI's `gpt-4o-transcribe`; OpenRouter tenants use OpenRouter's
+ * OpenAI-compatible `/audio/transcriptions` endpoint (added 2026) with Whisper, so voice
+ * works WITHOUT a funded OpenAI key — the master OpenAI key is a placeholder in prod
+ * (see DEMO_LLM_* above). Resolved by `lib/secrets.ts#getTranscriptionConfig`.
+ */
+export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+export const TRANSCRIBE_MODEL_OPENAI = 'gpt-4o-transcribe';
+export const TRANSCRIBE_MODEL_OPENROUTER = 'openai/whisper-large-v3';
+
+/**
+ * Cross-turn image memory: images ride only the turn they arrive on (the prompt-cache
+ * contract), so a later "the picture I sent you" is invisible to the model. When a turn
+ * brings no new image, the orchestrator re-attaches the single most recent image shared
+ * within this window so the reference resolves — capped to bound vision-token cost.
+ */
+export const RECENT_IMAGE_REATTACH_WINDOW_MINUTES = 60;
+
 /** Short-term memory: how many prior messages to load, and the dynamic-tail token budget. */
 export const MEMORY_WINDOW_MESSAGES = 16;
 export const MEMORY_TOKEN_BUDGET = 4000;

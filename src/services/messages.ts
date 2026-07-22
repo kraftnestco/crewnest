@@ -86,6 +86,38 @@ export async function countRecentAttachments(sessionId: string, windowMinutes: n
   );
 }
 
+/**
+ * Storage path of the most recent image attachment in this session within the window,
+ * or null. Backs cross-turn image memory (mediaIntake.getRecentImageUrl): images ride
+ * only the turn they arrive on, so a later "the picture I sent you" needs the prior
+ * image re-attached. Scans the newest few attachment-bearing rows and returns the first
+ * image found (most recent wins).
+ */
+export async function getRecentImageStoragePath(
+  sessionId: string,
+  windowMinutes: number,
+): Promise<string | null> {
+  const client = createServiceClient();
+  const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+  const { data, error } = await client
+    .from('chat_messages')
+    .select('attachments')
+    .eq('session_id', sessionId)
+    .not('attachments', 'is', null)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (error) throw error;
+
+  for (const row of data ?? []) {
+    const atts = (Array.isArray(row.attachments) ? row.attachments : []) as unknown as OrderAttachment[];
+    const img = atts.find((a) => a?.kind === 'image' && Boolean(a?.storagePath));
+    if (img) return img.storagePath;
+  }
+  return null;
+}
+
 /** Write a per-turn usage row for billing/cost/abuse. */
 export async function logUsage(args: {
   tenantId: string;

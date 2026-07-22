@@ -5,7 +5,7 @@ import * as messages from './messages';
 import * as orders from './orders';
 import * as sessions from './sessions';
 import { notifyBoth } from '@/services/notifications';
-import { getTranscriptionKey } from '@/lib/secrets';
+import { getTranscriptionConfig } from '@/lib/secrets';
 import { sanitizeInbound } from './security/sanitize';
 import { MAX_MEDIA_PER_SESSION_WINDOW, MEDIA_CAP_WINDOW_MINUTES } from '@/lib/constants';
 import type { ChatSession, InboundAttachment, OrderAttachment, Tenant } from '@/types/domain';
@@ -49,6 +49,7 @@ export async function processInboundMedia(
     | 'paymentsEnabled'
     | 'mediaHandling'
     | 'voiceHandling'
+    | 'llmProvider'
     | 'metaTokenSecretId'
     | 'whatsappTokenSecretId'
     | 'openaiKeySecretId'
@@ -128,8 +129,8 @@ export async function processInboundMedia(
 
     if (raw.kind === 'audio') {
       if (!tenant.customOrdersEnabled) continue;
-      const { key } = await getTranscriptionKey(tenant);
-      const result = await transcribeService.transcribe(raw, tenant, session.id, session.platform, key);
+      const transcriptionConfig = await getTranscriptionConfig(tenant);
+      const result = await transcribeService.transcribe(raw, tenant, session.id, session.platform, transcriptionConfig);
       if (!result) {
         textNotes.push(
           '[System note: the customer sent a voice note but it could not be transcribed — tell them it ' +
@@ -223,4 +224,23 @@ export async function processInboundMedia(
   }
 
   return { attachments, extraText: textNotes.length ? textNotes.join('\n') : null, imageUrls };
+}
+
+/**
+ * Cross-turn image memory: mint a signed URL for the single most recent image the
+ * customer shared within `windowMinutes`, so a later reference ("the picture I sent
+ * you") on a turn that carries no new image can still be shown to a vision model.
+ * Images otherwise ride only the turn they arrive on (the prompt-cache contract), and
+ * `messages.loadWindow` carries text only. Gated exactly like the vision-example path
+ * (custom-orders tenant, media not rejected); returns null when there's nothing recent.
+ */
+export async function getRecentImageUrl(
+  session: Pick<ChatSession, 'id'>,
+  tenant: Pick<Tenant, 'customOrdersEnabled' | 'mediaHandling'>,
+  windowMinutes: number,
+): Promise<string | null> {
+  if (!tenant.customOrdersEnabled || tenant.mediaHandling === 'reject') return null;
+  const storagePath = await messages.getRecentImageStoragePath(session.id, windowMinutes);
+  if (!storagePath) return null;
+  return media.getSignedUrl(storagePath);
 }

@@ -29,7 +29,12 @@ import {
   extractSignal,
   stripSignalTokens,
 } from './security/sanitize';
-import { MEMORY_TOKEN_BUDGET, MAX_TOOL_ROUNDS, FREE_PLAN_DAILY_SESSION_CAP } from '@/lib/constants';
+import {
+  MEMORY_TOKEN_BUDGET,
+  MAX_TOOL_ROUNDS,
+  FREE_PLAN_DAILY_SESSION_CAP,
+  RECENT_IMAGE_REATTACH_WINDOW_MINUTES,
+} from '@/lib/constants';
 import type { ChatSession, InboundMessage, OrderAttachment, Tenant } from '@/types/domain';
 
 export interface OrchestratorResult {
@@ -152,8 +157,36 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
     }
   }
 
+  // 6c. Cross-turn image memory: images ride only the turn they arrive on (the cache
+  // contract), and the history window is text-only — so a later "the picture I sent you"
+  // on a turn with no new image is invisible to the model. Re-attach the single most
+  // recent image shared within the window so the reference resolves (capped to bound
+  // vision-token cost). Skipped on continuation turns (no userText) and when this turn
+  // already carries a fresh image.
+  let effectiveImageUrls = imageUrls;
+  let reattachedRecentImage = false;
+  if ((!imageUrls || imageUrls.length === 0) && userText) {
+    const recent = await mediaIntake.getRecentImageUrl(session, tenant, RECENT_IMAGE_REATTACH_WINDOW_MINUTES);
+    if (recent) {
+      effectiveImageUrls = [recent];
+      reattachedRecentImage = true;
+    }
+  }
+
   // 7. Cache-ordered prompt: [static prefix] ++ history ++ new user msg (+ images, §4.2).
-  const built = promptBuilder.build({ tenant, history, userText, imageUrls, pendingReview });
+  const built = promptBuilder.build({ tenant, history, userText, imageUrls: effectiveImageUrls, pendingReview });
+
+  // 7a. Tell the model the re-attached image is a prior share, not a new one — spliced on
+  // the dynamic tail (after the cache prefix), same seam as the open-now/retrieval lines.
+  if (reattachedRecentImage) {
+    built.messages.splice(built.cachePrefixLength, 0, {
+      role: 'system',
+      content:
+        '[context] The image attached to the latest user message is the most recent photo the ' +
+        'customer already shared earlier in this conversation, re-attached for reference — they are ' +
+        'likely referring back to it. Do not tell them you never received an image.',
+    });
+  }
 
   // 7b. Dynamic "open now" line — server-computed, injected AFTER the cache prefix so it
   // never touches the byte-identical static block (docs/12 §4.3). Only emitted when the
