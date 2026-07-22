@@ -36,6 +36,10 @@ architecture. **Read the docs in order before writing code.**
 | [`11-PAYMENTS-AND-ORDER-LIFECYCLE.md`](./11-PAYMENTS-AND-ORDER-LIFECYCLE.md) | Payment collection (COD → manual transfer → hosted gateway) + order edit/cancel; orthogonal `payment_status` axis (Phase 2) |
 | [`12-KNOWLEDGE-BASE-AND-RETRIEVAL.md`](./12-KNOWLEDGE-BASE-AND-RETRIEVAL.md) | Knowledge base / FAQ / business-hours (stuff-and-cache) → `pgvector` retrieval when it outgrows the budget (Phase 2→3) |
 | [`14-COMMAND-CENTER-AND-NOTIFICATIONS.md`](./14-COMMAND-CENTER-AND-NOTIFICATIONS.md) | **Commercial Track 1:** live notification feed (both shells), the "needs attention" command center, a real client home, and the premium-UX/account pass |
+| [`15-RELIABILITY-AND-DURABILITY.md`](./15-RELIABILITY-AND-DURABILITY.md) | **Phase 3:** `after()` → pgmq durable worker (at-least-once + idempotency + poison handling), Postgres-backed rate limiting, Meta 24 h-window handling |
+| [`16-ANALYTICS-AND-PROOF.md`](./16-ANALYTICS-AND-PROOF.md) | **Phase 3:** volumes, deflection/handoff rates, cost per tenant (BYOK vs master), CSAT + sentiment health; agency + client analytics dashboards |
+| [`17-QUALITY-AND-DATA-LIFECYCLE.md`](./17-QUALITY-AND-DATA-LIFECYCLE.md) | **Phase 3:** `vitest` + RLS tests, GitHub Actions CI, structured logging + Sentry + cost alerts, retention + GDPR/Meta right-to-erasure |
+| [`18-HARDENING-AND-TEAM.md`](./18-HARDENING-AND-TEAM.md) | **Phase 3:** live-code audit fixes, rolling conversation memory, a real free-plan ceiling, and tenant self-service team management |
 
 SQL migrations live in [`../supabase/migrations/`](../supabase/migrations/). TypeScript interface
 stubs live under [`../src/`](../src/) with `TODO(sonnet)` markers where bodies must be filled in.
@@ -76,8 +80,10 @@ stubs live under [`../src/`](../src/) with `TODO(sonnet)` markers where bodies m
   catalogue-grounded, human handoff, agency dashboard with live inbox. Manual Meta token onboarding.
 - **Phase 2 — Automation & self-serve:** Shopify catalogue auto-sync, workflow/automation actions
   (tool-calling), client-facing logins, billing (Stripe), embedded Meta signup.
-- **Phase 3 — Voice & scale:** SIP/voice AI, pgmq durable queue, `pgvector` RAG for large catalogues,
-  analytics.
-- **Phase 4 — Platform:** template marketplace, multi-agent workflows, deeper integrations.
+- **Phase 3 — Harden, prove & complete** (rescoped 2026-07-22): pgmq durable queue, analytics & proof
+  layer, testing/CI/observability/data-lifecycle, ecosystem hardening + tenant team management. `pgvector`
+  RAG already shipped (doc-12). Voice AI moved to Phase 4. Designed in docs 15–18.
+- **Phase 4 — Voice & Platform:** SIP/voice AI, template marketplace, multi-agent workflows, deeper
+  integrations, white-label, audit-log UI.
 
 See [`07-PHASES.md`](./07-PHASES.md) for detailed scope and acceptance criteria.

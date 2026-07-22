@@ -78,31 +78,57 @@ Everything else in Phase 1 is mechanical for Sonnet given the stubs + guide.
 
 ---
 
-## Phase 3 — Voice & Scale
+## Phase 3 — Harden, Prove & Complete the Ecosystem
 
-**Scope**
-- **Voice AI:** SIP-trunk transcripts → orchestrator → TTS; `platform='voice'`.
-- **Durable queue:** enable **pgmq** (`0008`), move webhook processing from `after()` to a queue +
-  consumer for retries/backpressure. Orchestrator unchanged (trigger-agnostic).
-- **`pgvector` RAG:** embed large catalogues, retrieve top-k; `promptBuilder` `mode:'retrieve'`.
-- **Analytics:** volumes, deflection rate, handoff rate, cost per tenant, CSAT.
+> **Rescoped 2026-07-22 (user):** Voice AI/SIP moved **out to Phase 4** — no real voice-interpretation
+> capability exists yet, and the priority is perfecting the text/media/order ecosystem already shipped.
+> `pgvector` RAG already **shipped** (doc-12 Stage N, folded in early). What remains of the old "Voice &
+> Scale" is reliability + analytics, now expanded with the cross-phase backlog and a hardening pass.
+> Fully designed across **docs 15–18**; all `[OPUS]` gates below are **CLEARED**.
 
-**`[OPUS]` checkpoints**
-- **RAG retrieval design** (chunking, embedding model, hybrid search, re-ranking).
-- **Queue delivery guarantees** (at-least-once + idempotency interplay; poison-message handling).
+**Scope** (four workstreams — see the docs for stages, schema, acceptance criteria):
+- **Reliability & durable delivery** — [`15-RELIABILITY-AND-DURABILITY.md`](./15-RELIABILITY-AND-DURABILITY.md):
+  enable **pgmq** (`0008`), move Meta webhook processing from `after()` to a queue + worker
+  (at-least-once, poison-safe), Postgres-backed rate limiting, Meta 24 h-window handling. Orchestrator
+  unchanged (trigger-agnostic).
+- **Analytics & the proof layer** — [`16-ANALYTICS-AND-PROOF.md`](./16-ANALYTICS-AND-PROOF.md): volumes,
+  deflection rate, handoff rate (by cause), cost per tenant (BYOK vs master), CSAT (via existing order
+  reviews) + sentiment health; agency + client dashboards. Derived from existing tables, no new capture.
+- **Quality engineering & data lifecycle** — [`17-QUALITY-AND-DATA-LIFECYCLE.md`](./17-QUALITY-AND-DATA-LIFECYCLE.md):
+  `vitest` unit + RLS-isolation tests, GitHub Actions CI (typecheck/lint/test/secret-scan/migration-lint),
+  structured logging + env-gated Sentry + per-tenant cost alerts, retention + GDPR/Meta right-to-erasure
+  (incl. the Storage + Vault gaps the DB cascade misses).
+- **Hardening & complementary features** — [`18-HARDENING-AND-TEAM.md`](./18-HARDENING-AND-TEAM.md): the
+  live-code audit findings + fixes, rolling conversation memory (long-session coherence), a real
+  free-plan monthly cost ceiling, and **tenant self-service team management**.
+
+**`[OPUS]` checkpoints — all CLEARED (designed 2026-07-22):**
+- ✅ **Queue delivery guarantees** (at-least-once + two-source idempotency + poison handling) — doc-15 §3–4.
+- ✅ **Analytics metric definitions + CSAT strategy** — doc-16 §2, §4.
+- ✅ **Right-to-erasure / data-lifecycle** (cascade map, Storage/Vault gaps, customer-as-triple) — doc-17 §4.
+- ✅ **Rolling-summary prompt seam, free-plan ceiling, team-management guardrails** — doc-18 §2, §3, §5.
+- ✅ **RAG retrieval design** — already cleared + shipped in doc-12 (N1).
+
+Sonnet builds Stages **P → Q → R → S → T → U → V** against docs 15–18 with no further Opus pass.
 
 ---
 
-## Phase 4 — Platform
+## Phase 4 — Voice & Platform
 
-**Scope:** template/persona marketplace, multi-agent workflows (a "crew" of specialised agents),
-deeper CRM/helpdesk integrations, white-label, team roles/permissions, audit log UI.
+**Scope:**
+- **Voice AI** (moved here from Phase 3): SIP-trunk transcripts → orchestrator → TTS; `platform='voice'`
+  (the `sip_trunk_id` / `webhooks/voice` 501 stub is the seam). Net-new capability — needs its own Opus
+  design pass (STT/TTS provider, realtime turn-taking, latency budget, handoff interplay).
+- Template/persona marketplace, multi-agent workflows (a "crew" of specialised agents), deeper CRM/
+  helpdesk integrations, white-label, granular team roles/permissions, audit-log UI.
 
 ---
 
 ## Cross-phase engineering backlog
+**Now pulled into Phase 3** — see [`17-QUALITY-AND-DATA-LIFECYCLE.md`](./17-QUALITY-AND-DATA-LIFECYCLE.md):
 - Tests: unit (promptBuilder ordering, sanitize, signature verify), integration (webhook→reply with a
-  mocked provider), RLS tests (two-tenant isolation), e2e (dashboard login → onboarding → inbox).
+  mocked provider), RLS tests (two-tenant isolation). e2e (dashboard login → onboarding → inbox) remains
+  a later add.
 - CI: typecheck, lint, migration check, secret-scan. No secrets in repo.
 - Observability: structured, redacted logs; error tracking; per-tenant cost alerts.
 - Data lifecycle: retention windows + hard-delete path (GDPR/Meta policy).
