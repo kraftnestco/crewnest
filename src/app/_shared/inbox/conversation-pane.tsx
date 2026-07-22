@@ -9,14 +9,22 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import type { Database } from '@/types/database';
-import type { OrderAttachment, PaymentMethod } from '@/types/domain';
+import type { OrderAttachment, PaymentMethod, PendingClarification } from '@/types/domain';
 import {
+  getClarificationMediaUrlAction,
   getMessageMediaUrlAction,
   getMessagesAction,
   manualSendAction,
+  resolveClarificationAction,
   takeOverAction,
 } from '@/app/admin/chat/actions';
+import { ClarificationPanel } from './clarification-panel';
 import { OrderSummaryDialog } from './order-summary-dialog';
+
+function parsePendingClarification(raw: unknown): PendingClarification | null {
+  if (!raw || typeof raw !== 'object') return null;
+  return raw as unknown as PendingClarification;
+}
 
 export type SessionRow = Database['public']['Tables']['chat_sessions']['Row'];
 export type MessageRow = Database['public']['Tables']['chat_messages']['Row'];
@@ -184,6 +192,14 @@ export function ConversationPane({
     });
   }
 
+  async function handleResolveClarification(note: string) {
+    try {
+      await resolveClarificationAction(session.id, note);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to resolve.');
+    }
+  }
+
   return (
     <>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -296,6 +312,11 @@ export function ConversationPane({
           </div>
           <ScrollArea className="min-h-0 flex-1">
             <div className="space-y-5 p-4">
+              <ClarificationPanel
+                pendingClarification={parsePendingClarification(session.pending_clarification)}
+                onResolve={handleResolveClarification}
+                getAttachmentUrl={(path) => getClarificationMediaUrlAction(session.id, path)}
+              />
               <div>
                 <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                   Conversation

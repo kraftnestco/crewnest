@@ -17,6 +17,7 @@ import type { UpdateIntakeState } from './intake-state';
  */
 
 const MEDIA_HANDLING_VALUES = ['match_catalogue', 'accept_any', 'reject'] as const;
+const VOICE_HANDLING_VALUES = ['ai_autonomous', 'human_review'] as const;
 const BUSINESS_TYPE_VALUES = ['product', 'service'] as const;
 /** App-level allow-list (docs/11 §2.3) — payment_method(s) are plain text/text[], not a DB enum. */
 const PAYMENT_METHOD_VALUES = ['cod', 'manual_transfer', 'gateway'] as const;
@@ -43,6 +44,10 @@ export async function updateIntakeAction(
   const mediaHandling = (MEDIA_HANDLING_VALUES as readonly string[]).includes(mediaHandlingRaw)
     ? mediaHandlingRaw
     : 'match_catalogue';
+  const voiceHandlingRaw = String(formData.get('voice_handling') ?? 'human_review');
+  const voiceHandling = (VOICE_HANDLING_VALUES as readonly string[]).includes(voiceHandlingRaw)
+    ? voiceHandlingRaw
+    : 'human_review';
   const businessTypeRaw = String(formData.get('business_type') ?? 'product');
   const businessType = (BUSINESS_TYPE_VALUES as readonly string[]).includes(businessTypeRaw)
     ? businessTypeRaw
@@ -113,6 +118,7 @@ export async function updateIntakeAction(
       catalog_data: catalogData,
       custom_order_instructions: customOrderInstructions,
       media_handling: mediaHandling,
+      voice_handling: voiceHandling,
       custom_orders_enabled: customOrdersEnabled,
       custom_orders_require_approval: customOrdersRequireApproval,
       business_type: businessType,

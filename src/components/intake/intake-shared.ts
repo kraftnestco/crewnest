@@ -11,6 +11,7 @@ export type IntakeTenant = Pick<
   | 'custom_orders_require_approval'
   | 'custom_order_instructions'
   | 'media_handling'
+  | 'voice_handling'
   | 'business_type'
   | 'booking_link'
   | 'knowledge_base'
@@ -97,6 +98,19 @@ export const MEDIA_HANDLING_OPTIONS: Array<{ value: string; label: string; hint:
     value: 'reject',
     label: 'Reject',
     hint: 'Politely decline media, ask for a text description instead.',
+  },
+];
+
+export const VOICE_HANDLING_OPTIONS: Array<{ value: string; label: string; hint: string }> = [
+  {
+    value: 'ai_autonomous',
+    label: 'AI answers on its own',
+    hint: 'Transcribe the voice note and let the AI reply from it directly.',
+  },
+  {
+    value: 'human_review',
+    label: 'Hold for a human',
+    hint: 'AI gives a brief holding reply; a teammate reviews the note and answers. (Default)',
   },
 ];
 

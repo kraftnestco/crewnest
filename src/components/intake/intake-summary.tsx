@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   BUSINESS_TYPE_OPTIONS,
   MEDIA_HANDLING_OPTIONS,
+  VOICE_HANDLING_OPTIONS,
   parseBusinessHours,
   parseKnowledgeBase,
   type IntakeTenant,
@@ -18,6 +19,8 @@ export function IntakeSummary({ tenant, onEdit }: { tenant: IntakeTenant; onEdit
   const businessType = BUSINESS_TYPE_OPTIONS.find((o) => o.value === tenant.business_type)?.label ?? tenant.business_type;
   const mediaHandling =
     MEDIA_HANDLING_OPTIONS.find((o) => o.value === tenant.media_handling)?.label ?? tenant.media_handling ?? '—';
+  const voiceHandling =
+    VOICE_HANDLING_OPTIONS.find((o) => o.value === tenant.voice_handling)?.label ?? tenant.voice_handling ?? '—';
   const knowledge = parseKnowledgeBase(tenant.knowledge_base);
   const hours = parseBusinessHours(tenant.business_hours);
   const openDays = hours.week.filter((d) => d.open && d.close);
@@ -33,6 +36,7 @@ export function IntakeSummary({ tenant, onEdit }: { tenant: IntakeTenant; onEdit
         : 'Off',
     },
     { label: 'Customer example media', value: mediaHandling },
+    { label: 'Voice notes', value: voiceHandling },
     {
       label: 'Common questions',
       value: knowledge.faq.length ? `${knowledge.faq.length} FAQ entr${knowledge.faq.length === 1 ? 'y' : 'ies'} saved` : 'None yet',

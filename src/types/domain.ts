@@ -15,6 +15,8 @@ export type PaymentStatus = 'unpaid' | 'awaiting_verification' | 'paid' | 'refun
 export type PaymentMethod = 'cod' | 'manual_transfer' | 'gateway';
 /** How the assistant should treat a customer-sent example (photo/voice/video) of an item. See docs/10 §3.1. */
 export type MediaHandling = 'match_catalogue' | 'accept_any' | 'reject';
+/** Per-tenant policy for voice notes: answer from the transcript directly, or hold for human review. Video has no autonomous option — no video-interpretation capability exists. */
+export type VoiceHandling = 'ai_autonomous' | 'human_review';
 /** Product vs service framing — picks which flow block (ORDER_FLOW vs SERVICE_FLOW) the prompt shows. */
 export type BusinessType = 'product' | 'service';
 
@@ -43,6 +45,7 @@ export interface Tenant {
   customOrdersRequireApproval: boolean;
   customOrderInstructions: string | null;
   mediaHandling: MediaHandling;
+  voiceHandling: VoiceHandling;
   businessType: BusinessType;
   bookingLink: string | null;
   knowledgeBase: unknown; // JSONB; shape in docs/12 §3.1, serialised deterministically by promptBuilder
@@ -61,6 +64,22 @@ export interface Tenant {
   planStatus: string | null;
 }
 
+/**
+ * A single open "needs a human" flag on a session — voice/video the AI is
+ * withholding from an autonomous reply, or an image it flagged as too
+ * ambiguous to act on. Raising one also sets `isHumanHandoff` (docs: same
+ * hard-stop a human toggling handoff manually would trigger). Resolved via
+ * the inbox's clarification panel, which clears both fields together.
+ */
+export interface PendingClarification {
+  kind: 'voice_review' | 'video_review' | 'image_ambiguous';
+  question: string;
+  attachmentStoragePath?: string;
+  transcript?: string;
+  options?: string[];
+  raisedAt: string;
+}
+
 export interface ChatSession {
   id: string;
   tenantId: string;
@@ -69,6 +88,7 @@ export interface ChatSession {
   isHumanHandoff: boolean;
   alertSignal: AlertSignal | null;
   pendingReviewOrderId: string | null;
+  pendingClarification: PendingClarification | null;
 }
 
 export interface ChatMessage {
@@ -142,7 +162,8 @@ export type NotificationType =
   | 'payment_proof'
   | 'upgrade_request'
   | 'review'
-  | 'order_updated';
+  | 'order_updated'
+  | 'media_review';
 export type NotificationEntityType = 'order' | 'session' | 'tenant';
 
 /** A live notification-feed row (docs/14). Writes are service-role only; reads are RLS-scoped per audience. */

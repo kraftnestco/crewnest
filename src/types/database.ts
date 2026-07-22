@@ -71,6 +71,7 @@ export type Database = {
           custom_orders_require_approval: boolean;
           custom_order_instructions: string | null;
           media_handling: string | null;
+          voice_handling: string | null;
           business_type: string;
           booking_link: string | null;
           knowledge_base: Json | null;
@@ -119,6 +120,7 @@ export type Database = {
           custom_orders_require_approval?: boolean;
           custom_order_instructions?: string | null;
           media_handling?: string | null;
+          voice_handling?: string | null;
           business_type?: string;
           booking_link?: string | null;
           knowledge_base?: Json | null;
@@ -167,6 +169,7 @@ export type Database = {
           custom_orders_require_approval?: boolean;
           custom_order_instructions?: string | null;
           media_handling?: string | null;
+          voice_handling?: string | null;
           business_type?: string;
           booking_link?: string | null;
           knowledge_base?: Json | null;
@@ -222,6 +225,7 @@ export type Database = {
           last_message_at: string;
           unread_count: number;
           pending_review_order_id: string | null;
+          pending_clarification: Json | null;
           created_at: string;
         };
         Insert: {
@@ -234,6 +238,7 @@ export type Database = {
           last_message_at?: string;
           unread_count?: number;
           pending_review_order_id?: string | null;
+          pending_clarification?: Json | null;
           created_at?: string;
         };
         Update: {
@@ -246,6 +251,7 @@ export type Database = {
           last_message_at?: string;
           unread_count?: number;
           pending_review_order_id?: string | null;
+          pending_clarification?: Json | null;
           created_at?: string;
         };
         Relationships: [];

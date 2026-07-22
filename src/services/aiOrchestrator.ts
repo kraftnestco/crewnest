@@ -30,7 +30,7 @@ import {
   stripSignalTokens,
 } from './security/sanitize';
 import { MEMORY_TOKEN_BUDGET, MAX_TOOL_ROUNDS, FREE_PLAN_DAILY_SESSION_CAP } from '@/lib/constants';
-import type { InboundMessage } from '@/types/domain';
+import type { ChatSession, InboundMessage, OrderAttachment, Tenant } from '@/types/domain';
 
 export interface OrchestratorResult {
   /** Null only when a free-plan tenant's daily new-conversation cap blocked the session itself. */
@@ -118,6 +118,24 @@ export async function handleInboundMessage(
     attachments: media.attachments,
   });
 
+  return runTurn(tenant, session, { userText, imageUrls: media.imageUrls, attachments: media.attachments });
+}
+
+interface RunTurnInput {
+  /** `null` for a continuation turn with no new customer input (docs: media-handoff plan, B7). */
+  userText: string | null;
+  imageUrls?: string[];
+  attachments?: OrderAttachment[];
+}
+
+/**
+ * Steps 6–12 of the turn: build the prompt, run the bounded tool-calling loop,
+ * detect handoff/signal, persist the reply, and dispatch it. Shared by
+ * `handleInboundMessage` (a fresh customer message) and `continueSession` (a
+ * human-handoff resolution with no new customer input) — see docs: media-handoff
+ * plan, B7. Pure extraction from the original inline steps; behavior-preserving.
+ */
+async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUrls, attachments }: RunTurnInput): Promise<OrchestratorResult> {
   // 6. Short-term memory (chronological, token-budgeted).
   const history = await messages.loadWindow(session.id, MEMORY_TOKEN_BUDGET);
 
@@ -135,7 +153,7 @@ export async function handleInboundMessage(
   }
 
   // 7. Cache-ordered prompt: [static prefix] ++ history ++ new user msg (+ images, §4.2).
-  const built = promptBuilder.build({ tenant, history, userText, imageUrls: media.imageUrls, pendingReview });
+  const built = promptBuilder.build({ tenant, history, userText, imageUrls, pendingReview });
 
   // 7b. Dynamic "open now" line — server-computed, injected AFTER the cache prefix so it
   // never touches the byte-identical static block (docs/12 §4.3). Only emitted when the
@@ -150,8 +168,9 @@ export async function handleInboundMessage(
 
   // 7c. Stage-N retrieval (docs/12 §5.3) — only when the catalogue or knowledge base
   // outgrew the stuffed prefix (promptBuilder §5.5.7). Rides the dynamic tail, same
-  // seam as the open-now line, so the static prefix stays byte-identical.
-  if (built.retrievalNeeded) {
+  // seam as the open-now line, so the static prefix stays byte-identical. Skipped on a
+  // continuation turn (no new customer query to retrieve against).
+  if (built.retrievalNeeded && userText) {
     const retrieved = await knowledge.retrieveContext(tenant, userText, session.id);
     if (retrieved) {
       built.messages.splice(built.cachePrefixLength, 0, { role: 'system', content: retrieved });
@@ -198,7 +217,7 @@ export async function handleInboundMessage(
       for (const call of result.toolCalls) {
         // Identity (tenant/session) and this turn's media come from the server-side
         // ToolContext, never from the model's arguments — see services/tools/registry.ts.
-        const toolResult = await executeTool(call, { tenant, session, attachments: media.attachments });
+        const toolResult = await executeTool(call, { tenant, session, attachments });
         conversation.push({ role: 'tool', toolCallId: call.id, content: JSON.stringify(toolResult) });
       }
       continue; // let the model see the tool results and produce the next turn
@@ -296,15 +315,40 @@ export async function handleInboundMessage(
     tokenCount: finalCompletionTokens,
   });
 
-  // 12. Dispatch. Web widget returns the text in its HTTP response instead of sending.
-  if (input.platform !== 'web') {
+  // 12. Dispatch. Web widget returns the text in its HTTP response instead of sending —
+  // and for a continuation turn (`continueSession`) on a 'web' session there is no open
+  // HTTP response to return it on either, a known/accepted gap (docs: media-handoff plan, B7).
+  if (session.platform !== 'web') {
     await sendText({
       tenant,
-      platform: input.platform,
-      to: input.externalUserId,
+      platform: session.platform,
+      to: session.externalUserId,
       text: replyText,
     });
   }
 
   return { sessionId: session.id, replyText, handoff: false };
+}
+
+/**
+ * Resumes a session with no new customer input — e.g. a human resolving a
+ * voice/video/image clarification via the inbox panel (docs: media-handoff plan,
+ * B7/B8). Persists `note` as a system message, then runs the same tool-calling
+ * turn as a fresh customer message would, so the AI can reply immediately without
+ * the customer needing to send anything first.
+ */
+export async function continueSession(sessionId: string, note: string): Promise<OrchestratorResult | null> {
+  const session = await sessions.getById(sessionId);
+  if (!session) return null;
+  const tenant = await tenants.getById(session.tenantId);
+  if (!tenant) return null;
+
+  await messages.persist({
+    sessionId: session.id,
+    tenantId: tenant.id,
+    role: 'system',
+    content: note,
+  });
+
+  return runTurn(tenant, session, { userText: null });
 }

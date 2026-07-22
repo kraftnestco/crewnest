@@ -11,6 +11,7 @@ import {
   BUSINESS_TYPE_OPTIONS,
   MEDIA_HANDLING_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
+  VOICE_HANDLING_OPTIONS,
   parseBusinessHours,
   parseKnowledgeBase,
   type FaqEntry,
@@ -61,6 +62,7 @@ export function IntakeWizard({
   const [customOrdersEnabled, setCustomOrdersEnabled] = useState(tenant.custom_orders_enabled);
   const [customOrderInstructions, setCustomOrderInstructions] = useState(tenant.custom_order_instructions ?? '');
   const [mediaHandling, setMediaHandling] = useState(tenant.media_handling ?? 'match_catalogue');
+  const [voiceHandling, setVoiceHandling] = useState(tenant.voice_handling ?? 'human_review');
   const [requireApproval, setRequireApproval] = useState(tenant.custom_orders_require_approval);
   const [knowledge, setKnowledge] = useState(() => parseKnowledgeBase(tenant.knowledge_base));
   const [hours, setHours] = useState(() => parseBusinessHours(tenant.business_hours));
@@ -97,6 +99,7 @@ export function IntakeWizard({
     if (customOrdersEnabled) fd.set('custom_orders_enabled', 'on');
     fd.set('custom_order_instructions', customOrderInstructions);
     fd.set('media_handling', mediaHandling);
+    fd.set('voice_handling', voiceHandling);
     if (requireApproval) fd.set('custom_orders_require_approval', 'on');
     fd.set('knowledge_base_json', JSON.stringify(knowledge));
     fd.set('business_hours_json', JSON.stringify({ tz: timezone, week: hours.week, note: hours.note }));
@@ -242,21 +245,45 @@ export function IntakeWizard({
             <CardTitle>Photos & voice notes from customers</CardTitle>
             <CardDescription>How should the AI handle a picture, voice note, or video a customer sends as an example?</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-col gap-2">
-              {MEDIA_HANDLING_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setMediaHandling(opt.value)}
-                  className={`flex flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors ${
-                    mediaHandling === opt.value ? 'border-primary bg-primary/5' : 'border-input'
-                  }`}
-                >
-                  <span className="text-sm font-medium">{opt.label}</span>
-                  <span className="text-xs text-muted-foreground">{opt.hint}</span>
-                </button>
-              ))}
+          <CardContent className="space-y-5">
+            <div>
+              <p className="mb-2 text-sm font-medium">Photos</p>
+              <div className="flex flex-col gap-2">
+                {MEDIA_HANDLING_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setMediaHandling(opt.value)}
+                    className={`flex flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors ${
+                      mediaHandling === opt.value ? 'border-primary bg-primary/5' : 'border-input'
+                    }`}
+                  >
+                    <span className="text-sm font-medium">{opt.label}</span>
+                    <span className="text-xs text-muted-foreground">{opt.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-medium">Voice notes</p>
+              <div className="flex flex-col gap-2">
+                {VOICE_HANDLING_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setVoiceHandling(opt.value)}
+                    className={`flex flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors ${
+                      voiceHandling === opt.value ? 'border-primary bg-primary/5' : 'border-input'
+                    }`}
+                  >
+                    <span className="text-sm font-medium">{opt.label}</span>
+                    <span className="text-xs text-muted-foreground">{opt.hint}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Videos are always held for a human to review — there&apos;s no auto-answer option for those yet.
+              </p>
             </div>
           </CardContent>
         </Card>

@@ -15,6 +15,7 @@ import { checkOrderStatusTool } from './checkOrderStatus';
 import { editOrderTool } from './editOrder';
 import { cancelOrderTool } from './cancelOrder';
 import { submitReviewTool } from './submitReview';
+import { flagImageAmbiguousTool } from './flagImageAmbiguous';
 
 export interface ToolContext {
   tenant: Tenant;
@@ -30,7 +31,14 @@ export interface ToolExecutor {
 }
 
 /** Registered here as each tool ships (empty ⇒ identical to the pre-tool-calling path). */
-const ALL_TOOLS: ToolExecutor[] = [createOrderTool, checkOrderStatusTool, editOrderTool, cancelOrderTool, submitReviewTool];
+const ALL_TOOLS: ToolExecutor[] = [
+  createOrderTool,
+  checkOrderStatusTool,
+  editOrderTool,
+  cancelOrderTool,
+  submitReviewTool,
+  flagImageAmbiguousTool,
+];
 
 /**
  * Tenant-scoped (and, for the review flow, session-scoped): which tools this
@@ -55,6 +63,9 @@ function isToolEnabledForTenant(toolName: string, tenant: Tenant, session?: Chat
   // Only advertised the one turn it's legitimately usable — defense in depth on
   // top of submitReview.ts's own server-side re-check, not a replacement for it.
   if (toolName === 'submit_review') return ordersOn && Boolean(session?.pendingReviewOrderId);
+  // Images are only ever shown to the model for custom-orders tenants (docs/10 §4) —
+  // this tool would be unreachable for anyone else regardless, but gate explicitly.
+  if (toolName === 'flag_image_ambiguous') return tenant.customOrdersEnabled;
   return false;
 }
 

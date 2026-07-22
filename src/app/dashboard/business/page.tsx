@@ -24,7 +24,7 @@ export default async function DashboardBusinessPage() {
   const { data: tenant } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, system_prompt, catalog_data, catalog_freeform_text, custom_orders_enabled, custom_orders_require_approval, custom_order_instructions, media_handling, business_type, booking_link, knowledge_base, business_hours, timezone, payments_enabled, payment_methods, payment_instructions, default_currency, prepaid_required, whatsapp_phone_number_id, meta_page_id, instagram_id, widget_public_key, requested_platforms, platform_setup_notes, platform_setup_requested_at, intake_completed_at',
+      'id, business_name, system_prompt, catalog_data, catalog_freeform_text, custom_orders_enabled, custom_orders_require_approval, custom_order_instructions, media_handling, voice_handling, business_type, booking_link, knowledge_base, business_hours, timezone, payments_enabled, payment_methods, payment_instructions, default_currency, prepaid_required, whatsapp_phone_number_id, meta_page_id, instagram_id, widget_public_key, requested_platforms, platform_setup_notes, platform_setup_requested_at, intake_completed_at',
     )
     .eq('id', activeTenantId)
     .single();

@@ -3,6 +3,7 @@ import * as media from './meta/media';
 import * as transcribeService from './ai/transcribe';
 import * as messages from './messages';
 import * as orders from './orders';
+import * as sessions from './sessions';
 import { notifyBoth } from '@/services/notifications';
 import { getTranscriptionKey } from '@/lib/secrets';
 import { sanitizeInbound } from './security/sanitize';
@@ -43,9 +44,11 @@ export async function processInboundMedia(
   tenant: Pick<
     Tenant,
     | 'id'
+    | 'businessName'
     | 'customOrdersEnabled'
     | 'paymentsEnabled'
     | 'mediaHandling'
+    | 'voiceHandling'
     | 'metaTokenSecretId'
     | 'whatsappTokenSecretId'
     | 'openaiKeySecretId'
@@ -135,7 +138,42 @@ export async function processInboundMedia(
         continue;
       }
       attachments.push({ kind: 'audio', storagePath: result.storagePath, mimeType: result.mimeType });
-      textNotes.push(sanitizeInbound(result.transcript));
+
+      if (tenant.voiceHandling === 'ai_autonomous') {
+        textNotes.push(sanitizeInbound(result.transcript));
+      } else {
+        // human_review (default, docs: media-handoff plan B6) — the transcript is recorded
+        // but never fed to the model as answerable content; a human reviews it via the
+        // clarification panel instead.
+        textNotes.push(
+          '[System note: the customer sent a voice note. Do not answer its content — give them one brief, ' +
+            "natural holding reply (e.g. that you're checking on it), nothing about its content specifically.]",
+        );
+        await sessions.setPendingClarification(session.id, {
+          kind: 'voice_review',
+          question: 'Review this voice note',
+          transcript: result.transcript,
+          attachmentStoragePath: result.storagePath,
+          raisedAt: new Date().toISOString(),
+        });
+        await sessions.setHandoff(session.id, true);
+        await notifyBoth({
+          tenantId: tenant.id,
+          type: 'media_review',
+          entityType: 'session',
+          entityId: session.id,
+          agency: {
+            title: 'Voice note needs review',
+            body: `${tenant.businessName} — a customer sent a voice note`,
+            link: `/admin/chat?session=${session.id}`,
+          },
+          tenant: {
+            title: 'A voice note needs your input',
+            body: 'A customer sent a voice note — review and reply.',
+            link: `/dashboard/chat?session=${session.id}`,
+          },
+        });
+      }
       continue;
     }
 
@@ -150,10 +188,36 @@ export async function processInboundMedia(
         continue;
       }
       attachments.push({ kind: 'video', storagePath: downloaded.storagePath, mimeType: downloaded.mimeType });
+
+      // No autonomous video-interpretation capability exists (docs: media-handoff plan B6) —
+      // always hold for a human, same treatment as audio's human_review branch.
       textNotes.push(
-        '[System note: the customer sent a video. Video is not analysed automatically — ask them ' +
-          'for a clear photo of the item plus a short description (typed or voice note) instead.]',
+        '[System note: the customer sent a video. Do not answer its content — give them one brief, natural ' +
+          "holding reply (e.g. that you're checking on it), nothing about its content specifically.]",
       );
+      await sessions.setPendingClarification(session.id, {
+        kind: 'video_review',
+        question: 'Review this video',
+        attachmentStoragePath: downloaded.storagePath,
+        raisedAt: new Date().toISOString(),
+      });
+      await sessions.setHandoff(session.id, true);
+      await notifyBoth({
+        tenantId: tenant.id,
+        type: 'media_review',
+        entityType: 'session',
+        entityId: session.id,
+        agency: {
+          title: 'Video needs review',
+          body: `${tenant.businessName} — a customer sent a video`,
+          link: `/admin/chat?session=${session.id}`,
+        },
+        tenant: {
+          title: 'A video needs your input',
+          body: 'A customer sent a video — review and reply.',
+          link: `/dashboard/chat?session=${session.id}`,
+        },
+      });
       continue;
     }
   }

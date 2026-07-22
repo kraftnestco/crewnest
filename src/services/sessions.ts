@@ -1,7 +1,7 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
 import type { Database } from '@/types/database';
-import type { AlertSignal, ChatSession, Platform } from '@/types/domain';
+import type { AlertSignal, ChatSession, PendingClarification, Platform } from '@/types/domain';
 
 /**
  * Session lifecycle. Uses the SERVICE client from webhook/after() context.
@@ -19,6 +19,7 @@ function mapSession(row: ChatSessionRow): ChatSession {
     isHumanHandoff: row.is_human_handoff,
     alertSignal: (row.alert_signal as AlertSignal | null) ?? null,
     pendingReviewOrderId: row.pending_review_order_id,
+    pendingClarification: (row.pending_clarification as unknown as PendingClarification | null) ?? null,
   };
 }
 
@@ -151,4 +152,31 @@ export async function setPendingReview(sessionId: string, orderId: string | null
     .eq('id', sessionId);
 
   if (error) throw error;
+}
+
+/**
+ * Set (or clear, with null) the session's open human-review flag — raised by
+ * `flag_image_ambiguous` and the voice/video human-review paths, resolved by
+ * the inbox's clarification panel (docs: media-handoff plan, Phase B).
+ */
+export async function setPendingClarification(
+  sessionId: string,
+  value: PendingClarification | null,
+): Promise<void> {
+  const client = createServiceClient();
+  const { error } = await client
+    .from('chat_sessions')
+    .update({ pending_clarification: value as unknown as Database['public']['Tables']['chat_sessions']['Update']['pending_clarification'] })
+    .eq('id', sessionId);
+
+  if (error) throw error;
+}
+
+/** Load a session by id, regardless of tenant — used by `continueSession` to resume a turn. */
+export async function getById(sessionId: string): Promise<ChatSession | null> {
+  const client = createServiceClient();
+  const { data, error } = await client.from('chat_sessions').select('*').eq('id', sessionId).maybeSingle();
+
+  if (error) throw error;
+  return data ? mapSession(data) : null;
 }

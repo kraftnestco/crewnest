@@ -3,10 +3,11 @@
 import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import * as tenants from '@/services/tenants';
+import * as aiOrchestrator from '@/services/aiOrchestrator';
 import { sendText } from '@/services/meta/send';
 import * as media from '@/services/meta/media';
 import type { Database } from '@/types/database';
-import type { OrderAttachment } from '@/types/domain';
+import type { OrderAttachment, PendingClarification } from '@/types/domain';
 
 type MessageRow = Database['public']['Tables']['chat_messages']['Row'];
 
@@ -97,12 +98,26 @@ export async function manualSendAction(sessionId: string, text: string): Promise
   // RLS-scoped read also acts as the access check: no row back means no access.
   const { data: session, error: sessionError } = await supabase
     .from('chat_sessions')
-    .select('id, tenant_id, platform, external_user_id')
+    .select('id, tenant_id, platform, external_user_id, pending_clarification')
     .eq('id', sessionId)
     .single();
 
   if (sessionError || !session) {
     throw new Error(sessionError?.message ?? 'Session not found.');
+  }
+
+  // A human replying directly in the chat box is itself a valid resolution path for an
+  // open clarification (docs: media-handoff plan, B8) — best-effort, must never block the send.
+  if (session.pending_clarification) {
+    try {
+      const { error } = await supabase.from('chat_sessions').update({ pending_clarification: null }).eq('id', sessionId);
+      if (error) throw error;
+    } catch (err) {
+      console.error('[chat] failed to clear pending_clarification on manual send', {
+        sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   const { data: inserted, error: insertError } = await supabase
@@ -134,4 +149,85 @@ export async function manualSendAction(sessionId: string, text: string): Promise
       }
     }
   }
+}
+
+/** Human-facing label for what kind of media a resolved clarification was about (docs: media-handoff plan, B8). */
+const CLARIFICATION_KIND_PHRASES: Record<PendingClarification['kind'], string> = {
+  voice_review: 'the voice note',
+  video_review: 'the video',
+  image_ambiguous: 'the photo',
+};
+
+/**
+ * A human answers an open voice/video/image clarification from the panel — clears the
+ * pending pointer and hands control straight back to the AI, which replies to the
+ * customer immediately using the answer, no further customer message required
+ * (docs: media-handoff plan, B7/B8). Mirrors manualSendAction's RLS-scoped access
+ * check: no row back means no access.
+ */
+export async function resolveClarificationAction(sessionId: string, note: string): Promise<void> {
+  const trimmed = note.trim();
+  if (!trimmed) return;
+
+  const supabase = await createSupabaseServerClient();
+
+  const { data: session, error: sessionError } = await supabase
+    .from('chat_sessions')
+    .select('id, pending_clarification')
+    .eq('id', sessionId)
+    .single();
+
+  if (sessionError || !session) {
+    throw new Error(sessionError?.message ?? 'Session not found.');
+  }
+
+  const pending = session.pending_clarification as unknown as PendingClarification | null;
+  const phrase = pending ? CLARIFICATION_KIND_PHRASES[pending.kind] : 'this';
+  const formattedNote =
+    `[context] Staff reviewed ${phrase} and answered: "${trimmed}". Use this to reply to the customer now — ` +
+    'do not ask them to repeat what they already sent.';
+
+  const { error: clearError } = await supabase
+    .from('chat_sessions')
+    .update({ pending_clarification: null, is_human_handoff: false })
+    .eq('id', sessionId);
+
+  if (clearError) throw new Error(clearError.message);
+
+  // Best-effort: the resolution itself has already succeeded (pointer cleared, control
+  // handed back) by this point — an AI-turn failure here shouldn't be reported as this
+  // action having failed, only logged, same as manualSendAction's delivery-failure path.
+  try {
+    await aiOrchestrator.continueSession(sessionId, formattedNote);
+  } catch (err) {
+    console.error('[chat] continueSession failed after resolving clarification', {
+      sessionId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  revalidatePath('/admin/chat');
+  revalidatePath('/dashboard/chat');
+}
+
+/**
+ * Mint a short-TTL signed URL for the media attached to a session's OPEN clarification.
+ * Takes the session id, not a bare storage path — verifies the path actually matches
+ * the session's own `pending_clarification` before signing (same ownership-check shape
+ * as getMessageMediaUrlAction, docs/10 §7).
+ */
+export async function getClarificationMediaUrlAction(sessionId: string, storagePath: string): Promise<string | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data: session, error } = await supabase
+    .from('chat_sessions')
+    .select('id, pending_clarification')
+    .eq('id', sessionId)
+    .single();
+
+  if (error || !session) return null;
+
+  const pending = session.pending_clarification as unknown as PendingClarification | null;
+  if (!pending?.attachmentStoragePath || pending.attachmentStoragePath !== storagePath) return null;
+
+  return media.getSignedUrl(storagePath);
 }

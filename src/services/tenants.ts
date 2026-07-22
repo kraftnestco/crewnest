@@ -36,6 +36,7 @@ function mapTenant(row: TenantRow): Tenant {
     customOrdersRequireApproval: row.custom_orders_require_approval,
     customOrderInstructions: row.custom_order_instructions,
     mediaHandling: (row.media_handling as Tenant['mediaHandling']) ?? 'match_catalogue',
+    voiceHandling: (row.voice_handling as Tenant['voiceHandling']) ?? 'human_review',
     businessType: (row.business_type as Tenant['businessType']) ?? 'product',
     bookingLink: row.booking_link,
     knowledgeBase: row.knowledge_base,

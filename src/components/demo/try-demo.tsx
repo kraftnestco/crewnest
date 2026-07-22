@@ -31,6 +31,7 @@ const BLANK_TENANT: IntakeTenant = {
   custom_orders_require_approval: true,
   custom_order_instructions: null,
   media_handling: 'match_catalogue',
+  voice_handling: 'human_review',
   business_type: 'product',
   booking_link: null,
   knowledge_base: null,
