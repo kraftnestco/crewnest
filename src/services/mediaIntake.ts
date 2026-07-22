@@ -129,52 +129,69 @@ export async function processInboundMedia(
 
     if (raw.kind === 'audio') {
       if (!tenant.customOrdersEnabled) continue;
-      const transcriptionConfig = await getTranscriptionConfig(tenant);
-      const result = await transcribeService.transcribe(raw, tenant, session.id, session.platform, transcriptionConfig);
-      if (!result) {
+      const downloaded = await media.download(raw, tenant, session.id, session.platform);
+      if (!downloaded) {
         textNotes.push(
-          '[System note: the customer sent a voice note but it could not be transcribed — tell them it ' +
+          '[System note: the customer sent a voice note but it failed to download — tell them it ' +
             "didn't come through and ask them to resend it or type their message.]",
         );
         continue;
       }
-      attachments.push({ kind: 'audio', storagePath: result.storagePath, mimeType: result.mimeType });
+      attachments.push({ kind: 'audio', storagePath: downloaded.storagePath, mimeType: downloaded.mimeType });
+
+      // Transcription is BEST-EFFORT and needs a funded OpenAI/OpenRouter account (OpenRouter
+      // 402s for audio below a small balance; the master OpenAI key is a placeholder in prod).
+      // A null transcript must NOT break the human-review flow below — the human can just play
+      // the audio in the clarification panel.
+      const transcriptionConfig = await getTranscriptionConfig(tenant);
+      const transcript = await transcribeService.transcribeStoragePath(
+        downloaded.storagePath,
+        downloaded.mimeType,
+        transcriptionConfig,
+      );
 
       if (tenant.voiceHandling === 'ai_autonomous') {
-        textNotes.push(sanitizeInbound(result.transcript));
-      } else {
-        // human_review (default, docs: media-handoff plan B6) — the transcript is recorded
-        // but never fed to the model as answerable content; a human reviews it via the
-        // clarification panel instead.
+        // Autonomous mode genuinely needs the words — without a transcript, ask them to type.
         textNotes.push(
-          '[System note: the customer sent a voice note. Do not answer its content — give them one brief, ' +
-            "natural holding reply (e.g. that you're checking on it), nothing about its content specifically.]",
+          transcript
+            ? sanitizeInbound(transcript)
+            : '[System note: the customer sent a voice note but it could not be transcribed — tell them it ' +
+                "didn't come through and ask them to resend it or type their message.]",
         );
-        await sessions.setPendingClarification(session.id, {
-          kind: 'voice_review',
-          question: 'Review this voice note',
-          transcript: result.transcript,
-          attachmentStoragePath: result.storagePath,
-          raisedAt: new Date().toISOString(),
-        });
-        await sessions.setHandoff(session.id, true);
-        await notifyBoth({
-          tenantId: tenant.id,
-          type: 'media_review',
-          entityType: 'session',
-          entityId: session.id,
-          agency: {
-            title: 'Voice note needs review',
-            body: `${tenant.businessName} — a customer sent a voice note`,
-            link: `/admin/chat?session=${session.id}`,
-          },
-          tenant: {
-            title: 'A voice note needs your input',
-            body: 'A customer sent a voice note — review and reply.',
-            link: `/dashboard/chat?session=${session.id}`,
-          },
-        });
+        continue;
       }
+
+      // human_review (default, docs: media-handoff plan B6) — always hold for a human, with or
+      // without a transcript. The transcript (when available) enriches the clarification panel
+      // but is never fed to the model as answerable content.
+      textNotes.push(
+        '[System note: the customer sent a voice note. Do not answer its content — give them one brief, ' +
+          "natural holding reply (e.g. that you're checking on it), nothing about its content specifically.]",
+      );
+      await sessions.setPendingClarification(session.id, {
+        kind: 'voice_review',
+        question: 'Review this voice note',
+        transcript: transcript ?? undefined,
+        attachmentStoragePath: downloaded.storagePath,
+        raisedAt: new Date().toISOString(),
+      });
+      await sessions.setHandoff(session.id, true);
+      await notifyBoth({
+        tenantId: tenant.id,
+        type: 'media_review',
+        entityType: 'session',
+        entityId: session.id,
+        agency: {
+          title: 'Voice note needs review',
+          body: `${tenant.businessName} — a customer sent a voice note`,
+          link: `/admin/chat?session=${session.id}`,
+        },
+        tenant: {
+          title: 'A voice note needs your input',
+          body: 'A customer sent a voice note — review and reply.',
+          link: `/dashboard/chat?session=${session.id}`,
+        },
+      });
       continue;
     }
 

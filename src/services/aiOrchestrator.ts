@@ -54,6 +54,10 @@ function conversationHasImages(msgs: LlmMessage[]): boolean {
   return msgs.some((m) => Array.isArray(m.content) && m.content.some((p) => p.type === 'image_url'));
 }
 
+/** Words that plausibly refer to an image, gating whether to re-attach a recent one (below). */
+const IMAGE_REFERENCE_RE =
+  /\b(pic|picture|photo|image|screenshot|design|attached|sent you|like this|this one|that one|the one i sent)\b/i;
+
 /** Collapse a message's content to text only, dropping image parts (for a text-only retry). */
 function stripImageParts(msg: LlmMessage): LlmMessage {
   if (!Array.isArray(msg.content)) return msg;
@@ -173,22 +177,18 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
   }
 
   // 6c. Cross-turn image memory: images ride only the turn they arrive on (the cache
-  // contract), and the history window is text-only — so a later "the picture I sent you"
-  // on a turn with no new image is invisible to the model. Re-attach the single most
-  // recent image shared within the window so the reference resolves (capped to bound
-  // vision-token cost). Skipped on continuation turns (no userText) and when this turn
-  // already carries a fresh image.
+  // contract) and the history window is text-only, so a later "the picture I sent you" is
+  // invisible to the model. When THIS turn has no new image BUT the customer's words refer
+  // to one, re-attach the single most recent image shared within the window so the
+  // reference resolves. Gated on an explicit image reference so a plain "hello" doesn't
+  // pull in a stale image (and, on a text-only model, waste a doomed vision call).
+  // Best-effort: re-attaching a past image must never block the reply.
   let effectiveImageUrls = imageUrls;
-  let reattachedRecentImage = false;
-  if ((!imageUrls || imageUrls.length === 0) && userText) {
+  if ((!imageUrls || imageUrls.length === 0) && userText && IMAGE_REFERENCE_RE.test(userText)) {
     try {
       const recent = await mediaIntake.getRecentImageUrl(session, tenant, RECENT_IMAGE_REATTACH_WINDOW_MINUTES);
-      if (recent) {
-        effectiveImageUrls = [recent];
-        reattachedRecentImage = true;
-      }
+      if (recent) effectiveImageUrls = [recent];
     } catch (err) {
-      // Best-effort: re-attaching a PAST image is a nicety and must never block the reply.
       console.warn('[orchestrator] recent-image re-attach failed', {
         tenantId: tenant.id,
         error: err instanceof Error ? err.message : 'unknown',
@@ -198,18 +198,6 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
 
   // 7. Cache-ordered prompt: [static prefix] ++ history ++ new user msg (+ images, §4.2).
   const built = promptBuilder.build({ tenant, history, userText, imageUrls: effectiveImageUrls, pendingReview });
-
-  // 7a. Tell the model the re-attached image is a prior share, not a new one — spliced on
-  // the dynamic tail (after the cache prefix), same seam as the open-now/retrieval lines.
-  if (reattachedRecentImage) {
-    built.messages.splice(built.cachePrefixLength, 0, {
-      role: 'system',
-      content:
-        '[context] The image attached to the latest user message is the most recent photo the ' +
-        'customer already shared earlier in this conversation, re-attached for reference — they are ' +
-        'likely referring back to it. Do not tell them you never received an image.',
-    });
-  }
 
   // 7b. Dynamic "open now" line — server-computed, injected AFTER the cache prefix so it
   // never touches the byte-identical static block (docs/12 §4.3). Only emitted when the
@@ -267,6 +255,15 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
           error: err instanceof Error ? err.message : 'unknown',
         });
         for (let i = 0; i < conversation.length; i++) conversation[i] = stripImageParts(conversation[i]);
+        // The model couldn't accept the image(s) — tell it so it asks the customer to
+        // describe the design in words instead of ignoring or inventing the photo. Spliced
+        // on the dynamic tail (after the cache prefix), same seam as the other context lines.
+        conversation.splice(built.cachePrefixLength, 0, {
+          role: 'system',
+          content:
+            "[context] You can't view images. If the customer sent or referred to a photo, tell them " +
+            'you are unable to open images and ask them to describe what they want in words.',
+        });
         strippedImages = true;
         result = await provider.chat({ ...chatArgs, messages: conversation }, key);
       } else {
