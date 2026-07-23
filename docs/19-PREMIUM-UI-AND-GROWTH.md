@@ -12,15 +12,16 @@
 - next-themes wired (`ThemeProvider`, default light) + one-tap `ThemeToggle` in `AppTopbar`.
 - Space Grotesk promoted to app-wide `--font-heading`.
 
-### U2. Navigation & mobile shell — NEXT
-- **Icon sidebar** (dashboard + admin): lucide icon per item, grouped sections, refined active
-  state (emerald accent bar), collapsed labels optional. Files: `dashboard/dashboard-nav.tsx`,
-  `admin/admin-nav.tsx`, both `layout.tsx` shells.
-- **Mobile**: sidebar hidden `< lg`; bottom tab bar (4–5 core items) + sheet drawer for the rest.
-  Today the fixed `w-56` sidebar makes phones unusable — this is the "run the business from my
-  phone" unlock.
-- **PWA**: `app/manifest.ts` (name, icons, standalone, theme color) so tenants install to
-  home screen. No service worker/offline in this pass.
+### U2. Navigation & mobile shell — ✅ SHIPPED
+- Shared `components/app-nav.tsx` (`SidebarNav` + `MobileTabBar`, one `NavItem[]` drives both);
+  `dashboard-nav.tsx`/`admin-nav.tsx` rebuilt with lucide icons + emerald accent bar; dashboard
+  gains the previously-unreachable Home item (exact match).
+- Both shells: sidebar `hidden lg:flex` + Logomark brand; fixed bottom tab bar `< lg` (first 5
+  items — Team/Settings stay desktop-only); `main` gets `pb-16 lg:pb-0`; topbar shows
+  Logomark + CrewNest on mobile.
+- PWA: `app/manifest.ts` (standalone, `/dashboard` start, `#0E7A5A`), `public/icons/` set
+  (192/512 + maskable + apple-touch), root-metadata icons. No service worker/offline (deliberate —
+  realtime app, stale cache would mislead).
 
 ### U3. Landing page & commercial surfaces
 - Rebuild `app/page.tsx`: hero with live product visual → logos/social-proof slot → how-it-works

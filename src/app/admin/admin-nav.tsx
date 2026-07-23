@@ -1,38 +1,30 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { LayoutDashboard, Building2, MessagesSquare, Package, ChartNoAxesColumn, Settings } from 'lucide-react';
+import { SidebarNav, MobileTabBar, type NavItem } from '@/components/app-nav';
 
-const NAV_ITEMS = [
-  { href: '/admin', label: 'Overview' },
-  { href: '/admin/clients', label: 'Clients' },
-  { href: '/admin/chat', label: 'Live Inbox' },
-  { href: '/admin/orders', label: 'Orders' },
-  { href: '/admin/analytics', label: 'Analytics' },
-  { href: '/admin/settings', label: 'Settings' },
+/**
+ * Agency-admin nav items (docs/19, Phase U2). One list drives both the desktop
+ * sidebar and the mobile bottom tab bar. Overview is exact-match so it doesn't
+ * stay lit on every /admin child route.
+ */
+const NAV_ITEMS: NavItem[] = [
+  { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
+  { href: '/admin/clients', label: 'Clients', icon: Building2 },
+  { href: '/admin/chat', label: 'Live Inbox', shortLabel: 'Inbox', icon: MessagesSquare },
+  { href: '/admin/orders', label: 'Orders', icon: Package },
+  { href: '/admin/analytics', label: 'Analytics', icon: ChartNoAxesColumn },
+  { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
 export function AdminNav() {
-  const pathname = usePathname();
+  return <SidebarNav items={NAV_ITEMS} />;
+}
 
-  return (
-    <nav className="flex flex-1 flex-col gap-1 px-2">
-      {NAV_ITEMS.map((item) => {
-        const isActive = item.href === '/admin' ? pathname === item.href : pathname.startsWith(item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              'rounded-lg px-3 py-2 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-              isActive && 'bg-sidebar-accent text-sidebar-accent-foreground font-medium',
-            )}
-          >
-            {item.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+/**
+ * Mobile tabs cap at five — Settings (rare, setup-time) stays desktop-only
+ * rather than crowding the bar.
+ */
+export function AdminTabBar() {
+  return <MobileTabBar items={NAV_ITEMS} />;
 }

@@ -2,8 +2,9 @@ import { redirect } from 'next/navigation';
 import { getCallerContext } from '@/lib/auth/context';
 import { Button } from '@/components/ui/button';
 import { AppTopbar } from '@/components/app-topbar';
+import { Logomark } from '@/app/_landing/logomark';
 import { signOutAction } from './actions';
-import { AdminNav } from './admin-nav';
+import { AdminNav, AdminTabBar } from './admin-nav';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getCallerContext();
@@ -37,8 +38,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-        <div className="p-4">
+      {/* Desktop sidebar — hidden below lg; phones use the bottom tab bar instead. */}
+      <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
+        <div className="flex items-center gap-2.5 p-4">
+          <Logomark className="size-7" />
           <p className="font-heading text-sm font-semibold">CrewNest</p>
         </div>
         <AdminNav />
@@ -53,7 +56,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       </aside>
       <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
         <AppTopbar accountHref="/admin/account" />
-        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
+        {/* pb-16 keeps content clear of the fixed mobile tab bar. */}
+        <main className="min-h-0 flex-1 overflow-y-auto pb-16 lg:pb-0">{children}</main>
+        <AdminTabBar />
       </div>
     </div>
   );
