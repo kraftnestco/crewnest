@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: Typecheck, lint, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: node node_modules/typescript/bin/tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests (doc-17 R1)
+        run: npm run test
+
+      - name: Migration lint (doc-17 R4)
+        run: node scripts/lint-migrations.mjs
+
+  rls-isolation:
+    name: RLS two-tenant isolation (doc-17 R2)
+    runs-on: ubuntu-latest
+    # Migrations depend on Supabase-specific schemas/roles (auth, storage, vault) and
+    # extensions (pgvector, pgmq) that vanilla postgres:16 does not ship. supabase/postgres
+    # is Supabase's own distribution and is the closest available stand-in for a real
+    # project's Postgres — bootstraps the auth/storage/vault schemas and the
+    # anon/authenticated/service_role roles the migrations and rls.sql both require.
+    # NOTE: this job has not been run/verified against a live GitHub Actions runner as of
+    # authoring — no docker/psql/supabase CLI was available in the environment that wrote
+    # it. Watch the first real run for image-specific surprises (e.g. vault functions that
+    # need the full Supabase stack rather than just this container).
+    services:
+      postgres:
+        image: supabase/postgres:15.14.1.152
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Apply migrations in order
+        env:
+          PGPASSWORD: postgres
+        run: |
+          for f in supabase/migrations/*.sql; do
+            echo "Applying $f"
+            psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+      - name: Run RLS isolation assertions
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/rls.sql
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

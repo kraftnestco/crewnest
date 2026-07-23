@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
+import { log } from '@/lib/log';
 
 export type MemberRole = Database['public']['Enums']['member_role'];
 export interface Membership {
@@ -38,7 +39,7 @@ export const getCallerContext = cache(async (): Promise<CallerContext | null> =>
   // silently locks a real admin/client out with a misleading "Forbidden"/
   // "Access pending" screen instead of a visible error. Throw so it surfaces.
   if (profileError || membershipsError) {
-    console.error('[auth] getCallerContext lookup failed', {
+    log.error('[auth] getCallerContext lookup failed', {
       userId: user.id,
       profileError: profileError?.message,
       membershipsError: membershipsError?.message,

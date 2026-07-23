@@ -44,6 +44,22 @@ export const MEMORY_WINDOW_MESSAGES = 16;
 export const MEMORY_TOKEN_BUDGET = 4000;
 
 /**
+ * Stage U-mem (docs/18 §2) — rolling conversation summary, folded into the dynamic
+ * tail once a session outgrows the live window. `SUMMARY_TOKEN_CAP` bounds the
+ * digest itself; `SUMMARY_SOURCE_FETCH_LIMIT` bounds how many dropped-off messages
+ * a single refresh call folds in (a session with a huge one-time backlog catches up
+ * over a few turns instead of one giant call). The model is a FIXED cheap one per
+ * provider, independent of the tenant's configured (possibly pricier) `llmModel` —
+ * this is a background digest, not a customer-facing reply.
+ */
+export const SUMMARY_TOKEN_CAP = 250;
+export const SUMMARY_SOURCE_FETCH_LIMIT = 200;
+export const SUMMARY_MODEL_BY_PROVIDER: Record<string, string> = {
+  openai: DEFAULT_LLM_MODEL,
+  openrouter: DEMO_LLM_MODEL,
+};
+
+/**
  * Catalogue stuffing threshold (approx tokens). Above this, switch promptBuilder
  * to retrieval mode (pgvector) — Phase 3. Below, stuff into the cached prefix.
  */
@@ -137,3 +153,24 @@ export const RETRIEVED_CONTEXT_TOKEN_BUDGET = 2000;
  * (tenant, platform, external user) session is gated.
  */
 export const FREE_PLAN_DAILY_SESSION_CAP = 5;
+
+/**
+ * Stage U-cap (docs/18 §3, finding #7) — platform default for the free-plan
+ * monthly master-key cost ceiling. `tenants.free_monthly_cap_usd` is a nullable
+ * per-tenant override; null means "use this default", not "uncapped" — every
+ * free-plan tenant is bounded. Scoped to `plan='free'` + non-BYOK turns only.
+ */
+export const DEFAULT_FREE_MONTHLY_CAP_USD = 5;
+
+/**
+ * CSAT gate (docs/16 §2, §4) — below this many order-review ratings in a range,
+ * surface "not enough data yet" rather than a misleadingly precise percentage.
+ */
+export const MIN_CSAT_SAMPLE = 5;
+
+/**
+ * Stage T (docs/17 §4.3) — platform-level short retention on infra tables,
+ * independent of any tenant's message_retention_days setting. Meta won't
+ * redeliver a webhook after a few days, so idempotency only needs this horizon.
+ */
+export const WEBHOOK_EVENTS_RETENTION_DAYS = 30;

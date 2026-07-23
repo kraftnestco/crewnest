@@ -1,8 +1,10 @@
 import { type NextRequest } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { handleInboundMessage } from '@/services/aiOrchestrator';
 import * as tenants from '@/services/tenants';
 import { checkRateLimit } from '@/services/security/rateLimit';
 import { WIDGET_TENANT_RATE_LIMIT } from '@/lib/constants';
+import { log } from '@/lib/log';
 
 /**
  * Website chat widget endpoint. Least-privilege channel: authenticated by a
@@ -51,10 +53,11 @@ export async function POST(req: NextRequest) {
     });
     return json({ reply: result?.replyText ?? null, handoff: result?.handoff ?? false }, 200, origin);
   } catch (err) {
-    console.error('[widget] processing failed', {
+    log.error('[widget] processing failed', {
       tenantId: tenant.id,
       error: err instanceof Error ? err.message : 'unknown',
     });
+    Sentry.captureException(err, { tags: { platform: 'web', tenantId: tenant.id } });
     return json({ error: 'internal error' }, 500, origin);
   }
 }

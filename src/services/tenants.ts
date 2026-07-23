@@ -51,6 +51,10 @@ function mapTenant(row: TenantRow): Tenant {
     prepaidRequired: row.prepaid_required,
     plan: row.plan,
     planStatus: row.plan_status,
+    csatPromptEnabled: row.csat_prompt_enabled,
+    dailyCostAlertUsd: row.daily_cost_alert_usd,
+    freeMonthlyCapUsd: row.free_monthly_cap_usd,
+    messageRetentionDays: row.message_retention_days,
   };
 }
 
@@ -99,4 +103,29 @@ export async function getById(tenantId: string): Promise<Tenant | null> {
 
   if (error) throw error;
   return data ? mapTenant(data) : null;
+}
+
+/**
+ * Set (or clear, with null) `plan_status` — an app-validated marker, not a DB enum
+ * (same free-text convention as `business_type`/`media_handling`). Used today for
+ * `'pending_upgrade'` (signup) and `'cap_reached'` (docs/18 §3, Stage U-cap).
+ * Read-then-compare-then-write, like `sessions.setAlertSignal`, so the caller can
+ * notify only on a real transition rather than every blocked turn.
+ */
+export async function setPlanStatus(tenantId: string, value: string | null): Promise<boolean> {
+  const client = createServiceClient();
+
+  const { data: current, error: readError } = await client
+    .from('tenants')
+    .select('plan_status')
+    .eq('id', tenantId)
+    .single();
+  if (readError) throw readError;
+
+  const changed = current.plan_status !== value;
+
+  const { error } = await client.from('tenants').update({ plan_status: value }).eq('id', tenantId);
+  if (error) throw error;
+
+  return changed;
 }

@@ -72,6 +72,7 @@ export type Database = {
           custom_order_instructions: string | null;
           media_handling: string | null;
           voice_handling: string | null;
+          csat_prompt_enabled: boolean;
           business_type: string;
           booking_link: string | null;
           knowledge_base: Json | null;
@@ -90,6 +91,9 @@ export type Database = {
           intake_completed_at: string | null;
           plan: string;
           plan_status: string | null;
+          daily_cost_alert_usd: number | null;
+          free_monthly_cap_usd: number | null;
+          message_retention_days: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -121,6 +125,7 @@ export type Database = {
           custom_order_instructions?: string | null;
           media_handling?: string | null;
           voice_handling?: string | null;
+          csat_prompt_enabled?: boolean;
           business_type?: string;
           booking_link?: string | null;
           knowledge_base?: Json | null;
@@ -139,6 +144,9 @@ export type Database = {
           intake_completed_at?: string | null;
           plan?: string;
           plan_status?: string | null;
+          daily_cost_alert_usd?: number | null;
+          free_monthly_cap_usd?: number | null;
+          message_retention_days?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -188,6 +196,9 @@ export type Database = {
           intake_completed_at?: string | null;
           plan?: string;
           plan_status?: string | null;
+          daily_cost_alert_usd?: number | null;
+          free_monthly_cap_usd?: number | null;
+          message_retention_days?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -222,10 +233,13 @@ export type Database = {
           external_user_id: string;
           is_human_handoff: boolean;
           alert_signal: string | null;
+          handoff_cause: string | null;
           last_message_at: string;
           unread_count: number;
           pending_review_order_id: string | null;
           pending_clarification: Json | null;
+          summary: string | null;
+          summary_through_message_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -235,10 +249,13 @@ export type Database = {
           external_user_id: string;
           is_human_handoff?: boolean;
           alert_signal?: string | null;
+          handoff_cause?: string | null;
           last_message_at?: string;
           unread_count?: number;
           pending_review_order_id?: string | null;
           pending_clarification?: Json | null;
+          summary?: string | null;
+          summary_through_message_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -248,10 +265,13 @@ export type Database = {
           external_user_id?: string;
           is_human_handoff?: boolean;
           alert_signal?: string | null;
+          handoff_cause?: string | null;
           last_message_at?: string;
           unread_count?: number;
           pending_review_order_id?: string | null;
           pending_clarification?: Json | null;
+          summary?: string | null;
+          summary_through_message_at?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -267,6 +287,7 @@ export type Database = {
           token_count: number | null;
           attachments: Json | null;
           delivery_failed: boolean;
+          authored_by: string;
           created_at: string;
         };
         Insert: {
@@ -279,6 +300,7 @@ export type Database = {
           token_count?: number | null;
           attachments?: Json | null;
           delivery_failed?: boolean;
+          authored_by?: string;
           created_at?: string;
         };
         Update: {
@@ -291,6 +313,7 @@ export type Database = {
           token_count?: number | null;
           attachments?: Json | null;
           delivery_failed?: boolean;
+          authored_by?: string;
           created_at?: string;
         };
         Relationships: [];
@@ -366,6 +389,7 @@ export type Database = {
           review_text: string | null;
           review_requested_at: string | null;
           review_submitted_at: string | null;
+          pii_erased_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -397,6 +421,7 @@ export type Database = {
           review_text?: string | null;
           review_requested_at?: string | null;
           review_submitted_at?: string | null;
+          pii_erased_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -428,6 +453,7 @@ export type Database = {
           review_text?: string | null;
           review_requested_at?: string | null;
           review_submitted_at?: string | null;
+          pii_erased_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -532,6 +558,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      erasure_events: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          subject_platform: Database['public']['Enums']['platform'] | null;
+          subject_external_user_id: string | null;
+          scope: string;
+          requested_by: string | null;
+          storage_objects_deleted: number;
+          completed_at: string;
+          note: string | null;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          subject_platform?: Database['public']['Enums']['platform'] | null;
+          subject_external_user_id?: string | null;
+          scope: string;
+          requested_by?: string | null;
+          storage_objects_deleted?: number;
+          completed_at?: string;
+          note?: string | null;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          subject_platform?: Database['public']['Enums']['platform'] | null;
+          subject_external_user_id?: string | null;
+          scope?: string;
+          requested_by?: string | null;
+          storage_objects_deleted?: number;
+          completed_at?: string;
+          note?: string | null;
+        };
+        Relationships: [];
+      };
       demo_leads: {
         Row: {
           id: string;
@@ -577,6 +639,10 @@ export type Database = {
       get_tenant_secret: {
         Args: { p_secret_id: string };
         Returns: string;
+      };
+      delete_tenant_secret: {
+        Args: { p_secret_id: string };
+        Returns: undefined;
       };
       match_knowledge_chunks: {
         Args: { p_tenant: string; p_query: string; p_k: number };

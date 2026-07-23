@@ -10,6 +10,7 @@ import { ingestTenantKnowledge } from '@/services/knowledge';
 import * as tenantsService from '@/services/tenants';
 import type { DemoTenantInput } from '@/services/demo/schema';
 import type { Json } from '@/types/database';
+import { log } from '@/lib/log';
 
 /**
  * Provisions a real tenant from the demo's stored intake, right after a
@@ -108,7 +109,7 @@ export async function provisionTenantAction(input: {
       await svc.from('tenants').update({ catalog_data: catalogData }).eq('id', tenant.id);
       await ingestTenantKnowledge(full, catalogData, demoTenant.knowledgeBase);
     } catch (err) {
-      console.error('[signup] post-provision catalogue enrichment failed', { tenantId: tenant.id, err });
+      log.error('[signup] post-provision catalogue enrichment failed', { tenantId: tenant.id, err });
     }
   });
 

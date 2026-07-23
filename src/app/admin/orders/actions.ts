@@ -9,6 +9,7 @@ import { sendTemplate, sendText } from '@/services/meta/send';
 import * as media from '@/services/meta/media';
 import type { Database } from '@/types/database';
 import type { OrderAttachment, OrderItem, Tenant } from '@/types/domain';
+import { log } from '@/lib/log';
 
 export type OrderRow = Database['public']['Tables']['orders']['Row'];
 export type OrderStatus = Database['public']['Enums']['order_status'];
@@ -55,7 +56,7 @@ async function notifyCustomerOfOrderEvent(
     try {
       await sendText({ tenant, platform: order.platform, to: order.external_user_id, text });
     } catch (err) {
-      console.error('[orders] customer notify send failed', {
+      log.error('[orders] customer notify send failed', {
         orderId: order.id,
         event: historyEvent,
         error: err instanceof Error ? err.message : String(err),
@@ -69,7 +70,7 @@ async function notifyCustomerOfOrderEvent(
   try {
     await orderService.appendStatusEvent(order.id, historyEvent);
   } catch (err) {
-    console.error('[orders] status-history append failed', {
+    log.error('[orders] status-history append failed', {
       orderId: order.id,
       event: historyEvent,
       error: err instanceof Error ? err.message : String(err),
@@ -178,7 +179,7 @@ export async function approveOrderAction(orderId: string): Promise<void> {
       });
       await orderService.markOwnerNotified(orderId);
     } catch (err) {
-      console.error('[orders] owner notify failed (approve)', {
+      log.error('[orders] owner notify failed (approve)', {
         orderId,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -261,7 +262,7 @@ export async function fulfillOrderAction(orderId: string): Promise<void> {
     try {
       await sessions.setPendingReview(order.session_id, order.id);
     } catch (err) {
-      console.error('[orders] pending-review pointer set failed', {
+      log.error('[orders] pending-review pointer set failed', {
         orderId,
         error: err instanceof Error ? err.message : String(err),
       });

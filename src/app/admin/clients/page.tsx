@@ -8,6 +8,8 @@ import { PageHeader } from '@/components/page-header';
 import { EditClientDialog } from './edit-client-dialog';
 import { InviteClientDialog } from './[id]/invite/invite-client-dialog';
 import { NewClientDialog } from './new-client-dialog';
+import { OffboardTenantDialog } from './offboard-tenant-dialog';
+import { log } from '@/lib/log';
 
 const CHANNEL_LABELS: Record<string, string> = {
   whatsapp: 'WhatsApp',
@@ -26,7 +28,7 @@ export default async function ClientsPage() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('[admin/clients] tenants lookup failed', error.message);
+    log.error('[admin/clients] tenants lookup failed', error.message);
   }
 
   return (
@@ -93,6 +95,7 @@ export default async function ClientsPage() {
                     </Link>
                     <EditClientDialog tenant={t} />
                     <InviteClientDialog tenantId={t.id} businessName={t.business_name} />
+                    <OffboardTenantDialog tenantId={t.id} businessName={t.business_name} />
                   </div>
                 </TableCell>
               </TableRow>

@@ -10,7 +10,9 @@ export function DashboardNav({ showBusiness }: { showBusiness: boolean }) {
   const items = [
     { href: '/dashboard/chat', label: 'My Inbox' },
     { href: '/dashboard/orders', label: 'My Orders' },
+    { href: '/dashboard/analytics', label: 'Analytics' },
     ...(showBusiness ? [{ href: '/dashboard/business', label: 'My Business' }] : []),
+    ...(showBusiness ? [{ href: '/dashboard/team', label: 'My Team' }] : []),
   ];
 
   return (

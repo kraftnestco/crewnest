@@ -7,6 +7,7 @@ import {
   TRANSCRIBE_MODEL_OPENROUTER,
 } from '@/lib/constants';
 import type { Tenant } from '@/types/domain';
+import { log } from '@/lib/log';
 
 /**
  * BYOK secret access via Supabase Vault. All reads go through the service-role
@@ -32,6 +33,17 @@ export async function getTenantSecret(secretId: string): Promise<string | null> 
 }
 
 /**
+ * Delete a Vault secret outright. A tenant-row cascade drops only the
+ * *reference* (the *_secret_id column); the secret itself is orphaned unless
+ * explicitly removed this way (docs/17 §4.1, Stage T's eraseTenant).
+ */
+export async function deleteTenantSecret(secretId: string): Promise<void> {
+  const svc = createServiceClient();
+  const { error } = await svc.rpc('delete_tenant_secret', { p_secret_id: secretId });
+  if (error) throw new Error(`deleteTenantSecret failed: ${error.message}`);
+}
+
+/**
  * Resolve the LLM API key for a tenant: the tenant's BYOK key from Vault, or the
  * master fallback. The second element indicates whether BYOK was used (for
  * usage_logs.used_byok).
@@ -42,7 +54,7 @@ export async function getLlmKey(
   if (tenant.openaiKeySecretId) {
     const key = await getTenantSecret(tenant.openaiKeySecretId);
     if (key) return { key, usedByok: true };
-    console.warn(`[secrets] BYOK secret ${tenant.openaiKeySecretId} configured but unreadable — falling back to master LLM key`);
+    log.warn(`[secrets] BYOK secret ${tenant.openaiKeySecretId} configured but unreadable — falling back to master LLM key`);
   }
   if (tenant.llmProvider === 'openrouter') {
     if (!env.MASTER_OPENROUTER_KEY) {
@@ -75,7 +87,7 @@ export async function getTranscriptionConfig(
   if (tenant.openaiKeySecretId) {
     const key = await getTenantSecret(tenant.openaiKeySecretId);
     if (key) return { apiKey: key, model: TRANSCRIBE_MODEL_OPENAI, usedByok: true };
-    console.warn(`[secrets] BYOK secret ${tenant.openaiKeySecretId} configured but unreadable — falling back to master transcription`);
+    log.warn(`[secrets] BYOK secret ${tenant.openaiKeySecretId} configured but unreadable — falling back to master transcription`);
   }
   if (tenant.llmProvider === 'openrouter' && env.MASTER_OPENROUTER_KEY) {
     return {
@@ -98,7 +110,7 @@ export async function getEmbeddingKey(
   if (tenant.openaiKeySecretId) {
     const key = await getTenantSecret(tenant.openaiKeySecretId);
     if (key) return { key, usedByok: true };
-    console.warn(`[secrets] BYOK secret ${tenant.openaiKeySecretId} configured but unreadable — falling back to master OpenAI key`);
+    log.warn(`[secrets] BYOK secret ${tenant.openaiKeySecretId} configured but unreadable — falling back to master OpenAI key`);
   }
   return { key: env.MASTER_OPENAI_KEY, usedByok: false };
 }

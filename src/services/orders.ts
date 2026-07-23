@@ -49,6 +49,7 @@ function mapOrder(row: OrderRow): Order {
     reviewText: row.review_text,
     reviewRequestedAt: row.review_requested_at,
     reviewSubmittedAt: row.review_submitted_at,
+    piiErasedAt: row.pii_erased_at,
     createdAt: row.created_at,
   };
 }

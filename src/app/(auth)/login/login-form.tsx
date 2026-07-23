@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,10 +20,12 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
   // otherwise strand the user on the code screen with no way to request a
   // fresh one (e.g. after the first code expires or they left and came back).
   const [codeRequested, setCodeRequested] = useState(false);
+  const [handledForgotState, setHandledForgotState] = useState(forgotState);
 
-  useEffect(() => {
+  if (forgotState !== handledForgotState) {
+    setHandledForgotState(forgotState);
     if (forgotState.sent) setCodeRequested(true);
-  }, [forgotState]);
+  }
 
   function backToSignIn() {
     setMode('sign-in');

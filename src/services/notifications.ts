@@ -4,6 +4,7 @@ import { env } from '@/lib/env';
 import { sendEmail } from '@/services/email';
 import type { Database } from '@/types/database';
 import type { Notification, NotificationEntityType, NotificationType } from '@/types/domain';
+import { log } from '@/lib/log';
 
 /**
  * The one notification emitter (docs/14 §3.1). Called from aiOrchestrator.ts,
@@ -61,7 +62,7 @@ export async function notify(input: NotifyInput): Promise<void> {
     });
     if (error) throw error;
   } catch (err) {
-    console.error('[notifications] emit failed', {
+    log.error('[notifications] emit failed', {
       type: input.type,
       tenantId: input.tenantId,
       error: err instanceof Error ? err.message : String(err),
@@ -128,7 +129,7 @@ async function emitEmailFanOut(input: NotifyInput): Promise<void> {
     if (recipients.length === 0) return;
     await sendEmail({ to: recipients, subject: input.title, text: input.body ?? input.title });
   } catch (err) {
-    console.error('[notifications] email fan-out failed', {
+    log.error('[notifications] email fan-out failed', {
       type: input.type,
       tenantId: input.tenantId,
       error: err instanceof Error ? err.message : String(err),

@@ -1,10 +1,12 @@
 import { after, type NextRequest } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { env } from '@/lib/env';
 import { verifyMetaSignature } from '@/services/meta/signature';
 import { parseMetaWebhook } from '@/services/meta/parse';
 import { handleInboundMessage } from '@/services/aiOrchestrator';
 import { createServiceClient } from '@/lib/supabase/service';
 import type { InboundMessage } from '@/types/domain';
+import { log } from '@/lib/log';
 
 /**
  * Meta webhook (WhatsApp / Messenger / Instagram). Multi-tenant: one URL, tenant
@@ -61,10 +63,11 @@ export async function POST(req: NextRequest) {
         await handleInboundMessage(msg);
       } catch (err) {
         // Log metadata only — never message bodies or secrets.
-        console.error('[meta webhook] processing failed', {
+        log.error('[meta webhook] processing failed', {
           platform: msg.platform,
           error: err instanceof Error ? err.message : 'unknown',
         });
+        Sentry.captureException(err, { tags: { platform: msg.platform, destinationId: msg.destinationId } });
       }
     }
   });
@@ -72,7 +75,13 @@ export async function POST(req: NextRequest) {
   return new Response('OK', { status: 200 });
 }
 
-/** Insert each provider_msg_id into webhook_events; return only the newly-seen ones. */
+/**
+ * Insert each provider_msg_id into webhook_events; return only the newly-seen ones.
+ *
+ * `tenant_id` is deliberately left null here (docs/18 §4 finding #8) — resolving it
+ * needs a tenant lookup before ACK, which folds into doc-15's full webhook rewrite
+ * (Stage P2), not this pre-ACK dedupe path. Don't add it here piecemeal.
+ */
 async function dedupe(messages: InboundMessage[]): Promise<InboundMessage[]> {
   const svc = createServiceClient();
   const fresh: InboundMessage[] = [];
@@ -88,7 +97,7 @@ async function dedupe(messages: InboundMessage[]): Promise<InboundMessage[]> {
       fresh.push(msg);
     } else if (error.code !== '23505') {
       // Not a duplicate-key error → log and still process to avoid dropping messages.
-      console.error('[meta webhook] dedupe insert error', { code: error.code });
+      log.error('[meta webhook] dedupe insert error', { code: error.code });
       fresh.push(msg);
     }
     // 23505 (unique_violation) => already handled; skip.

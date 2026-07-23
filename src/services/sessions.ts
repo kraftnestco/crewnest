@@ -1,7 +1,7 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
 import type { Database } from '@/types/database';
-import type { AlertSignal, ChatSession, PendingClarification, Platform } from '@/types/domain';
+import type { AlertSignal, ChatSession, HandoffCause, PendingClarification, Platform } from '@/types/domain';
 
 /**
  * Session lifecycle. Uses the SERVICE client from webhook/after() context.
@@ -18,8 +18,11 @@ function mapSession(row: ChatSessionRow): ChatSession {
     externalUserId: row.external_user_id,
     isHumanHandoff: row.is_human_handoff,
     alertSignal: (row.alert_signal as AlertSignal | null) ?? null,
+    handoffCause: (row.handoff_cause as HandoffCause | null) ?? null,
     pendingReviewOrderId: row.pending_review_order_id,
     pendingClarification: (row.pending_clarification as unknown as PendingClarification | null) ?? null,
+    summary: row.summary,
+    summaryThroughMessageAt: row.summary_through_message_at,
   };
 }
 
@@ -100,12 +103,17 @@ export async function findOrCreate(
   return mapSession(inserted);
 }
 
-/** Toggle the human-handoff flag (used by the AI on [HUMAN_HANDOFF] and by the inbox Take Over). */
-export async function setHandoff(sessionId: string, value: boolean): Promise<void> {
+/**
+ * Toggle the human-handoff flag (used by the AI on [HUMAN_HANDOFF], the media-review
+ * paths, and by the inbox Take Over). `cause`, when raising a handoff, is stored
+ * alongside the notification each call site already emits — the analytics
+ * handoff-rate breakdown reads this column directly (docs/16 §2, §5).
+ */
+export async function setHandoff(sessionId: string, value: boolean, cause?: HandoffCause): Promise<void> {
   const client = createServiceClient();
   const { error } = await client
     .from('chat_sessions')
-    .update({ is_human_handoff: value })
+    .update({ is_human_handoff: value, ...(value && cause ? { handoff_cause: cause } : {}) })
     .eq('id', sessionId);
 
   if (error) throw error;
@@ -167,6 +175,34 @@ export async function setPendingClarification(
   const { error } = await client
     .from('chat_sessions')
     .update({ pending_clarification: value as unknown as Database['public']['Tables']['chat_sessions']['Update']['pending_clarification'] })
+    .eq('id', sessionId);
+
+  if (error) throw error;
+}
+
+/**
+ * Server-authoritative unread reset — called when staff actually opens a conversation
+ * (docs/18 §4 finding #9). The inbox already does an ephemeral client-side `unread_count: 0`
+ * on select for instant feedback; this persists it so a page reload or a second staff
+ * member's inbox doesn't see a stale unread badge.
+ */
+export async function markRead(sessionId: string): Promise<void> {
+  const client = createServiceClient();
+  const { error } = await client.from('chat_sessions').update({ unread_count: 0 }).eq('id', sessionId);
+
+  if (error) throw error;
+}
+
+/**
+ * Store a refreshed rolling summary and advance the boundary it covers (docs/18 §2,
+ * Stage U-mem) — called from the best-effort refresh step in `runTurn`, never
+ * user-facing, so a failure here should just be logged by the caller, not surfaced.
+ */
+export async function setSummary(sessionId: string, summary: string, throughMessageAt: string): Promise<void> {
+  const client = createServiceClient();
+  const { error } = await client
+    .from('chat_sessions')
+    .update({ summary, summary_through_message_at: throughMessageAt })
     .eq('id', sessionId);
 
   if (error) throw error;

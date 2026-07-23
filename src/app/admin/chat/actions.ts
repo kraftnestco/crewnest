@@ -4,10 +4,14 @@ import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import * as tenants from '@/services/tenants';
 import * as aiOrchestrator from '@/services/aiOrchestrator';
+import { eraseCustomer } from '@/services/dataLifecycle';
+import * as sessions from '@/services/sessions';
+import { getCallerContext } from '@/lib/auth/context';
 import { sendText } from '@/services/meta/send';
 import * as media from '@/services/meta/media';
 import type { Database } from '@/types/database';
 import type { OrderAttachment, PendingClarification } from '@/types/domain';
+import { log } from '@/lib/log';
 
 type MessageRow = Database['public']['Tables']['chat_messages']['Row'];
 
@@ -76,10 +80,11 @@ export async function takeOverAction(sessionId: string, value: boolean): Promise
           content:
             '[context] A human agent handled the conversation above. If an order was clearly agreed but not yet ' +
             'recorded, call create_order now using the details already discussed instead of re-asking the customer.',
+          authored_by: 'system',
         });
       }
     } catch (err) {
-      console.error('[chat] resume-context nudge failed', {
+      log.error('[chat] resume-context nudge failed', {
         sessionId,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -113,7 +118,7 @@ export async function manualSendAction(sessionId: string, text: string): Promise
       const { error } = await supabase.from('chat_sessions').update({ pending_clarification: null }).eq('id', sessionId);
       if (error) throw error;
     } catch (err) {
-      console.error('[chat] failed to clear pending_clarification on manual send', {
+      log.error('[chat] failed to clear pending_clarification on manual send', {
         sessionId,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -127,6 +132,7 @@ export async function manualSendAction(sessionId: string, text: string): Promise
       tenant_id: session.tenant_id,
       role: 'assistant',
       content: trimmed,
+      authored_by: 'human',
     })
     .select('id')
     .single();
@@ -139,7 +145,7 @@ export async function manualSendAction(sessionId: string, text: string): Promise
       try {
         await sendText({ tenant, platform: session.platform, to: session.external_user_id, text: trimmed });
       } catch (err) {
-        console.error('[chat] manual send failed', {
+        log.error('[chat] manual send failed', {
           sessionId: session.id,
           error: err instanceof Error ? err.message : String(err),
         });
@@ -148,6 +154,31 @@ export async function manualSendAction(sessionId: string, text: string): Promise
         }
       }
     }
+  }
+}
+
+/**
+ * Server-authoritative unread reset when staff actually opens a conversation (docs/18 §4
+ * finding #9) — the inbox already zeroes `unread_count` locally on select for instant
+ * feedback; this persists it. RLS-scoped read is the access check, same shape as every
+ * other action here: no row back means no access. Best-effort by design: called from a
+ * UI click, not a form — a failure here shouldn't surface as an error toast, just a stale
+ * badge until the next successful open.
+ */
+export async function markReadAction(sessionId: string): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+  const { data: session, error } = await supabase
+    .from('chat_sessions')
+    .select('id')
+    .eq('id', sessionId)
+    .single();
+
+  if (error || !session) return;
+
+  try {
+    await sessions.markRead(sessionId);
+  } catch (err) {
+    log.error('[chat] markRead failed', { sessionId, error: err instanceof Error ? err.message : String(err) });
   }
 }
 
@@ -198,9 +229,9 @@ export async function resolveClarificationAction(sessionId: string, note: string
   // handed back) by this point — an AI-turn failure here shouldn't be reported as this
   // action having failed, only logged, same as manualSendAction's delivery-failure path.
   try {
-    await aiOrchestrator.continueSession(sessionId, formattedNote);
+    await aiOrchestrator.continueSession(sessionId, formattedNote, 'human');
   } catch (err) {
-    console.error('[chat] continueSession failed after resolving clarification', {
+    log.error('[chat] continueSession failed after resolving clarification', {
       sessionId,
       error: err instanceof Error ? err.message : String(err),
     });
@@ -230,4 +261,31 @@ export async function getClarificationMediaUrlAction(sessionId: string, storageP
   if (!pending?.attachmentStoragePath || pending.attachmentStoragePath !== storagePath) return null;
 
   return media.getSignedUrl(storagePath);
+}
+
+/**
+ * Right-to-erasure for a single customer (docs/17 §4.2, Stage T): deletes their session
+ * (cascades chat_messages), their order-media storage objects, and scrubs PII on their
+ * orders while keeping the order shell for the tenant's own records. RLS-scoped read is
+ * the access check, same shape as every other action here: no row back means no access.
+ * The session-row delete propagates to both inbox views via their existing Realtime
+ * `chat_sessions` DELETE handler — no extra client-side cleanup needed.
+ */
+export async function eraseCustomerAction(sessionId: string): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+  const { data: session, error } = await supabase
+    .from('chat_sessions')
+    .select('id, tenant_id, platform, external_user_id')
+    .eq('id', sessionId)
+    .single();
+
+  if (error || !session) {
+    throw new Error(error?.message ?? 'Session not found.');
+  }
+
+  const ctx = await getCallerContext();
+  await eraseCustomer(session.tenant_id, session.platform, session.external_user_id, ctx?.userId ?? null);
+
+  revalidatePath('/admin/chat');
+  revalidatePath('/dashboard/chat');
 }

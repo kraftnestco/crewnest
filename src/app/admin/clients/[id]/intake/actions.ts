@@ -9,6 +9,7 @@ import { ingestTenantKnowledge } from '@/services/knowledge';
 import { parseCatalogueFreeform } from '@/services/ai/catalogueParser';
 import type { Json } from '@/types/database';
 import type { UpdateIntakeState } from './intake-state';
+import { log } from '@/lib/log';
 
 /**
  * Writes the Stage-E intake wizard fields (docs/10-CUSTOM-ORDERS-MEDIA-AND-INTAKE.md §3.1).
@@ -149,7 +150,7 @@ export async function updateIntakeAction(
     try {
       await ingestTenantKnowledge(tenant, catalogData, knowledgeBase);
     } catch (err) {
-      console.error('[intake] knowledge re-embed failed', { tenantId, err });
+      log.error('[intake] knowledge re-embed failed', { tenantId, err });
     }
   });
 

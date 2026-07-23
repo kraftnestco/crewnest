@@ -13,6 +13,7 @@ import * as orders from './orders';
 import * as messages from './messages';
 import * as mediaIntake from './mediaIntake';
 import * as promptBuilder from './ai/promptBuilder';
+import * as summarize from './ai/summarize';
 import * as knowledge from './knowledge';
 import { computeOpenNow } from './hours';
 import { getProvider } from './ai/provider';
@@ -26,6 +27,7 @@ import {
   sanitizeInbound,
   stripHandoffToken,
   assistantRequestedHandoff,
+  detectEscalationKeywords,
   extractSignal,
   stripSignalTokens,
 } from './security/sanitize';
@@ -33,9 +35,11 @@ import {
   MEMORY_TOKEN_BUDGET,
   MAX_TOOL_ROUNDS,
   FREE_PLAN_DAILY_SESSION_CAP,
+  DEFAULT_FREE_MONTHLY_CAP_USD,
   RECENT_IMAGE_REATTACH_WINDOW_MINUTES,
 } from '@/lib/constants';
-import type { ChatSession, InboundMessage, OrderAttachment, Tenant } from '@/types/domain';
+import type { AuthoredBy, ChatSession, InboundMessage, OrderAttachment, Tenant } from '@/types/domain';
+import { log } from '@/lib/log';
 
 export interface OrchestratorResult {
   /** Null only when a free-plan tenant's daily new-conversation cap blocked the session itself. */
@@ -48,6 +52,10 @@ export interface OrchestratorResult {
 /** Shown to the customer, and returned to the web widget, when Phase D's free-plan cap blocks a NEW conversation. */
 const FREE_PLAN_LIMIT_REACHED_TEXT =
   "Thanks for reaching out! We've reached today's conversation limit on our free plan — please try again tomorrow, or the business will get back to you soon.";
+
+/** Shown when a free-plan, non-BYOK tenant crosses its MONTHLY cost ceiling mid-conversation (docs/18 §3, Stage U-cap). */
+const FREE_PLAN_MONTHLY_CAP_REACHED_TEXT =
+  "Thanks for your message! This business has reached its monthly limit on our free plan — they'll follow up soon, or can upgrade to keep the AI answering right away.";
 
 /** True if any message carries an image part (vision content) — used for the text-only retry. */
 function conversationHasImages(msgs: LlmMessage[]): boolean {
@@ -78,7 +86,7 @@ export async function handleInboundMessage(
       : await tenants.resolveByDestination(input.platform, input.destinationId);
 
   if (!tenant) {
-    console.warn('[orchestrator] no active tenant for destination', {
+    log.warn('[orchestrator] no active tenant for destination', {
       platform: input.platform,
     });
     return null;
@@ -129,6 +137,34 @@ export async function handleInboundMessage(
       providerMsgId: input.providerMsgId,
       attachments: media.attachments,
     });
+
+    // 4b. During-handoff escalation backstop (docs/18 §4 finding #10) — the LLM is
+    // skipped above, so it can't re-flag a customer getting angrier after a human
+    // took over. A keyword-only heuristic bumps the sticky alert_signal instead, no
+    // model call. `setAlertSignal` already notifies only on a real transition, so a
+    // customer sending several escalating messages in a row still notifies once.
+    if (userText && detectEscalationKeywords(userText)) {
+      const changed = await sessions.setAlertSignal(session.id, 'frustrated');
+      if (changed) {
+        await notifyBoth({
+          tenantId: tenant.id,
+          type: 'alert_signal',
+          entityType: 'session',
+          entityId: session.id,
+          agency: {
+            title: 'Still escalating',
+            body: `${tenant.businessName} — customer still escalating on a handed-over chat`,
+            link: `/admin/chat?session=${session.id}`,
+          },
+          tenant: {
+            title: 'Still escalating',
+            body: 'Customer still escalating on a handed-over chat',
+            link: `/dashboard/chat?session=${session.id}`,
+          },
+        });
+      }
+    }
+
     return { sessionId: session.id, replyText: null, handoff: true };
   }
 
@@ -160,8 +196,13 @@ interface RunTurnInput {
  * plan, B7. Pure extraction from the original inline steps; behavior-preserving.
  */
 async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUrls, attachments }: RunTurnInput): Promise<OrchestratorResult> {
-  // 6. Short-term memory (chronological, token-budgeted).
-  const history = await messages.loadWindow(session.id, MEMORY_TOKEN_BUDGET);
+  // 6. Short-term memory (chronological, token-budgeted). `truncated`/`oldestKeptAt`
+  // feed the rolling-summary refresh at step 13 (docs/18 §2, Stage U-mem).
+  const {
+    messages: history,
+    truncated: windowTruncated,
+    oldestKeptAt: windowOldestAt,
+  } = await messages.loadWindow(session.id, MEMORY_TOKEN_BUDGET);
 
   // 6b. Pending post-fulfillment review (docs: order-event-messaging plan, Phase B) — only
   // built when the order still needs a rating; submitReview.ts clears the pointer on
@@ -189,7 +230,7 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
       const recent = await mediaIntake.getRecentImageUrl(session, tenant, RECENT_IMAGE_REATTACH_WINDOW_MINUTES);
       if (recent) effectiveImageUrls = [recent];
     } catch (err) {
-      console.warn('[orchestrator] recent-image re-attach failed', {
+      log.warn('[orchestrator] recent-image re-attach failed', {
         tenantId: tenant.id,
         error: err instanceof Error ? err.message : 'unknown',
       });
@@ -221,8 +262,74 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
     }
   }
 
+  // 7d. Rolling conversation summary (docs/18 §2, Stage U-mem) — injected on the
+  // dynamic tail, same seam as open-now/retrieval above, NEVER in the cached static
+  // prefix. Every turn that already has one gets it; REFRESHING the summary itself
+  // (step 13, below) only happens on a turn whose window had to drop rows, so this
+  // turn's prompt uses whatever was already stored before this turn started.
+  if (session.summary) {
+    built.messages.splice(built.cachePrefixLength, 0, {
+      role: 'system',
+      content: `[context] Summary of the earlier part of this conversation: ${session.summary}`,
+    });
+  }
+
   // 8. Resolve the LLM key (tenant BYOK from Vault, else master fallback).
   const { key, usedByok } = await getLlmKey(tenant);
+
+  // 8b. Free-plan monthly cost ceiling (docs/18 §3, Stage U-cap, finding #7) — the
+  // daily cap at step 2 only throttles NEW conversations; an existing free session
+  // could otherwise run up unbounded master-key spend. Scoped to plan='free' AND
+  // this turn using the master key (a BYOK free tenant spends their own key — not
+  // ours to cap). Checked here, now that `usedByok` is known, before any model call.
+  if (tenant.plan === 'free' && !usedByok) {
+    const cap = tenant.freeMonthlyCapUsd ?? DEFAULT_FREE_MONTHLY_CAP_USD;
+    const spentUsd = await messages.getMonthToDateMasterCostUsd(tenant.id);
+
+    if (spentUsd >= cap) {
+      // Transition-only notify (mirrors sessions.setAlertSignal) so a chatty capped-out
+      // tenant doesn't spam an alert on every subsequent blocked message this month.
+      const changed = await tenants.setPlanStatus(tenant.id, 'cap_reached');
+      if (changed) {
+        await notifyBoth({
+          tenantId: tenant.id,
+          type: 'upgrade_request',
+          entityType: 'tenant',
+          entityId: tenant.id,
+          agency: {
+            title: 'Free plan limit reached',
+            body: `${tenant.businessName} hit its monthly free-plan spend cap ($${cap.toFixed(2)}) — upgrade or raise their cap`,
+            link: `/admin/clients/${tenant.id}`,
+          },
+          tenant: {
+            title: 'Monthly limit reached',
+            body: `You've reached this month's free-plan limit ($${cap.toFixed(2)}) — upgrade to keep the AI answering.`,
+            link: '/dashboard/business',
+          },
+        });
+      }
+
+      await messages.persist({
+        sessionId: session.id,
+        tenantId: tenant.id,
+        role: 'assistant',
+        content: FREE_PLAN_MONTHLY_CAP_REACHED_TEXT,
+      });
+      if (session.platform !== 'web') {
+        await sendText({
+          tenant,
+          platform: session.platform,
+          to: session.externalUserId,
+          text: FREE_PLAN_MONTHLY_CAP_REACHED_TEXT,
+        });
+      }
+      return {
+        sessionId: session.id,
+        replyText: session.platform === 'web' ? FREE_PLAN_MONTHLY_CAP_REACHED_TEXT : null,
+        handoff: false,
+      };
+    }
+  }
 
   // 9. Bounded tool-calling loop (docs/09-ORDERS-AND-TOOLS.md §2.3). A tenant with
   // no enabled tools gets an empty list, which behaves identically to the old
@@ -250,7 +357,7 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
       result = await provider.chat({ ...chatArgs, messages: conversation }, key);
     } catch (err) {
       if (!strippedImages && conversationHasImages(conversation)) {
-        console.warn('[orchestrator] chat failed with images — retrying text-only', {
+        log.warn('[orchestrator] chat failed with images — retrying text-only', {
           tenantId: tenant.id,
           error: err instanceof Error ? err.message : 'unknown',
         });
@@ -302,7 +409,7 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
   // Round cap exhausted with no plain-text turn (e.g. tool args kept failing
   // validation) — hand off rather than leaving the customer without a reply.
   if (!finalText) {
-    await sessions.setHandoff(session.id, true);
+    await sessions.setHandoff(session.id, true, 'tool_exhaustion');
     await notifyBoth({
       tenantId: tenant.id,
       type: 'handoff',
@@ -356,7 +463,7 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
   }
 
   if (handoff) {
-    await sessions.setHandoff(session.id, true);
+    await sessions.setHandoff(session.id, true, 'requested');
     await notifyBoth({
       tenantId: tenant.id,
       type: 'handoff',
@@ -398,6 +505,28 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
     });
   }
 
+  // 13. Rolling summary refresh (docs/18 §2, Stage U-mem) — best-effort, off-hot-path:
+  // only runs when this turn's window had to drop rows, and never blocks or fails the
+  // reply already sent above. The refreshed summary lands in time for the NEXT turn's
+  // injection at step 7d, not this one — a natural, accepted one-turn lag.
+  if (windowTruncated && windowOldestAt) {
+    try {
+      const source = await messages.loadMessagesForSummary(session.id, windowOldestAt, session.summaryThroughMessageAt);
+      if (source.messages.length > 0) {
+        const updatedSummary = await summarize.refreshSummary(tenant, session.summary, source.messages);
+        if (updatedSummary) {
+          await sessions.setSummary(session.id, updatedSummary, source.newestIncludedAt ?? windowOldestAt);
+        }
+      }
+    } catch (err) {
+      log.warn('[orchestrator] summary refresh failed', {
+        tenantId: tenant.id,
+        sessionId: session.id,
+        error: err instanceof Error ? err.message : 'unknown',
+      });
+    }
+  }
+
   return { sessionId: session.id, replyText, handoff: false };
 }
 
@@ -408,7 +537,11 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
  * turn as a fresh customer message would, so the AI can reply immediately without
  * the customer needing to send anything first.
  */
-export async function continueSession(sessionId: string, note: string): Promise<OrchestratorResult | null> {
+export async function continueSession(
+  sessionId: string,
+  note: string,
+  authoredBy: AuthoredBy = 'system',
+): Promise<OrchestratorResult | null> {
   const session = await sessions.getById(sessionId);
   if (!session) return null;
   const tenant = await tenants.getById(session.tenantId);
@@ -419,6 +552,7 @@ export async function continueSession(sessionId: string, note: string): Promise<
     tenantId: tenant.id,
     role: 'system',
     content: note,
+    authoredBy,
   });
 
   return runTurn(tenant, session, { userText: null });

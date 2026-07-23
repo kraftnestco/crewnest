@@ -26,14 +26,30 @@ export function ClarificationPanel({
   onResolve: (note: string) => void | Promise<void>;
   getAttachmentUrl?: (path: string) => Promise<string | null>;
 }) {
+  if (!pendingClarification) return null;
+
+  return (
+    <ClarificationPanelBody
+      key={pendingClarification.raisedAt}
+      pendingClarification={pendingClarification}
+      onResolve={onResolve}
+      getAttachmentUrl={getAttachmentUrl}
+    />
+  );
+}
+
+/** Keyed on `raisedAt` by the parent so a new clarification remounts with fresh `note`/`submitting` state. */
+function ClarificationPanelBody({
+  pendingClarification,
+  onResolve,
+  getAttachmentUrl,
+}: {
+  pendingClarification: PendingClarification;
+  onResolve: (note: string) => void | Promise<void>;
+  getAttachmentUrl?: (path: string) => Promise<string | null>;
+}) {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    setNote('');
-  }, [pendingClarification?.raisedAt]);
-
-  if (!pendingClarification) return null;
 
   async function submit(text: string) {
     const trimmed = text.trim();
@@ -64,7 +80,7 @@ export function ClarificationPanel({
       )}
 
       {pendingClarification.kind === 'voice_review' && pendingClarification.transcript && (
-        <p className="mb-2.5 text-sm italic text-muted-foreground">"{pendingClarification.transcript}"</p>
+        <p className="mb-2.5 text-sm italic text-muted-foreground">&ldquo;{pendingClarification.transcript}&rdquo;</p>
       )}
 
       <p className="mb-2.5 text-sm font-medium">{pendingClarification.question}</p>

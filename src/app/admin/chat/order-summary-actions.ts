@@ -13,6 +13,7 @@ import { sendTemplate } from '@/services/meta/send';
 import { notifyBoth } from '@/services/notifications';
 import { MEMORY_TOKEN_BUDGET } from '@/lib/constants';
 import type { OrderItem, PaymentMethod } from '@/types/domain';
+import { log } from '@/lib/log';
 
 /**
  * "Generate order summary" (docs: order-event-messaging plan, Phase D) — a human-confirmed
@@ -88,7 +89,7 @@ export async function generateOrderSummaryAction(sessionId: string): Promise<Ord
   const tenant = await tenants.getById(session.tenant_id);
   if (!tenant) throw new Error('Tenant not found.');
 
-  const history = await messages.loadWindow(sessionId, MEMORY_TOKEN_BUDGET);
+  const { messages: history } = await messages.loadWindow(sessionId, MEMORY_TOKEN_BUDGET);
   if (history.length === 0) return EMPTY_DRAFT;
 
   const transcript = history.map((m) => `${m.role}: ${m.content}`).join('\n');
@@ -215,7 +216,7 @@ export async function createOrderFromSummaryAction(sessionId: string, fields: Or
       });
       await orders.markOwnerNotified(order.id);
     } catch (err) {
-      console.error('[orders] owner notify failed (order summary)', {
+      log.error('[orders] owner notify failed (order summary)', {
         tenantId: session.tenant_id,
         orderId: order.id,
         error: err instanceof Error ? err.message : String(err),

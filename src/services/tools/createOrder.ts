@@ -7,6 +7,7 @@ import { notifyBoth } from '@/services/notifications';
 import { MAX_ORDERS_PER_SESSION_WINDOW, PAYMENT_METHOD_PRIORITY } from '@/lib/constants';
 import type { PaymentMethod, Tenant } from '@/types/domain';
 import type { ToolContext, ToolExecutor } from './registry';
+import { log } from '@/lib/log';
 
 /**
  * create_order — captures a confirmed customer order. The model must only call
@@ -157,7 +158,7 @@ export const createOrderTool: ToolExecutor = {
       try {
         await sessions.setPendingReview(ctx.session.id, null);
       } catch (err) {
-        console.error('[orders] failed to clear stale review pointer', {
+        log.error('[orders] failed to clear stale review pointer', {
           sessionId: ctx.session.id,
           error: err instanceof Error ? err.message : String(err),
         });
@@ -196,7 +197,7 @@ export const createOrderTool: ToolExecutor = {
         });
         await orders.markOwnerNotified(order.id);
       } catch (err) {
-        console.error('[orders] owner notify failed', {
+        log.error('[orders] owner notify failed', {
           tenantId: ctx.tenant.id,
           orderId: order.id,
           error: err instanceof Error ? err.message : String(err),

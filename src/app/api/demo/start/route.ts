@@ -3,6 +3,7 @@ import { checkRateLimit } from '@/services/security/rateLimit';
 import { DEMO_SESSION_RATE_LIMIT } from '@/lib/constants';
 import { demoLeadRequestSchema } from '@/services/demo/schema';
 import { createServiceClient } from '@/lib/supabase/service';
+import { log } from '@/lib/log';
 
 /**
  * Gates a new public demo session (docs: "try it for your business" plan,
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
       });
     } catch (err) {
       // Lead capture is a courtesy write — never block the demo over it.
-      console.error('[demo/start] failed to record demo_leads row', err);
+      log.error('[demo/start] failed to record demo_leads row', err);
     }
   }
 

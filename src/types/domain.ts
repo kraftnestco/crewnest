@@ -19,6 +19,10 @@ export type MediaHandling = 'match_catalogue' | 'accept_any' | 'reject';
 export type VoiceHandling = 'ai_autonomous' | 'human_review';
 /** Product vs service framing — picks which flow block (ORDER_FLOW vs SERVICE_FLOW) the prompt shows. */
 export type BusinessType = 'product' | 'service';
+/** Why a session was handed to a human — set at each handoff-emit site alongside the existing notification. See docs/16 §2. */
+export type HandoffCause = 'requested' | 'alert' | 'tool_exhaustion' | 'media_review';
+/** Who produced a `role:'assistant'` reply — distinguishes an LLM turn from a staff manual send (docs/16 §2.1). */
+export type AuthoredBy = 'ai' | 'human' | 'system';
 
 /** The subset of a tenant needed to answer a message. */
 export interface Tenant {
@@ -62,6 +66,14 @@ export interface Tenant {
   plan: string;
   /** Non-null only while a self-serve paid selection awaits agency activation (docs Phase C). */
   planStatus: string | null;
+  /** Opt-in per-conversation CSAT prompt (docs/16 §4.3) — designed but off by default; not wired in Phase 3. */
+  csatPromptEnabled: boolean;
+  /** Agency alert threshold for a tenant's daily spend (docs/17 §3, Stage S3). Null = no alert. */
+  dailyCostAlertUsd: number | null;
+  /** Free-plan monthly master-key spend ceiling override (docs/18 §3, Stage U-cap). Null = use the platform default (`DEFAULT_FREE_MONTHLY_CAP_USD`), not "uncapped". */
+  freeMonthlyCapUsd: number | null;
+  /** Days of chat_messages history to keep for this tenant (docs/17 §4.3, Stage T). Null = keep forever. */
+  messageRetentionDays: number | null;
 }
 
 /**
@@ -87,8 +99,14 @@ export interface ChatSession {
   externalUserId: string;
   isHumanHandoff: boolean;
   alertSignal: AlertSignal | null;
+  /** Set at the same site as the handoff-triggering notification; null while never handed off. See docs/16 §2. */
+  handoffCause: HandoffCause | null;
   pendingReviewOrderId: string | null;
   pendingClarification: PendingClarification | null;
+  /** Rolling digest of everything older than the live memory window (docs/18 §2, Stage U-mem). Null until the first refresh. */
+  summary: string | null;
+  /** `created_at` of the newest message already folded into `summary` — the boundary the next refresh resumes from. */
+  summaryThroughMessageAt: string | null;
 }
 
 export interface ChatMessage {
@@ -98,6 +116,7 @@ export interface ChatMessage {
   role: MessageRole;
   content: string;
   attachments: OrderAttachment[] | null;
+  authoredBy: AuthoredBy;
   createdAt: string;
 }
 
@@ -150,6 +169,8 @@ export interface Order {
   reviewText: string | null;
   reviewRequestedAt: string | null;
   reviewSubmittedAt: string | null;
+  /** Set when eraseCustomer/eraseTenant scrubs this order's PII while retaining the shell (docs/17 §4.2). */
+  piiErasedAt: string | null;
   createdAt: string;
 }
 
@@ -163,7 +184,8 @@ export type NotificationType =
   | 'upgrade_request'
   | 'review'
   | 'order_updated'
-  | 'media_review';
+  | 'media_review'
+  | 'system_alert';
 export type NotificationEntityType = 'order' | 'session' | 'tenant';
 
 /** A live notification-feed row (docs/14). Writes are service-role only; reads are RLS-scoped per audience. */
@@ -185,6 +207,19 @@ export interface Notification {
 export interface NotificationPrefs {
   emailEnabled?: boolean;
   mutedTypes?: NotificationType[];
+}
+
+/** Audit row for a completed erasure (docs/17 §4.4, Stage T). Written by dataLifecycle.ts, agency-read only. */
+export interface ErasureEvent {
+  id: string;
+  tenantId: string;
+  subjectPlatform: Platform | null;
+  subjectExternalUserId: string | null;
+  scope: 'customer' | 'tenant';
+  requestedBy: string | null;
+  storageObjectsDeleted: number;
+  completedAt: string;
+  note: string | null;
 }
 
 export type AttachmentKind = 'image' | 'audio' | 'video';

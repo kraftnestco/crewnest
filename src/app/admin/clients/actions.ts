@@ -5,8 +5,9 @@ import { revalidatePath } from 'next/cache';
 import { getCallerContext } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { setTenantSecret } from '@/lib/secrets';
+import { eraseTenant } from '@/services/dataLifecycle';
 import type { Database, Json } from '@/types/database';
-import type { CreateTenantState, UpdateTenantState } from './action-state';
+import type { CreateTenantState, OffboardTenantState, UpdateTenantState } from './action-state';
 
 type TenantSecretIdFields = Pick<
   Database['public']['Tables']['tenants']['Update'],
@@ -199,6 +200,49 @@ export async function updateTenantAction(
 
   if (updateError) {
     return { error: updateError.message, success: false };
+  }
+
+  revalidatePath('/admin/clients');
+  return { error: null, success: true };
+}
+
+/**
+ * Tenant-wide right-to-erasure / offboarding (docs/17 §4.1, Stage T). Irreversible: every
+ * order-media object under the tenant's storage prefix, every Vault secret it references,
+ * and the tenant row itself (DB cascade drops sessions/messages/orders/usage/notifications)
+ * are gone after this returns. Requires the caller to type the exact business name as a
+ * confirmation gate — platform-admin only, same guard as create/update.
+ */
+export async function offboardTenantAction(
+  tenantId: string,
+  _prev: OffboardTenantState,
+  formData: FormData,
+): Promise<OffboardTenantState> {
+  const ctx = await getCallerContext();
+  if (!ctx?.isPlatformAdmin) {
+    return { error: 'Forbidden.', success: false };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: tenant, error: lookupError } = await supabase
+    .from('tenants')
+    .select('business_name')
+    .eq('id', tenantId)
+    .single();
+
+  if (lookupError || !tenant) {
+    return { error: lookupError?.message ?? 'Client not found.', success: false };
+  }
+
+  const confirmName = optionalString(formData.get('confirm_name')) ?? '';
+  if (confirmName !== tenant.business_name) {
+    return { error: 'Business name did not match — nothing was deleted.', success: false };
+  }
+
+  try {
+    await eraseTenant(tenantId, ctx.userId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to offboard client.', success: false };
   }
 
   revalidatePath('/admin/clients');

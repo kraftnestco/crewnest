@@ -175,7 +175,7 @@ export async function processInboundMedia(
         attachmentStoragePath: downloaded.storagePath,
         raisedAt: new Date().toISOString(),
       });
-      await sessions.setHandoff(session.id, true);
+      await sessions.setHandoff(session.id, true, 'media_review');
       await notifyBoth({
         tenantId: tenant.id,
         type: 'media_review',
@@ -219,7 +219,7 @@ export async function processInboundMedia(
         attachmentStoragePath: downloaded.storagePath,
         raisedAt: new Date().toISOString(),
       });
-      await sessions.setHandoff(session.id, true);
+      await sessions.setHandoff(session.id, true, 'media_review');
       await notifyBoth({
         tenantId: tenant.id,
         type: 'media_review',

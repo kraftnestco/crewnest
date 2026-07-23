@@ -15,10 +15,12 @@ import {
   getMessageMediaUrlAction,
   getMessagesAction,
   manualSendAction,
+  markReadAction,
   resolveClarificationAction,
   takeOverAction,
 } from '@/app/admin/chat/actions';
 import { ClarificationPanel } from './clarification-panel';
+import { EraseCustomerDialog } from './erase-customer-dialog';
 import { OrderSummaryDialog } from './order-summary-dialog';
 
 function parsePendingClarification(raw: unknown): PendingClarification | null {
@@ -118,10 +120,16 @@ export function ConversationPane({
   const [isPending, startTransition] = useTransition();
   const [showDetails, setShowDetails] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [loadedSessionId, setLoadedSessionId] = useState(session.id);
+
+  if (session.id !== loadedSessionId) {
+    setLoadedSessionId(session.id);
+    setMessagesLoading(true);
+    setMessages([]);
+  }
 
   useEffect(() => {
     let active = true;
-    setMessagesLoading(true);
     getMessagesAction(session.id)
       .then((data) => {
         if (active) setMessages(data);
@@ -133,6 +141,10 @@ export function ConversationPane({
       .finally(() => {
         if (active) setMessagesLoading(false);
       });
+
+    // Server-authoritative unread reset (docs/18 §4 finding #9) — fire-and-forget,
+    // the local optimistic reset in the parent inbox list already gives instant feedback.
+    void markReadAction(session.id);
 
     const channel = supabase
       .channel(`chat-messages-${session.id}`)
@@ -337,6 +349,9 @@ export function ConversationPane({
                     </div>
                   )}
                 </dl>
+                <div className="mt-3">
+                  <EraseCustomerDialog sessionId={session.id} customerLabel={session.external_user_id} />
+                </div>
               </div>
               {viewer === 'admin' ? (
                 <>

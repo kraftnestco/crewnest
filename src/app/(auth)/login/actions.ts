@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { log } from '@/lib/log';
 
 export interface SignInState {
   error: string | null;
@@ -73,7 +74,7 @@ export async function signInAction(_prev: SignInState, formData: FormData): Prom
   // Don't let a failed lookup read as "confirmed not an admin" — that produces a
   // specific, wrong-sounding rejection for what's actually a DB/lookup error.
   if (profileError) {
-    console.error('[auth] signInAction profile lookup failed', {
+    log.error('[auth] signInAction profile lookup failed', {
       userId: signIn.user?.id,
       error: profileError.message,
     });

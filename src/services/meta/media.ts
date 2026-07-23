@@ -13,6 +13,7 @@ import {
 import { getMetaToken } from '@/lib/secrets';
 import { createServiceClient } from '@/lib/supabase/service';
 import type { AttachmentKind, InboundAttachment, Platform, Tenant } from '@/types/domain';
+import { log } from '@/lib/log';
 
 /**
  * Download an inbound WhatsApp/Messenger/Instagram attachment server-side and
@@ -39,7 +40,7 @@ export async function download(
 
     const mimeType = fetched.mimeType ?? attachment.mimeType ?? fallbackMime(attachment.kind);
     if (!MEDIA_ALLOWED_MIME[attachment.kind].includes(mimeType)) {
-      console.warn(`[media] rejected mime "${mimeType}" for kind ${attachment.kind} (tenant ${tenant.id})`);
+      log.warn(`[media] rejected mime "${mimeType}" for kind ${attachment.kind} (tenant ${tenant.id})`);
       return null;
     }
 
@@ -49,13 +50,13 @@ export async function download(
       .from(ORDER_MEDIA_BUCKET)
       .upload(storagePath, fetched.bytes, { contentType: mimeType, upsert: false });
     if (error) {
-      console.warn(`[media] storage upload failed (tenant ${tenant.id}): ${error.message}`);
+      log.warn(`[media] storage upload failed (tenant ${tenant.id}): ${error.message}`);
       return null;
     }
 
     return { storagePath, mimeType };
   } catch (err) {
-    console.warn(`[media] download failed (tenant ${tenant.id}):`, err instanceof Error ? err.message : err);
+    log.warn(`[media] download failed (tenant ${tenant.id}):`, err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -67,7 +68,7 @@ export async function getSignedUrl(storagePath: string): Promise<string | null> 
     .from(ORDER_MEDIA_BUCKET)
     .createSignedUrl(storagePath, MEDIA_SIGNED_URL_TTL_SECONDS);
   if (error || !data) {
-    console.warn(`[media] signed url failed for ${storagePath}: ${error?.message}`);
+    log.warn(`[media] signed url failed for ${storagePath}: ${error?.message}`);
     return null;
   }
   return data.signedUrl;

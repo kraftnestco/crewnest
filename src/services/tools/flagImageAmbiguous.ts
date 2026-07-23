@@ -54,7 +54,7 @@ export const flagImageAmbiguousTool: ToolExecutor = {
       attachmentStoragePath: image.storagePath,
       raisedAt: new Date().toISOString(),
     });
-    await sessions.setHandoff(ctx.session.id, true);
+    await sessions.setHandoff(ctx.session.id, true, 'media_review');
 
     await notifyBoth({
       tenantId: ctx.tenant.id,

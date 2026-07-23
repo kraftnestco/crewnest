@@ -23,6 +23,10 @@ const schema = z.object({
   // Optional — email fan-out (docs/14 §3.4, Stage O7) is a no-op until this is set.
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().optional(),
+  // Optional — error tracking (docs/17 S2) is a no-op until this is set.
+  SENTRY_DSN: z.string().optional(),
+  // Optional — Vercel Cron auth (docs/17 §3.1) rejects every request until set.
+  CRON_SECRET: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

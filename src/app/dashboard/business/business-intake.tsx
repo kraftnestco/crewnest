@@ -18,11 +18,16 @@ export function BusinessIntake({ tenant }: { tenant: IntakeTenant & { intake_com
   const [editing, setEditing] = useState(!tenant.intake_completed_at);
   const boundAction = updateIntakeAction.bind(null, tenant.id);
   const [state, formAction, isPending] = useActionState(boundAction, initialUpdateIntakeState);
+  const [handledState, setHandledState] = useState(state);
+
+  if (state !== handledState) {
+    setHandledState(state);
+    if (state.success) setEditing(false);
+  }
 
   useEffect(() => {
     if (state.success) {
       toast.success('Business details saved.');
-      setEditing(false);
     }
   }, [state]);
 

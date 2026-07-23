@@ -6,6 +6,7 @@ import { sanitizeInbound } from '@/services/security/sanitize';
 import { env } from '@/lib/env';
 import { DEMO_LLM_PROVIDER, DEMO_LLM_MODEL, MAX_TOOL_ROUNDS } from '@/lib/constants';
 import { demoChatRequestSchema } from '@/services/demo/schema';
+import { log } from '@/lib/log';
 
 /**
  * Stateless public-demo chat endpoint (docs: "try it for your business" plan,
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
   });
 
   if (!env.MASTER_OPENROUTER_KEY) {
-    console.error('[demo/chat] MASTER_OPENROUTER_KEY is not configured');
+    log.error('[demo/chat] MASTER_OPENROUTER_KEY is not configured');
     return json({ error: 'The demo assistant is unavailable right now — please try again shortly.' }, 502);
   }
 
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
         env.MASTER_OPENROUTER_KEY,
       );
     } catch (err) {
-      console.error('[demo/chat] provider call failed', { error: err instanceof Error ? err.message : String(err) });
+      log.error('[demo/chat] provider call failed', { error: err instanceof Error ? err.message : String(err) });
       return json({ error: 'The demo assistant is unavailable right now — please try again shortly.' }, 502);
     }
 

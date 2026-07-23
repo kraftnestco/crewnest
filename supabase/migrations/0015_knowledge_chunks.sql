@@ -1,7 +1,7 @@
 -- Stage N (docs/12 §2.2, §5.5) — pgvector retrieval. N1 [OPUS] decision frozen 2026-07-16.
 create extension if not exists vector;
 
-create table public.knowledge_chunks (
+create table if not exists public.knowledge_chunks (
   id          uuid primary key default gen_random_uuid(),
   tenant_id   uuid not null references public.tenants(id) on delete cascade,
   source      text not null,          -- 'catalogue' | 'knowledge' | 'file'
@@ -12,12 +12,13 @@ create table public.knowledge_chunks (
   created_at  timestamptz not null default now()
 );
 
-create index knowledge_chunks_tenant_idx on public.knowledge_chunks (tenant_id);
+create index if not exists knowledge_chunks_tenant_idx on public.knowledge_chunks (tenant_id);
 -- hnsw / cosine, defaults m=16 ef_construction=64 (§5.5.3).
-create index knowledge_chunks_embedding_idx on public.knowledge_chunks
+create index if not exists knowledge_chunks_embedding_idx on public.knowledge_chunks
   using hnsw (embedding vector_cosine_ops);
 
 alter table public.knowledge_chunks enable row level security;
+drop policy if exists knowledge_chunks_select on public.knowledge_chunks;
 create policy knowledge_chunks_select on public.knowledge_chunks
   for select to authenticated using (public.user_can_access_tenant(tenant_id));
 -- INSERT/UPDATE/DELETE via service role only (the ingestion job) — matches usage_logs / orders.

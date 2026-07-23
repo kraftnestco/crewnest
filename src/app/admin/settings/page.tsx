@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/page-header';
+import { log } from '@/lib/log';
 
 export default async function SettingsPage() {
   const supabase = await createSupabaseServerClient();
@@ -15,7 +16,7 @@ export default async function SettingsPage() {
     .order('created_at', { ascending: true });
 
   if (error) {
-    console.error('[admin/settings] platform admins lookup failed', error.message);
+    log.error('[admin/settings] platform admins lookup failed', error.message);
   }
 
   const systemInfo = [

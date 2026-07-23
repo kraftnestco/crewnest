@@ -16,6 +16,7 @@ import { editOrderTool } from './editOrder';
 import { cancelOrderTool } from './cancelOrder';
 import { submitReviewTool } from './submitReview';
 import { flagImageAmbiguousTool } from './flagImageAmbiguous';
+import { log } from '@/lib/log';
 
 export interface ToolContext {
   tenant: Tenant;
@@ -89,7 +90,7 @@ export async function executeTool(call: LlmToolCall, ctx: ToolContext): Promise<
   try {
     return await tool.execute(parsed.data, ctx);
   } catch (err) {
-    console.error('[tools] executor failed', {
+    log.error('[tools] executor failed', {
       tool: call.name,
       tenantId: ctx.tenant.id,
       error: err instanceof Error ? err.message : String(err),

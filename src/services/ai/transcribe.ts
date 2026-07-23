@@ -2,6 +2,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import OpenAI from 'openai';
 import * as media from '@/services/meta/media';
+import { log } from '@/lib/log';
 
 /**
  * Voice-note transcription (docs/10 §5). Transcribes an ALREADY-DOWNLOADED audio object
@@ -42,7 +43,7 @@ export async function transcribeStoragePath(
 
     return result.text?.trim() || null;
   } catch (err) {
-    console.warn(`[transcribe] failed (model ${config.model}):`, err instanceof Error ? err.message : err);
+    log.warn(`[transcribe] failed (model ${config.model}):`, err instanceof Error ? err.message : err);
     return null;
   }
 }
