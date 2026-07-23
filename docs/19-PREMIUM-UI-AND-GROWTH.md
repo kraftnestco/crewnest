@@ -23,12 +23,17 @@
   (192/512 + maskable + apple-touch), root-metadata icons. No service worker/offline (deliberate —
   realtime app, stale cache would mislead).
 
-### U3. Landing page & commercial surfaces
-- Rebuild `app/page.tsx`: hero with live product visual → logos/social-proof slot → how-it-works
-  (3 steps) → feature grid (keep) → **pricing section** (from `PAYWALL_PLANS`) → FAQ → real footer.
-- Remove "Admin login" from public navbar (reachable at /admin directly).
-- `/privacy` + `/terms` static pages — **required for Meta app review**, link in footer.
-- Surface order `review_rating` aggregate as social proof once real data exists.
+### U3. Landing page & commercial surfaces — ✅ SHIPPED
+- `app/page.tsx` rebuilt: hero (kept) → channel strip (honest social proof until real logos) →
+  how-it-works (3 steps) → feature grid → pricing from `PAYWALL_PLANS` (Starter highlighted) →
+  FAQ (native `<details>`, 6 owner-voice questions) → closing CTA → real 3-column footer.
+- Admin login removed from public navbar + footer (reachable at /admin directly); navbar gains
+  anchor links (How it works / Pricing / FAQ, `md+`).
+- `/privacy` + `/terms` live (shared `_landing/legal-page.tsx` shell) — Meta App Review
+  prerequisite; contact email kraftnestco@gmail.com; linked in footer.
+- Still open: surface order `review_rating` aggregate as social proof once real data exists.
+- Gotcha: Turbopack JSX dropped some inline spaces after `</strong>` before em dashes — use
+  explicit `{' — '}` when it bites (see privacy/page.tsx).
 
 ## Track O — Onboarding automation (non-technical clients, zero-bottleneck agency)
 
