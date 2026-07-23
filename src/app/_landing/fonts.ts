@@ -1,11 +1,10 @@
 import { Space_Grotesk } from 'next/font/google';
 
 /**
- * Display font for the public marketing surfaces only (landing + demo) — kept
- * out of globals.css/`--font-heading` on purpose so the dashboard/admin app
- * keeps its current Geist-based look untouched. Apply `displayFont.className`
- * directly to headings within src/app/page.tsx, src/app/try/, and
- * src/components/demo/*.
+ * Brand display font (docs: UI overhaul, Phase U1). Loaded once in the root
+ * layout as `--font-display` and mapped to `--font-heading` in globals.css, so
+ * every `font-heading` heading — marketing AND app — carries it. Marketing
+ * surfaces may still apply `displayFont.className` directly for hero type.
  */
 export const displayFont = Space_Grotesk({
   variable: '--font-display',
