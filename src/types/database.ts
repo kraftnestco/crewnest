@@ -240,6 +240,8 @@ export type Database = {
           pending_clarification: Json | null;
           summary: string | null;
           summary_through_message_at: string | null;
+          customer_name: string | null;
+          customer_avatar_url: string | null;
           created_at: string;
         };
         Insert: {
@@ -256,6 +258,8 @@ export type Database = {
           pending_clarification?: Json | null;
           summary?: string | null;
           summary_through_message_at?: string | null;
+          customer_name?: string | null;
+          customer_avatar_url?: string | null;
           created_at?: string;
         };
         Update: {
@@ -272,6 +276,8 @@ export type Database = {
           pending_clarification?: Json | null;
           summary?: string | null;
           summary_through_message_at?: string | null;
+          customer_name?: string | null;
+          customer_avatar_url?: string | null;
           created_at?: string;
         };
         Relationships: [];

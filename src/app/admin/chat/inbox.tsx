@@ -10,6 +10,7 @@ import type { Database } from '@/types/database';
 import {
   alertSignalLabel,
   ConversationPane,
+  customerLabel,
   platformDotColor,
   platformLabel,
   relativeTime,
@@ -63,7 +64,8 @@ export function Inbox({
     return sessions.filter(
       (s) =>
         s.tenantName.toLowerCase().includes(trimmedQuery) ||
-        s.external_user_id.toLowerCase().includes(trimmedQuery),
+        s.external_user_id.toLowerCase().includes(trimmedQuery) ||
+        (s.customer_name?.toLowerCase().includes(trimmedQuery) ?? false),
     );
   }, [sessions, trimmedQuery]);
 
@@ -205,10 +207,10 @@ export function Inbox({
                             s.id === selectedId ? 'bg-background shadow-sm ring-1 ring-border' : 'hover:bg-background/60'
                           }`}
                         >
-                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${platformDotColor(s.platform)}`} />
+                          <SessionAvatar name={customerLabel(s)} avatarUrl={s.customer_avatar_url} />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="truncate text-xs font-medium">{s.external_user_id}</span>
+                              <span className="truncate text-xs font-medium">{customerLabel(s)}</span>
                               <div className="flex shrink-0 items-center gap-1">
                                 {s.alert_signal && (
                                   <TriangleAlert
@@ -313,10 +315,10 @@ export function Inbox({
                             s.id === selectedId ? 'bg-background shadow-sm ring-1 ring-border' : 'hover:bg-background/60'
                           }`}
                         >
-                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${platformDotColor(s.platform)}`} />
+                          <SessionAvatar name={customerLabel(s)} avatarUrl={s.customer_avatar_url} />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="truncate text-xs font-medium">{s.external_user_id}</span>
+                              <span className="truncate text-xs font-medium">{customerLabel(s)}</span>
                               <div className="flex shrink-0 items-center gap-1.5">
                                 {s.alert_signal && (
                                   <TriangleAlert
@@ -337,7 +339,12 @@ export function Inbox({
                                 )}
                               </div>
                             </div>
-                            <span className="text-[10px] text-muted-foreground">{relativeTime(s.last_message_at)}</span>
+                            <div className="mt-0.5 flex items-center gap-1.5">
+                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${platformDotColor(s.platform)}`} />
+                              <span className="truncate text-[10px] text-muted-foreground">
+                                {relativeTime(s.last_message_at)}
+                              </span>
+                            </div>
                           </div>
                         </button>
                       ))}
@@ -365,10 +372,14 @@ export function Inbox({
                             s.id === selectedId ? 'bg-background shadow-sm ring-1 ring-border' : 'hover:bg-background/60'
                           }`}
                         >
-                          <SessionAvatar name={s.tenantName} alert={s.is_human_handoff || Boolean(s.alert_signal)} />
+                          <SessionAvatar
+                            name={customerLabel(s)}
+                            avatarUrl={s.customer_avatar_url}
+                            alert={s.is_human_handoff || Boolean(s.alert_signal)}
+                          />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="truncate text-xs font-medium">{s.tenantName}</span>
+                              <span className="truncate text-xs font-medium">{customerLabel(s)}</span>
                               <span className="shrink-0 text-[10px] text-muted-foreground">
                                 {relativeTime(s.last_message_at)}
                               </span>
@@ -376,7 +387,7 @@ export function Inbox({
                             <div className="mt-0.5 flex items-center gap-1.5">
                               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${platformDotColor(s.platform)}`} />
                               <span className="truncate text-[10px] text-muted-foreground">
-                                {platformLabel(s.platform)} · {s.external_user_id}
+                                {s.tenantName} · {platformLabel(s.platform)}
                               </span>
                             </div>
                           </div>

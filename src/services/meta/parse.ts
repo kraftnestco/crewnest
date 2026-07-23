@@ -23,6 +23,7 @@ import type { AttachmentKind, InboundAttachment, InboundMessage, Platform } from
  *      text          = messages[].text.body        (type === 'text')
  *      attachment    = messages[].{image,audio,video}.{id, mime_type, caption?}
  *                      (type === 'image'|'audio'|'video'; caption is absent for audio)
+ *      customerName  = value.contacts[] (parallel array, matched by wa_id) → profile.name
  *      (value.statuses[] are receipts → ignored: we only read value.messages[])
  *  - Messenger (object 'page') & Instagram (object 'instagram'):
  *      entry[].messaging[]
@@ -83,6 +84,8 @@ function parseWhatsAppEntry(entry: Record<string, unknown>, out: InboundMessage[
     const destinationId = asString(asRecord(value.metadata)?.phone_number_id);
     if (!destinationId) continue;
 
+    const namesByWaId = extractWhatsAppContactNames(value.contacts);
+
     for (const msgRaw of asArray(value.messages)) {
       const msg = asRecord(msgRaw);
       if (!msg) continue;
@@ -100,12 +103,27 @@ function parseWhatsAppEntry(entry: Record<string, unknown>, out: InboundMessage[
         platform: 'whatsapp',
         destinationId,
         externalUserId: from,
+        customerName: namesByWaId.get(from) ?? null,
         text: text ?? '',
         attachments,
         providerMsgId: asString(msg.id) ?? undefined,
       });
     }
   }
+}
+
+/** `value.contacts[]` is a parallel array (not indexed to `messages[]`) — build a wa_id → name lookup. */
+function extractWhatsAppContactNames(value: unknown): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const contactRaw of asArray(value)) {
+    const contact = asRecord(contactRaw);
+    if (!contact) continue;
+
+    const waId = asString(contact.wa_id);
+    const name = asString(asRecord(contact.profile)?.name);
+    if (waId && name) out.set(waId, name);
+  }
+  return out;
 }
 
 /** WhatsApp media messages nest the descriptor under a key named after `type` itself. */

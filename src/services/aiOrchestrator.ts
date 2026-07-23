@@ -22,6 +22,7 @@ import { estimateCostUsd } from './ai/pricing';
 import { getEnabledTools, executeTool } from './tools/registry';
 import { getLlmKey } from '@/lib/secrets';
 import { sendText } from './meta/send';
+import * as metaProfile from './meta/profile';
 import { notifyBoth } from '@/services/notifications';
 import {
   sanitizeInbound,
@@ -100,6 +101,7 @@ export async function handleInboundMessage(
     input.platform,
     input.externalUserId,
     tenant.plan === 'free' ? FREE_PLAN_DAILY_SESSION_CAP : undefined,
+    input.customerName,
   );
 
   if (sessionOrCap === 'cap_reached') {
@@ -115,6 +117,16 @@ export async function handleInboundMessage(
     return { sessionId: null, replyText: FREE_PLAN_LIMIT_REACHED_TEXT, handoff: false };
   }
   const session = sessionOrCap;
+
+  // 2b. Messenger/Instagram carry no name/photo in the webhook payload (unlike
+  // WhatsApp's contacts[]) — best-effort backfill once per session via a Graph
+  // API lookup. Awaited (not fire-and-forget) since after() may tear the function
+  // context down as soon as this call returns; fetchProfile itself never throws,
+  // so a failed lookup just leaves the raw id showing rather than failing the turn.
+  if (!session.customerName && input.platform !== 'whatsapp' && input.platform !== 'web') {
+    const profile = await metaProfile.fetchProfile(input.externalUserId, tenant);
+    if (profile) await sessions.setCustomerIdentity(session.id, profile);
+  }
 
   // 3. Sanitise untrusted customer text (prompt-injection guardrail).
   let userText = sanitizeInbound(input.text);

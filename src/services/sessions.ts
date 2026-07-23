@@ -21,6 +21,8 @@ function mapSession(row: ChatSessionRow): ChatSession {
     handoffCause: (row.handoff_cause as HandoffCause | null) ?? null,
     pendingReviewOrderId: row.pending_review_order_id,
     pendingClarification: (row.pending_clarification as unknown as PendingClarification | null) ?? null,
+    customerName: row.customer_name,
+    customerAvatarUrl: row.customer_avatar_url,
     summary: row.summary,
     summaryThroughMessageAt: row.summary_through_message_at,
   };
@@ -59,6 +61,7 @@ export async function findOrCreate(
   platform: Platform,
   externalUserId: string,
   dailyCap?: number,
+  customerName?: string | null,
 ): Promise<ChatSession | 'cap_reached'> {
   const client = createServiceClient();
 
@@ -80,7 +83,12 @@ export async function findOrCreate(
 
   const { data: inserted, error: insertError } = await client
     .from('chat_sessions')
-    .insert({ tenant_id: tenantId, platform, external_user_id: externalUserId })
+    .insert({
+      tenant_id: tenantId,
+      platform,
+      external_user_id: externalUserId,
+      customer_name: customerName ?? null,
+    })
     .select('*')
     .single();
 
@@ -205,6 +213,31 @@ export async function setSummary(sessionId: string, summary: string, throughMess
     .update({ summary, summary_through_message_at: throughMessageAt })
     .eq('id', sessionId);
 
+  if (error) throw error;
+}
+
+/**
+ * Best-effort backfill of the customer's real name/photo once resolved via a Graph
+ * API lookup (Messenger/Instagram — docs/06 §1.1). WhatsApp never calls this: its
+ * name arrives synchronously in the webhook payload and is passed to `findOrCreate`
+ * directly instead, and WhatsApp has no photo, ever (Cloud API platform limitation).
+ * Only fills in fields that are still null so a later, less-complete lookup can
+ * never clobber an earlier good one.
+ */
+export async function setCustomerIdentity(
+  sessionId: string,
+  identity: { name: string | null; avatarUrl: string | null },
+): Promise<void> {
+  if (!identity.name && !identity.avatarUrl) return;
+
+  const client = createServiceClient();
+  const { error } = await client
+    .from('chat_sessions')
+    .update({
+      ...(identity.name ? { customer_name: identity.name } : {}),
+      ...(identity.avatarUrl ? { customer_avatar_url: identity.avatarUrl } : {}),
+    })
+    .eq('id', sessionId);
   if (error) throw error;
 }
 

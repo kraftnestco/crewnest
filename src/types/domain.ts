@@ -103,6 +103,10 @@ export interface ChatSession {
   handoffCause: HandoffCause | null;
   pendingReviewOrderId: string | null;
   pendingClarification: PendingClarification | null;
+  /** Real customer identity surfaced on the Live Inbox instead of the raw platform id. Null until captured. */
+  customerName: string | null;
+  /** WhatsApp never exposes this (platform limitation) — only ever populated for Messenger/Instagram. */
+  customerAvatarUrl: string | null;
   /** Rolling digest of everything older than the live memory window (docs/18 §2, Stage U-mem). Null until the first refresh. */
   summary: string | null;
   /** `created_at` of the newest message already folded into `summary` — the boundary the next refresh resumes from. */
@@ -247,6 +251,8 @@ export interface InboundMessage {
   destinationId: string;
   /** The customer's id on that platform. */
   externalUserId: string;
+  /** Real display name, when the channel hands it over for free (WhatsApp `contacts[].profile.name`). */
+  customerName?: string | null;
   text: string;
   attachments?: InboundAttachment[];
   providerMsgId?: string;

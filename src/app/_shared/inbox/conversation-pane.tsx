@@ -85,19 +85,37 @@ export function relativeTime(iso: string): string {
   return `${Math.floor(diffHr / 24)}d`;
 }
 
-/** Small identity anchor for a session row — initial-based, with a corner dot when a human has taken over. */
-export function SessionAvatar({ name, alert }: { name: string; alert?: boolean }) {
+/** Small identity anchor for a session row — real photo when we have one, else initials; corner dot on takeover. */
+export function SessionAvatar({
+  name,
+  avatarUrl,
+  alert,
+}: {
+  name: string;
+  avatarUrl?: string | null;
+  alert?: boolean;
+}) {
   const initial = name.trim().charAt(0).toUpperCase() || '?';
   return (
     <div className="relative shrink-0">
-      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted-foreground/15 text-xs font-semibold text-muted-foreground">
-        {initial}
-      </div>
+      {avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- external Meta CDN url, not an optimizable static asset
+        <img src={avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+      ) : (
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted-foreground/15 text-xs font-semibold text-muted-foreground">
+          {initial}
+        </div>
+      )}
       {alert && (
         <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-destructive" />
       )}
     </div>
   );
+}
+
+/** The label to show for "who is this chat with" — real name when we have it, raw platform id otherwise. */
+export function customerLabel(session: Pick<SessionRow, 'customer_name' | 'external_user_id'>): string {
+  return session.customer_name || session.external_user_id;
 }
 
 export function ConversationPane({
@@ -217,11 +235,17 @@ export function ConversationPane({
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex h-14 shrink-0 items-center justify-between border-b bg-background px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <SessionAvatar name={session.tenantName} />
+            <SessionAvatar name={customerLabel(session)} avatarUrl={session.customer_avatar_url} />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold leading-none">{session.tenantName}</p>
+              <p className="truncate text-sm font-semibold leading-none">{customerLabel(session)}</p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                {session.external_user_id} · <span className="capitalize">{session.platform}</span>
+                {viewer === 'admin' ? (
+                  <>
+                    {session.tenantName} · <span className="capitalize">{session.platform}</span>
+                  </>
+                ) : (
+                  <span className="capitalize">{session.platform}</span>
+                )}
               </p>
             </div>
           </div>
@@ -335,6 +359,12 @@ export function ConversationPane({
                 </p>
                 <dl className="space-y-1.5 text-sm">
                   <div className="flex justify-between gap-2">
+                    <dt className="text-muted-foreground">Customer ID</dt>
+                    <dd className="truncate text-right" title={session.external_user_id}>
+                      {session.external_user_id}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
                     <dt className="text-muted-foreground">Platform</dt>
                     <dd>{platformLabel(session.platform)}</dd>
                   </div>
@@ -350,7 +380,7 @@ export function ConversationPane({
                   )}
                 </dl>
                 <div className="mt-3">
-                  <EraseCustomerDialog sessionId={session.id} customerLabel={session.external_user_id} />
+                  <EraseCustomerDialog sessionId={session.id} customerLabel={customerLabel(session)} />
                 </div>
               </div>
               {viewer === 'admin' ? (

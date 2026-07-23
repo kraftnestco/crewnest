@@ -9,9 +9,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   alertSignalLabel,
   ConversationPane,
+  customerLabel,
   platformDotColor,
   platformLabel,
   relativeTime,
+  SessionAvatar,
   type SessionRow,
   type SessionWithTenant,
   type TenantRow,
@@ -50,7 +52,12 @@ export function DashboardInbox({
     () =>
       sessions.filter((s) => {
         if (platformFilter !== 'all' && s.platform !== platformFilter) return false;
-        if (trimmedQuery && !s.external_user_id.toLowerCase().includes(trimmedQuery)) return false;
+        if (
+          trimmedQuery &&
+          !s.external_user_id.toLowerCase().includes(trimmedQuery) &&
+          !(s.customer_name?.toLowerCase().includes(trimmedQuery) ?? false)
+        )
+          return false;
         return true;
       }),
     [sessions, platformFilter, trimmedQuery],
@@ -169,10 +176,10 @@ export function DashboardInbox({
                   s.id === selectedId ? 'bg-background shadow-sm ring-1 ring-border' : 'hover:bg-background/60'
                 }`}
               >
-                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${platformDotColor(s.platform)}`} />
+                <SessionAvatar name={customerLabel(s)} avatarUrl={s.customer_avatar_url} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-xs font-medium">{s.external_user_id}</span>
+                    <span className="truncate text-xs font-medium">{customerLabel(s)}</span>
                     <div className="flex shrink-0 items-center gap-1.5">
                       {s.alert_signal && (
                         <TriangleAlert className="h-3 w-3 text-amber-500" aria-label={alertSignalLabel(s.alert_signal)}>
@@ -190,9 +197,12 @@ export function DashboardInbox({
                       )}
                     </div>
                   </div>
-                  <span className="text-[10px] text-muted-foreground">
-                    {platformLabel(s.platform)} · {relativeTime(s.last_message_at)}
-                  </span>
+                  <div className="mt-0.5 flex items-center gap-1.5">
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${platformDotColor(s.platform)}`} />
+                    <span className="truncate text-[10px] text-muted-foreground">
+                      {platformLabel(s.platform)} · {relativeTime(s.last_message_at)}
+                    </span>
+                  </div>
                 </div>
               </button>
             ))}
