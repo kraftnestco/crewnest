@@ -114,6 +114,9 @@
     '.footer button:disabled{ opacity:.5; cursor:default; }',
     '.footer button svg{ width:18px; height:18px; }',
     '.branding{ text-align:center; font-size:11px; color:#a7abb8; padding:0 0 8px; background:#fff; }',
+    '.branding a{ color:inherit; text-decoration:none; }',
+    '.branding a:hover{ text-decoration:underline; }',
+    '.branding.cn-hidden{ display:none; }',
   ].join('\n');
   root.appendChild(style);
 
@@ -151,9 +154,44 @@
   panel.querySelector('h3').textContent = TITLE;
 
   var messagesEl = panel.querySelector('.messages');
+  var brandingEl = panel.querySelector('.branding');
   var textarea = panel.querySelector('textarea');
   var sendBtn = panel.querySelector('.send');
   var closeBtn = panel.querySelector('.close');
+
+  // --- plan-gated referral badge (docs/19 G1) ---------------------------------
+  // Default (and fail-open) is the static "Powered by CrewNest" text already in
+  // the markup. Paid tenants get it removed; free tenants get it upgraded to a
+  // referral link. A fetch failure just leaves the static text — never blocks chat.
+  (function loadBranding() {
+    if (!API_BASE) return;
+    fetch(API_BASE + '/api/widget/config?key=' + encodeURIComponent(PUBLIC_KEY))
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (cfg) {
+        if (!cfg || typeof cfg.branding === 'undefined') return;
+        if (!cfg.branding) {
+          brandingEl.classList.add('cn-hidden'); // paid plan — remove the badge
+          return;
+        }
+        // Free plan — turn the badge into a referral link (XSS-safe: href set via
+        // setAttribute, only for http(s) URLs; text stays a static literal).
+        var url = typeof cfg.referralUrl === 'string' ? cfg.referralUrl : '';
+        if (/^https?:\/\//i.test(url)) {
+          var a = document.createElement('a');
+          a.setAttribute('href', url);
+          a.setAttribute('target', '_blank');
+          a.setAttribute('rel', 'noopener noreferrer');
+          a.textContent = 'Powered by CrewNest';
+          brandingEl.textContent = '';
+          brandingEl.appendChild(a);
+        }
+      })
+      .catch(function () {
+        /* keep the static badge */
+      });
+  })();
 
   var greeted = false;
   var sending = false;

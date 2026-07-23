@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/page-header';
 import { EditClientDialog } from './edit-client-dialog';
 import { InviteClientDialog } from './[id]/invite/invite-client-dialog';
 import { NewClientDialog } from './new-client-dialog';
+import { QuickProvisionDialog } from './quick-provision-dialog';
 import { OffboardTenantDialog } from './offboard-tenant-dialog';
 import { log } from '@/lib/log';
 
@@ -36,7 +37,12 @@ export default async function ClientsPage() {
       <PageHeader
         title="Clients"
         description="Manage tenant businesses and their channels."
-        actions={<NewClientDialog />}
+        actions={
+          <div className="flex items-center gap-2">
+            <NewClientDialog />
+            <QuickProvisionDialog />
+          </div>
+        }
       />
 
       <div className="rounded-xl bg-card ring-1 ring-foreground/10">

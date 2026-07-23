@@ -1,6 +1,6 @@
 'use client';
 
-import { House, MessagesSquare, Package, ChartNoAxesColumn, Store, Users } from 'lucide-react';
+import { House, MessagesSquare, Package, ChartNoAxesColumn, Store, Boxes, Users } from 'lucide-react';
 import { SidebarNav, MobileTabBar, type NavItem } from '@/components/app-nav';
 
 /**
@@ -15,6 +15,10 @@ function buildItems(showBusiness: boolean): NavItem[] {
     { href: '/dashboard/orders', label: 'My Orders', shortLabel: 'Orders', icon: Package },
     { href: '/dashboard/analytics', label: 'Analytics', icon: ChartNoAxesColumn },
     ...(showBusiness ? [{ href: '/dashboard/business', label: 'My Business', shortLabel: 'Business', icon: Store }] : []),
+    // Inventory + Team sit past the mobile five-tab cap on purpose — both are
+    // tenant-admin management pages, not daily drivers; the low-stock
+    // notification deep-links straight into Inventory on phones (docs/19 I1).
+    ...(showBusiness ? [{ href: '/dashboard/inventory', label: 'Inventory', shortLabel: 'Stock', icon: Boxes }] : []),
     ...(showBusiness ? [{ href: '/dashboard/team', label: 'My Team', shortLabel: 'Team', icon: Users }] : []),
   ];
 }

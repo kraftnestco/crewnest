@@ -4,6 +4,7 @@ import * as orders from '@/services/orders';
 import * as sessions from '@/services/sessions';
 import { sendTemplate } from '@/services/meta/send';
 import { notifyBoth } from '@/services/notifications';
+import { applyOrderStockEffects } from '@/services/inventoryStore';
 import { MAX_ORDERS_PER_SESSION_WINDOW, PAYMENT_METHOD_PRIORITY } from '@/lib/constants';
 import type { PaymentMethod, Tenant } from '@/types/domain';
 import type { ToolContext, ToolExecutor } from './registry';
@@ -198,6 +199,25 @@ export const createOrderTool: ToolExecutor = {
         await orders.markOwnerNotified(order.id);
       } catch (err) {
         log.error('[orders] owner notify failed', {
+          tenantId: ctx.tenant.id,
+          orderId: order.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    // Inventory Lite (docs/19 I1) — decrement tracked stock the moment an order is
+    // truly confirmed. Pending orders decrement at approval time instead (admin
+    // orders action), so a rejected order never wrongly consumes stock. Fully
+    // best-effort: a stock write must never fail the customer's confirmation.
+    if (order.status === 'confirmed') {
+      try {
+        await applyOrderStockEffects(
+          { id: ctx.tenant.id, businessName: ctx.tenant.businessName },
+          args.items.map((i) => ({ name: i.name, qty: i.qty })),
+        );
+      } catch (err) {
+        log.error('[orders] stock decrement failed', {
           tenantId: ctx.tenant.id,
           orderId: order.id,
           error: err instanceof Error ? err.message : String(err),

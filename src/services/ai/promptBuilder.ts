@@ -1,4 +1,5 @@
 import { CATALOG_STUFF_TOKEN_LIMIT, SIGNAL_TOKENS } from '@/lib/constants';
+import { catalogHasStockTracking } from '@/services/inventory';
 import type { LlmMessage } from './provider';
 import type { ChatMessage, PaymentMethod, Tenant } from '@/types/domain';
 
@@ -230,6 +231,23 @@ export function buildCustomOrdersBlock(
   return parts.join('\n');
 }
 
+/**
+ * Stock-awareness rule (docs/19 I1). Only folded in when the (stuffed) CATALOGUE
+ * actually carries `stock` numbers, so a tenant who tracks no inventory gets a
+ * byte-identical prefix to before. Static text ⇒ cache-safe; it teaches the
+ * model to read the `stock` field already present in the catalogue JSON.
+ */
+export function buildInventoryRule(): string {
+  return [
+    '## STOCK',
+    'Some CATALOGUE items include a "stock" number — the units currently available. Treat it as authoritative:',
+    '- If an item the customer wants shows "stock": 0, it is SOLD OUT. Do not take an order for it; tell them it is currently unavailable and offer the closest in-stock alternative from the CATALOGUE.',
+    '- If they ask for more units than the "stock" number allows, accept only up to what is in stock and tell them that is all that is available right now.',
+    '- Items with NO "stock" field are not stock-tracked — treat them as normally available.',
+    "Never invent or promise a restock date; if they ask when it will be back, say you'll check with the team.",
+  ].join('\n');
+}
+
 /** Human labels for the accepted-methods list and gated per-method lines (docs/11 §3.2). */
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cod: 'Cash on Delivery',
@@ -454,6 +472,12 @@ export function buildSystemPrefix(
   }
   if (tenant.customOrdersEnabled) {
     parts.push('', buildCustomOrdersBlock(tenant));
+  }
+  // Stock grounding (docs/19 I1) — only when the model can actually see the
+  // `stock` numbers (stuffed catalogue) AND at least one item tracks them.
+  // Untracked tenants get a byte-identical prefix, so the cache never breaks.
+  if (catalogueMode === 'stuff' && catalogHasStockTracking(tenant.catalogData)) {
+    parts.push('', buildInventoryRule());
   }
   return {
     text: parts.join('\n'),

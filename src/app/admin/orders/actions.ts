@@ -7,6 +7,7 @@ import * as tenants from '@/services/tenants';
 import * as sessions from '@/services/sessions';
 import { sendTemplate, sendText } from '@/services/meta/send';
 import * as media from '@/services/meta/media';
+import { applyOrderStockEffects } from '@/services/inventoryStore';
 import type { Database } from '@/types/database';
 import type { OrderAttachment, OrderItem, Tenant } from '@/types/domain';
 import { log } from '@/lib/log';
@@ -165,6 +166,24 @@ export async function approveOrderAction(orderId: string): Promise<void> {
   await orderService.approve(orderId);
 
   const tenant = await tenants.getById(order.tenant_id);
+
+  // Inventory Lite (docs/19 I1) — a pending order only consumes stock now, at the
+  // pending→confirmed transition, mirroring the confirmed path in createOrder.ts.
+  // Best-effort: a stock write must never fail the approval.
+  if (tenant) {
+    try {
+      const items = (order.items as unknown as OrderItem[]) ?? [];
+      await applyOrderStockEffects(
+        { id: tenant.id, businessName: tenant.businessName },
+        items.map((i) => ({ name: i.name, qty: i.qty })),
+      );
+    } catch (err) {
+      log.error('[orders] stock decrement failed (approve)', {
+        orderId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   // Best-effort owner push, same path as the bypass-mode confirm in createOrder.ts.
   if (tenant?.ownerNotifyWhatsapp && tenant.ownerNotifyTemplate) {

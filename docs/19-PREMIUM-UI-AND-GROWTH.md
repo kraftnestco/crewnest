@@ -65,8 +65,16 @@ else is generated, reviewed once, and live.
 - **O3. Meta embedded signup**: replace manual token paste with click-to-connect OAuth
   (locked decision said "later" — pulled forward; token paste is the step non-technical clients
   cannot do). Vault columns unchanged.
-- **O4. Agency provisioning**: one admin form = tenant + magic-import + prompt-architect + invite
-  email in a single action, so onboarding a client is minutes, not sessions.
+- **O4. Agency provisioning** — ✅ SHIPPED. One admin action provisions a client end to end:
+  `app/admin/clients/quick-provision-actions.ts` (`quickProvisionAction`, platform-admin gated)
+  creates the tenant with a fresh `pk_live_` widget key, then — all best-effort, each failure a
+  non-fatal warning so a bad import never blocks the tenant — runs O2 **Magic Import** from the
+  supplied website/social URL (system prompt + business type + freeform catalogue → `catalog_data`
+  via `parseCatalogueFreeform`, + knowledge base), re-embeds via `ingestTenantKnowledge` in
+  `after()`, and sends the client a `tenant_admin` invite. Only the tenant insert is fatal. UI:
+  `quick-provision-dialog.tsx` (Sparkles trigger) with a success screen showing the widget key
+  (copy button) + any warnings; wired beside `NewClientDialog` on `admin/clients/page.tsx`. Turns
+  onboarding from a multi-session chore into one form.
 - **O5. Business Copilot** — ✅ SHIPPED. A Claude-style chat at the top of `dashboard/business`
   (`components/copilot/business-copilot.tsx`) where the non-technical owner types plain language
   ("add bridal makeup for 15000", "close 24–26 Dec for Eid", "we take bank transfer now", "make my
@@ -107,18 +115,57 @@ else is generated, reviewed once, and live.
     `intake_completed_at`); Phase 3 adds proactive automation (owner daily digest, auto-KB suggestions,
     hard holiday-pause mode — see Track A).
 
-## Track I — Inventory lite
+## Track I — Inventory lite — ✅ SHIPPED (I1)
 
 Approve/reject alone is NOT enough (damage happens before rejection; AI keeps selling sold-out
-items). Scope: optional `in_stock`/`quantity` per catalogue item (inside `catalog_data` JSON),
-prompt grounding ("unavailable — offer alternative"), auto-decrement on confirmed order,
-low-stock notification, one-tap restock. Explicitly NOT variants/warehouses.
+items). Scope: optional stock per catalogue item, prompt grounding, auto-decrement on confirmed
+order, low-stock notification, one-tap restock. Explicitly NOT variants/warehouses.
+
+- **Model (no migration):** stock rides INSIDE each `catalog_data` item as an optional numeric
+  `stock` field. `services/inventory.ts` is the single **pure** interpreter (no `server-only`, so
+  prompt builder + dashboard + order tool all share it): `readInventory`, `catalogHasStockTracking`,
+  `setStockInCatalog` (case-insensitive exact-name; `null` clears tracking), `applyOrderDecrements`
+  (aggregate per name, floor at 0, emit low/out `StockEvent`s). `LOW_STOCK_THRESHOLD = 3`.
+- **Prompt grounding:** `promptBuilder.ts#buildInventoryRule` (a static `## STOCK` block) is spliced
+  into `buildSystemPrefix` **only** when `catalogueMode === 'stuff' && catalogHasStockTracking(...)`,
+  so untracked tenants get a byte-identical, cache-safe prefix. Teaches the model: `stock: 0` = sold
+  out (refuse + offer an in-stock alternative), cap orders at available units, no `stock` field =
+  untracked, never invent restock dates.
+- **Auto-decrement:** `services/inventoryStore.ts#applyOrderStockEffects` (service-role, read-modify-
+  write on the JSON — the race is accepted for "lite") fires at both confirmation points, best-effort:
+  bypass-mode confirmed orders in `services/tools/createOrder.ts`, and pending→confirmed in
+  `app/admin/orders/actions.ts#approveOrderAction` (so a rejected order never consumes stock). It also
+  `notifyBoth` a `low_stock` alert when an item crosses low/out.
+- **Dashboard:** new tenant-admin `/dashboard/inventory` route (`page.tsx` + `inventory-panel.tsx` +
+  `inventory-actions.ts`, RLS-scoped writes via `createSupabaseServerClient`, same guard as intake).
+  Per-item: set/track stock, one-tap **+10** restock (server-side read-modify-write), stop tracking.
+  Nav entry (`Boxes` icon) sits in the tenant-admin management cluster past the mobile five-tab cap;
+  the low-stock notification deep-links straight to it.
+- **Parked migration** `0034_inventory_and_referrals.sql`: adds `low_stock` to
+  `notifications_type_check`. Until applied, the low-stock notify silently no-ops (best-effort
+  `notify()` swallows the constraint error) — **stock still decrements**; only the bell/email defers.
 
 ## Track G — Growth mechanics
 
-- "Powered by CrewNest" badge + referral link on free-plan web widget (paid removes it).
-- Referral credits (give a month / get a month); annual pricing (2 months free).
-- Per-vertical `/try` templates (salon, boutique, bakery…) as SEO landing pages.
+- **G1 — plan-gated referral badge + attribution — ✅ SHIPPED.** The free-plan web widget's
+  "Powered by CrewNest" footer is now plan-gated and doubles as a referral link; paid plans remove it.
+  - **Config endpoint:** public `GET /api/widget/config?key=pk_live_…` (`app/api/widget/config/route.ts`)
+    resolves the tenant via `resolveByWidgetKey` and returns `{ branding: boolean, referralUrl }`
+    (`branding = plan !== 'free'` inverted; `referralUrl = ${APP_URL}/?ref=<slug|id>`). CORS echoes the
+    origin (public, non-sensitive data only), 5-min cache, and **fails open to `branding: true`** on
+    any unknown key/error so a free tenant is never silently un-branded and a transient failure never
+    strips a paid tenant's removal unexpectedly.
+  - **Widget:** `public/embed/widget.js` fetches the config on load; default (and fail-open) is the
+    static badge text. Paid → badge hidden; free → badge becomes a referral `<a>` to `referralUrl`
+    (href set via `setAttribute`, http(s)-only, `rel=noopener` — XSS-safe).
+  - **Attribution capture:** `components/ref-capture.tsx` (mounted once in the root layout) reads
+    `?ref=` off the landing URL, sanitises it, stores it in a first-party `cn_ref` cookie (30 d,
+    SameSite=Lax) that survives the demo→signup funnel, and cleans the URL.
+    `signup/provision-actions.ts` reads the cookie and records `referred_by` on the new tenant
+    (best-effort; column ships with the parked `0034` migration, so it no-ops until applied — signup
+    never breaks on attribution). **Capture-only — referral credits/rewards deferred.**
+- Referral credits (give a month / get a month); annual pricing (2 months free). *(deferred)*
+- Per-vertical `/try` templates (salon, boutique, bakery…) as SEO landing pages. *(deferred)*
 - Later: white-label agency tier (~$199+) — admin panel already 80% of it.
 
 ## Research findings (2026-07 competitive/ecosystem scan)

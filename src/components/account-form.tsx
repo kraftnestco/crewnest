@@ -22,6 +22,7 @@ const TYPE_LABELS: Record<NotificationType, string> = {
   order_updated: 'AI-made order edits/cancellations',
   media_review: 'Voice notes, videos & photos needing review',
   system_alert: 'System alerts (e.g. a tenant crossing its daily cost cap)',
+  low_stock: 'Low / out-of-stock catalogue items',
 };
 
 /** channel_request and system_alert are agency-only (a tenant asking the agency for a new channel, or an infra alert) — never emitted to a tenant's own feed, so they have nothing to mute on the client side (docs/14 §7.3). upgrade_request is mostly agency-only too, except the free-plan monthly cap notice (docs/18 §3, Stage U-cap) also reaches the tenant so they know to upgrade. */
@@ -36,6 +37,7 @@ const ADMIN_TYPES: NotificationType[] = [
   'order_updated',
   'media_review',
   'system_alert',
+  'low_stock',
 ];
 const DASHBOARD_TYPES: NotificationType[] = [
   'new_order',
@@ -46,6 +48,7 @@ const DASHBOARD_TYPES: NotificationType[] = [
   'review',
   'order_updated',
   'media_review',
+  'low_stock',
 ];
 
 export function AccountForm({

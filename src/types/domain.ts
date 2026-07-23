@@ -189,7 +189,8 @@ export type NotificationType =
   | 'review'
   | 'order_updated'
   | 'media_review'
-  | 'system_alert';
+  | 'system_alert'
+  | 'low_stock';
 export type NotificationEntityType = 'order' | 'session' | 'tenant';
 
 /** A live notification-feed row (docs/14). Writes are service-role only; reads are RLS-scoped per audience. */
