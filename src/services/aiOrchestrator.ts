@@ -257,9 +257,14 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
   // tenant has configured hours.
   const openNow = computeOpenNow(tenant.businessHours, tenant.timezone);
   if (openNow) {
+    // A holiday closure (docs/19 O5) rides in business_hours; when active, tell the
+    // model why it's closed and the owner's away message so it can reassure customers.
+    const closureNote = openNow.closureMessage
+      ? ` It is closed for a holiday/scheduled break — tell the customer: "${openNow.closureMessage}"`
+      : '';
     built.messages.splice(built.cachePrefixLength, 0, {
       role: 'system',
-      content: `[context] Current local time for this business: ${openNow.localTimeLabel} (${tenant.timezone}). The business is currently ${openNow.isOpen ? 'OPEN' : 'CLOSED'}.`,
+      content: `[context] Current local time for this business: ${openNow.localTimeLabel} (${tenant.timezone}). The business is currently ${openNow.isOpen ? 'OPEN' : 'CLOSED'}.${closureNote}`,
     });
   }
 

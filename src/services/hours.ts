@@ -10,9 +10,24 @@ export interface HourRow {
   close: string; // 'HH:MM', 24h
 }
 
+/**
+ * A holiday/vacation closure window. Rides inside the `business_hours` JSONB as
+ * an optional `closures` array, so no migration is needed. `from`/`to` are
+ * inclusive calendar dates (YYYY-MM-DD) in the tenant's timezone; `message` is
+ * the customer-facing "we're closed / back on…" note. Written by the Business
+ * Copilot (docs/19 O5); read here so the AI's "open now?" verdict honours it.
+ */
+export interface Closure {
+  from: string; // 'YYYY-MM-DD', inclusive
+  to: string; // 'YYYY-MM-DD', inclusive
+  message?: string;
+}
+
 export interface OpenNowResult {
   isOpen: boolean;
   localTimeLabel: string; // e.g. "Saturday 14:32"
+  /** Set only when a holiday closure is active today — the owner's away message. */
+  closureMessage?: string;
 }
 
 const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -32,6 +47,23 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 function isHourRow(v: unknown): v is HourRow {
   return isRecord(v) && typeof v.day === 'string' && typeof v.open === 'string' && typeof v.close === 'string';
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isClosureRow(v: unknown): v is Closure {
+  return isRecord(v) && typeof v.from === 'string' && typeof v.to === 'string' && ISO_DATE.test(v.from) && ISO_DATE.test(v.to);
+}
+
+/**
+ * The active closure for a tenant-local calendar date (YYYY-MM-DD), or null. A
+ * closure covers `from`..`to` inclusive; ISO date strings compare correctly with
+ * plain `<=`/`>=` (lexicographic == chronological for zero-padded YYYY-MM-DD).
+ */
+function activeClosure(businessHours: Record<string, unknown>, localDate: string): Closure | null {
+  if (!Array.isArray(businessHours.closures)) return null;
+  const closures = businessHours.closures.filter(isClosureRow);
+  return closures.find((c) => localDate >= c.from && localDate <= c.to) ?? null;
 }
 
 function toMinutes(hhmm: string): number | null {
@@ -69,6 +101,9 @@ export function computeOpenNow(
     parts = new Intl.DateTimeFormat('en-US', {
       timeZone: timezone,
       weekday: 'short',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
       hourCycle: 'h23',
@@ -78,13 +113,24 @@ export function computeOpenNow(
   }
 
   const weekday = parts.find((p) => p.type === 'weekday')?.value ?? '';
+  const year = parts.find((p) => p.type === 'year')?.value ?? '';
+  const month = parts.find((p) => p.type === 'month')?.value ?? '';
+  const day = parts.find((p) => p.type === 'day')?.value ?? '';
   const hour = parts.find((p) => p.type === 'hour')?.value ?? '00';
   const minute = parts.find((p) => p.type === 'minute')?.value ?? '00';
   if (!DAY_ORDER.includes(weekday)) return null;
+
+  const localTimeLabel = `${DAY_FULL_NAMES[weekday]} ${hour}:${minute}`;
+
+  // A holiday closure overrides the weekly schedule — closed regardless of hours.
+  const closure = activeClosure(businessHours, `${year}-${month}-${day}`);
+  if (closure) {
+    return { isOpen: false, localTimeLabel, ...(closure.message ? { closureMessage: closure.message } : {}) };
+  }
 
   const nowMinutes = Number(hour) * 60 + Number(minute);
   const row = week.find((r) => r.day === weekday);
   const isOpen = Boolean(row && isWithinRange(row.open, row.close, nowMinutes));
 
-  return { isOpen, localTimeLabel: `${DAY_FULL_NAMES[weekday]} ${hour}:${minute}` };
+  return { isOpen, localTimeLabel };
 }

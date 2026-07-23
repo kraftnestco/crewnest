@@ -67,6 +67,45 @@ else is generated, reviewed once, and live.
   cannot do). Vault columns unchanged.
 - **O4. Agency provisioning**: one admin form = tenant + magic-import + prompt-architect + invite
   email in a single action, so onboarding a client is minutes, not sessions.
+- **O5. Business Copilot** — ✅ SHIPPED. A Claude-style chat at the top of `dashboard/business`
+  (`components/copilot/business-copilot.tsx`) where the non-technical owner types plain language
+  ("add bridal makeup for 15000", "close 24–26 Dec for Eid", "we take bank transfer now", "make my
+  assistant sound more premium") and the copilot proposes the exact profile edit as a
+  **ProposedChangeCard** the owner commits with one tap. It's the friendly front door; the intake
+  wizard stays underneath as the precise/manual editor. Reuses O1 Prompt Architect and O2 Magic
+  Import as tools.
+  - **Safety spine — propose/apply split.** The LLM **never writes to the DB**; it only proposes a
+    structured `CopilotPatch`, and a deterministic, auth-checked applier commits it. Two server
+    actions in `app/dashboard/business/copilot-actions.ts`, both gated exactly like the intake actions
+    (`getCallerContext` → `assertTenantAccess` → require `platform_admin` or `tenant_admin` of THIS
+    tenant): `copilotTurnAction` runs the bounded tool-calling loop (DB-read-only w.r.t. tenant data —
+    writes only a `usage_logs` row) and returns a staged patch; `applyCopilotPatchAction` is the ONLY
+    writer — it re-checks auth, hard-validates the patch against the allowlist, and does a **partial**
+    `.update()` through the RLS-scoped authenticated client so untouched settings are never reset.
+  - **Access tiers** (`services/ai/copilot/tiers.ts`, the single source of truth): **Editable** —
+    persona, catalogue, knowledge/FAQ, weekly hours + holiday closures & timezone, business basics,
+    custom orders, media/voice. **Money (flagged)** — payment settings; the preview card shows a
+    "⚠ changes how customers pay you" banner but takes the same explicit Apply. **Off-limits** —
+    model/provider, all `*_secret_id`/keys/tokens, plan/billing/caps, account on/off, channel wiring,
+    retention: these have **no tool and no allowlist entry**, so no prompt can reach them, and a
+    hand-forged patch naming one is rejected by `validatePatch` (`.strict()` zod). Consistent with the
+    standing rule to **never change a tenant's `llm_provider`/`llm_model` without asking** — there is
+    deliberately no tool for it.
+  - **Engine:** `services/ai/copilot/copilotTools.ts` is a side-effect-free tool registry over an
+    in-memory `CopilotDraft` (mutable working snapshot so multiple tool calls in one turn compose);
+    `runCopilotTurn.ts` builds the tier-rule system prompt + a compact snapshot of the editable profile
+    only (no secrets), runs the bounded `provider.chat({ tools }, key)` loop, and logs one `usage_logs`
+    row. `applyCopilotPatchAction` derives `catalog_data` via `parseCatalogueFreeform` and re-embeds via
+    `ingestTenantKnowledge` in `after()` when the catalogue/KB changed.
+  - **Holiday closure (no migration):** an optional `closures: [{from, to, message}]` (inclusive ISO
+    dates) rides inside the existing `business_hours` JSONB. `services/hours.ts#computeOpenNow` checks
+    an active closure first and returns `isOpen:false` + the closure message, which `aiOrchestrator.ts`
+    surfaces in the open-now context line so the assistant tells customers "we're closed 24–26 Dec,
+    back the 27th".
+  - **Later:** Phase 2 reuses the same engine as a conversational onboarding intake for brand-new
+    tenants (seeded onboarding prompt, kicks off with `import_from_url`, ends by marking
+    `intake_completed_at`); Phase 3 adds proactive automation (owner daily digest, auto-KB suggestions,
+    hard holiday-pause mode — see Track A).
 
 ## Track I — Inventory lite
 

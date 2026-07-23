@@ -1,0 +1,421 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { AlertTriangle, ArrowUp, Check, Loader2, Sparkles, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+import { applyCopilotPatchAction, copilotTurnAction } from '@/app/dashboard/business/copilot-actions';
+import { MONEY_FIELDS, type CopilotMessage, type CopilotPatch } from '@/services/ai/copilot/tiers';
+
+/**
+ * Business Copilot — the Claude-style chat in "My Business" (docs/19 O5). The
+ * owner types plain language ("add bridal makeup for 15000", "close 24–26 Dec for
+ * Eid") and the copilot proposes the exact profile edit as a `ProposedChangeCard`;
+ * the owner commits it with one tap. Nothing is saved until Apply.
+ *
+ * The safety spine lives on the server (propose/apply split in copilot-actions.ts):
+ * this component only renders the transcript, sends turns to `copilotTurnAction`,
+ * and — on Apply — calls `applyCopilotPatchAction` then `router.refresh()` so the
+ * Business-details editor below reflects the committed change.
+ */
+
+const SUGGESTIONS = [
+  'Add a new service to my catalogue',
+  'Close for the holidays',
+  'Change my delivery charges',
+  'Make my assistant sound more premium',
+] as const;
+
+type ProposalStatus = 'pending' | 'applied' | 'dismissed' | 'superseded';
+
+interface Turn {
+  role: 'user' | 'assistant';
+  content: string;
+  /** Present on assistant turns that staged a change. */
+  patch?: CopilotPatch;
+  hasMoneyChange?: boolean;
+  status?: ProposalStatus;
+}
+
+const MONEY_FIELD_SET: ReadonlySet<string> = new Set(MONEY_FIELDS);
+
+export function BusinessCopilot({ tenantId, businessName }: { tenantId: string; businessName: string }) {
+  const router = useRouter();
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [input, setInput] = useState('');
+  const [thinking, setThinking] = useState(false);
+  const [applyingIndex, setApplyingIndex] = useState<number | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [turns, thinking]);
+
+  const send = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || thinking) return;
+
+      // Build the history the server sees from what's on screen, then append the new turn.
+      const history: CopilotMessage[] = turns.map((t) => ({ role: t.role, content: t.content }));
+      history.push({ role: 'user', content: trimmed });
+
+      setTurns((prev) => [...prev, { role: 'user', content: trimmed }]);
+      setInput('');
+      setThinking(true);
+
+      try {
+        const result = await copilotTurnAction(tenantId, history);
+        if (result.error) {
+          setTurns((prev) => [...prev, { role: 'assistant', content: result.error as string }]);
+          return;
+        }
+        const staged = Object.keys(result.patch).length > 0;
+        setTurns((prev) => {
+          // A fresh proposal supersedes any earlier still-pending one to avoid stale applies.
+          const next = staged
+            ? prev.map((t) => (t.status === 'pending' ? { ...t, status: 'superseded' as const } : t))
+            : prev;
+          return [
+            ...next,
+            {
+              role: 'assistant',
+              content: result.reply,
+              ...(staged ? { patch: result.patch, hasMoneyChange: result.hasMoneyChange, status: 'pending' as const } : {}),
+            },
+          ];
+        });
+      } catch {
+        setTurns((prev) => [
+          ...prev,
+          { role: 'assistant', content: 'Something went wrong there — please try again in a moment.' },
+        ]);
+      } finally {
+        setThinking(false);
+      }
+    },
+    [tenantId, thinking, turns],
+  );
+
+  async function apply(index: number) {
+    const turn = turns[index];
+    if (!turn?.patch || applyingIndex !== null) return;
+    setApplyingIndex(index);
+    try {
+      const res = await applyCopilotPatchAction(tenantId, turn.patch);
+      if (res.success) {
+        setTurns((prev) => prev.map((t, i) => (i === index ? { ...t, status: 'applied' } : t)));
+        toast.success('Change applied — your assistant is using it now.');
+        router.refresh();
+      } else {
+        toast.error(res.error ?? "That change couldn't be applied.");
+      }
+    } catch {
+      toast.error("That change couldn't be applied — please try again.");
+    } finally {
+      setApplyingIndex(null);
+    }
+  }
+
+  function dismiss(index: number) {
+    setTurns((prev) => prev.map((t, i) => (i === index ? { ...t, status: 'dismissed' } : t)));
+  }
+
+  function onComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      send(input);
+    }
+  }
+
+  const isEmpty = turns.length === 0;
+
+  return (
+    <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
+      {/* Header */}
+      <div className="flex items-center gap-2.5 border-b bg-primary/[0.03] px-4 py-3">
+        <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Sparkles className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <p className="font-heading text-sm font-semibold leading-tight">Business Copilot</p>
+          <p className="truncate text-xs text-muted-foreground">
+            Tell me what changed and I&apos;ll set it up for you to review.
+          </p>
+        </div>
+      </div>
+
+      {/* Transcript */}
+      <div className="max-h-[26rem] min-h-[8rem] overflow-y-auto px-4 py-4">
+        {isEmpty ? (
+          <div className="flex flex-col items-center gap-4 py-6 text-center">
+            <p className="max-w-sm text-sm text-muted-foreground">
+              Just say what&apos;s new about {businessName} in plain words — a new item, holiday hours, a price change —
+              and I&apos;ll prepare the exact update for you to approve.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => send(s)}
+                  className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {turns.map((turn, i) => (
+              <div key={i}>
+                <MessageBubble role={turn.role} content={turn.content} />
+                {turn.patch && (
+                  <ProposedChangeCard
+                    patch={turn.patch}
+                    hasMoneyChange={Boolean(turn.hasMoneyChange)}
+                    status={turn.status ?? 'pending'}
+                    applying={applyingIndex === i}
+                    onApply={() => apply(i)}
+                    onDismiss={() => dismiss(i)}
+                  />
+                )}
+              </div>
+            ))}
+            {thinking && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                <span>Working on it…</span>
+              </div>
+            )}
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Composer */}
+      <div className="border-t p-3">
+        <div className="flex items-end gap-2 rounded-xl border border-input bg-background px-2.5 py-2 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onComposerKeyDown}
+            placeholder="Tell me what changed…"
+            rows={1}
+            disabled={thinking}
+            className="max-h-40 min-h-0 flex-1 resize-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
+          />
+          <Button
+            type="button"
+            size="icon"
+            onClick={() => send(input)}
+            disabled={thinking || !input.trim()}
+            aria-label="Send"
+            className="shrink-0 rounded-lg"
+          >
+            {thinking ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+          </Button>
+        </div>
+        <p className="mt-2 px-1 text-[0.7rem] leading-relaxed text-muted-foreground">
+          The copilot only prepares changes — nothing is saved until you tap Apply. It can&apos;t touch billing, your
+          plan, connected accounts, or API keys.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function MessageBubble({ role, content }: { role: 'user' | 'assistant'; content: string }) {
+  const isUser = role === 'user';
+  return (
+    <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
+      <div
+        className={cn(
+          'max-w-[85%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap',
+          isUser ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground',
+        )}
+      >
+        {content}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ proposed change */
+
+interface PatchLine {
+  label: string;
+  detail: string;
+  /** Render detail in a preserve-whitespace block (catalogue, instructions). */
+  block?: boolean;
+}
+
+const MEDIA_LABEL: Record<string, string> = {
+  match_catalogue: 'Only recognise photos of catalogue items',
+  accept_any: 'Accept any photo',
+  reject: 'Politely decline photos',
+};
+
+const VOICE_LABEL: Record<string, string> = {
+  ai_autonomous: 'Assistant answers voice notes itself',
+  human_review: 'Hold voice notes for a teammate',
+};
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  cod: 'Cash on delivery',
+  manual_transfer: 'Bank / wallet transfer',
+  gateway: 'Online payment gateway',
+};
+
+function truncate(text: string, max = 1200): string {
+  const t = text.trim();
+  return t.length > max ? `${t.slice(0, max)}…` : t;
+}
+
+function describeHours(bh: NonNullable<CopilotPatch['business_hours']>): string {
+  const lines: string[] = [];
+  const open = (bh.week ?? []).filter((r) => r.open && r.close);
+  if (open.length) lines.push(`Open: ${open.map((r) => `${r.day} ${r.open}–${r.close}`).join(', ')}`);
+  if (bh.closures?.length) {
+    for (const c of bh.closures) {
+      const range = c.from === c.to ? c.from : `${c.from} → ${c.to}`;
+      lines.push(`Closed: ${range}${c.message ? ` — ${c.message}` : ''}`);
+    }
+  }
+  return lines.join('\n') || 'Hours updated';
+}
+
+function describeKnowledge(kb: NonNullable<CopilotPatch['knowledge_base']>): string {
+  const parts: string[] = [];
+  if (kb.delivery !== undefined) parts.push(`Delivery: ${kb.delivery || '(cleared)'}`);
+  if (kb.returns !== undefined) parts.push(`Returns: ${kb.returns || '(cleared)'}`);
+  if (kb.location !== undefined) parts.push(`Location: ${kb.location || '(cleared)'}`);
+  if (kb.note !== undefined) parts.push(`Note: ${kb.note || '(cleared)'}`);
+  if (kb.faq !== undefined) parts.push(`FAQ: ${kb.faq.length} ${kb.faq.length === 1 ? 'entry' : 'entries'}`);
+  return parts.join('\n') || 'Business info updated';
+}
+
+/** Turn a staged patch into human-readable, non-technical review lines. */
+function describePatch(patch: CopilotPatch): PatchLine[] {
+  const lines: PatchLine[] = [];
+  const p = patch;
+
+  if (p.system_prompt !== undefined)
+    lines.push({ label: 'Assistant persona & voice', detail: 'Rewritten to match your request' });
+  if (p.catalog_freeform_text !== undefined)
+    lines.push({ label: 'Catalogue', detail: truncate(p.catalog_freeform_text) || '(cleared)', block: true });
+  if (p.knowledge_base !== undefined)
+    lines.push({ label: 'Business info & FAQ', detail: describeKnowledge(p.knowledge_base), block: true });
+  if (p.business_hours !== undefined)
+    lines.push({ label: 'Opening hours & closures', detail: describeHours(p.business_hours), block: true });
+  if (p.timezone !== undefined) lines.push({ label: 'Timezone', detail: p.timezone ?? '(cleared)' });
+  if (p.business_type !== undefined)
+    lines.push({ label: 'Business type', detail: p.business_type === 'product' ? 'Product / shop' : 'Service / bookings' });
+  if (p.booking_link !== undefined) lines.push({ label: 'Booking link', detail: p.booking_link ?? '(removed)' });
+  if (p.custom_orders_enabled !== undefined)
+    lines.push({ label: 'Custom orders', detail: p.custom_orders_enabled ? 'On' : 'Off' });
+  if (p.custom_orders_require_approval !== undefined)
+    lines.push({ label: 'Custom orders need your approval', detail: p.custom_orders_require_approval ? 'Yes' : 'No' });
+  if (p.custom_order_instructions !== undefined)
+    lines.push({ label: 'Custom order instructions', detail: p.custom_order_instructions ?? '(cleared)', block: true });
+  if (p.media_handling !== undefined)
+    lines.push({ label: 'Photo handling', detail: MEDIA_LABEL[p.media_handling] ?? p.media_handling });
+  if (p.voice_handling !== undefined)
+    lines.push({ label: 'Voice-note handling', detail: VOICE_LABEL[p.voice_handling] ?? p.voice_handling });
+
+  // Money fields
+  if (p.payments_enabled !== undefined)
+    lines.push({ label: 'Accept payments', detail: p.payments_enabled ? 'On' : 'Off' });
+  if (p.payment_methods !== undefined)
+    lines.push({
+      label: 'Payment methods',
+      detail: p.payment_methods.map((m) => PAYMENT_METHOD_LABEL[m] ?? m).join(', ') || '(none)',
+    });
+  if (p.payment_instructions !== undefined)
+    lines.push({ label: 'Payment instructions', detail: p.payment_instructions ?? '(cleared)', block: true });
+  if (p.default_currency !== undefined) lines.push({ label: 'Currency', detail: p.default_currency });
+  if (p.prepaid_required !== undefined)
+    lines.push({ label: 'Prepayment required', detail: p.prepaid_required ? 'Yes' : 'No' });
+
+  return lines;
+}
+
+function ProposedChangeCard({
+  patch,
+  hasMoneyChange,
+  status,
+  applying,
+  onApply,
+  onDismiss,
+}: {
+  patch: CopilotPatch;
+  hasMoneyChange: boolean;
+  status: ProposalStatus;
+  applying: boolean;
+  onApply: () => void;
+  onDismiss: () => void;
+}) {
+  const lines = describePatch(patch);
+  if (lines.length === 0) return null;
+
+  const settled = status !== 'pending';
+
+  return (
+    <div
+      className={cn(
+        'mt-2 ml-0 overflow-hidden rounded-xl border transition-opacity',
+        status === 'applied' ? 'border-primary/40' : 'border-border',
+        settled && status !== 'applied' && 'opacity-70',
+      )}
+    >
+      <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3.5 py-2">
+        <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Proposed change</p>
+        {status === 'applied' && (
+          <span className="flex items-center gap-1 text-xs font-medium text-primary">
+            <Check className="size-3.5" /> Applied
+          </span>
+        )}
+        {status === 'dismissed' && <span className="text-xs text-muted-foreground">Dismissed</span>}
+        {status === 'superseded' && <span className="text-xs text-muted-foreground">Replaced by a newer change</span>}
+      </div>
+
+      {hasMoneyChange && (
+        <div className="flex items-start gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+          <span>This changes how customers pay you — please double-check it before applying.</span>
+        </div>
+      )}
+
+      <dl className="divide-y divide-border/70">
+        {lines.map((line, i) => (
+          <div key={i} className="px-3.5 py-2.5">
+            <dt className="text-xs font-medium text-muted-foreground">{line.label}</dt>
+            {line.block ? (
+              <dd className="mt-1 rounded-md bg-muted/60 px-2.5 py-2 text-sm whitespace-pre-wrap text-foreground">
+                {line.detail}
+              </dd>
+            ) : (
+              <dd className="mt-0.5 text-sm text-foreground">{line.detail}</dd>
+            )}
+          </div>
+        ))}
+      </dl>
+
+      {!settled && (
+        <div className="flex items-center justify-end gap-2 border-t bg-muted/30 px-3.5 py-2.5">
+          <Button type="button" variant="ghost" size="sm" onClick={onDismiss} disabled={applying}>
+            <X className="size-3.5" /> Dismiss
+          </Button>
+          <Button type="button" size="sm" onClick={onApply} disabled={applying}>
+            {applying ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+            {applying ? 'Applying…' : 'Apply'}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
