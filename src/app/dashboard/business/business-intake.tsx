@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { IntakeWizard } from '@/components/intake/intake-wizard';
 import { IntakeSummary } from '@/components/intake/intake-summary';
 import type { IntakeTenant } from '@/components/intake/intake-shared';
-import { updateIntakeAction } from '@/app/admin/clients/[id]/intake/actions';
+import { generateSystemPromptAction, updateIntakeAction } from '@/app/admin/clients/[id]/intake/actions';
 import { initialUpdateIntakeState } from '@/app/admin/clients/[id]/intake/intake-state';
 
 /**
@@ -42,6 +42,7 @@ export function BusinessIntake({ tenant }: { tenant: IntakeTenant & { intake_com
       isSubmitting={isPending}
       submitError={state.error}
       finishLabel="Save business details"
+      onGeneratePrompt={generateSystemPromptAction.bind(null, tenant.id)}
     />
   );
 }

@@ -40,9 +40,16 @@
 Target flow: client gives **business name + website/social link + WhatsApp number** → everything
 else is generated, reviewed once, and live.
 
-- **O1. Prompt Architect**: LLM pass composes the system prompt from wizard fields (tone, persona,
-  boundaries, escalation). Raw textarea becomes "advanced mode". Also regenerable from the
-  dashboard. [OPUS]-grade prompt engineering.
+- **O1. Prompt Architect** — ✅ SHIPPED. `services/ai/promptArchitect.ts` (mirrors `catalogueParser.ts`:
+  `server-only` → `getLlmKey` → `provider.chat` → `usage_logs`) composes ONLY the persona layer —
+  identity/voice/scope/boundaries — from the owner's guided answers (one-liner + tone chip + optional
+  do's/don'ts). Critically it must NOT recite catalogue/hours/payments/policies or restate guardrails;
+  `promptBuilder.ts` injects all of those separately and a duplicate here would drift. Shared
+  `components/intake/prompt-architect.tsx` (guided fields + Generate + collapsible raw "advanced"
+  textarea) is used by the tenant wizard (`intake-wizard.tsx` step 1) AND the agency editor
+  (`intake-form.tsx` §2); both call `generateSystemPromptAction` (tenant-scoped, in intake `actions.ts`).
+  Regenerable anytime (the dashboard reopens the same wizard). Public demo has no tenant/LLM key, so
+  `PromptArchitect` degrades to the plain textarea when `onGenerate` is absent — demo path unchanged.
 - **O2. Magic Import**: paste website URL (later: FB page via token) → server-side fetch →
   LLM extracts business type, catalogue draft, hours, FAQs, tone → prefills the entire intake
   wizard for one-click confirm. [OPUS] extraction prompt.

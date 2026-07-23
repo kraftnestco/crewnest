@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { PromptArchitect } from '@/components/intake/prompt-architect';
 import {
   BUSINESS_TYPE_OPTIONS,
   MEDIA_HANDLING_OPTIONS,
@@ -19,7 +20,7 @@ import {
   type IntakeTenant,
   type KnowledgeBaseState,
 } from '@/components/intake/intake-shared';
-import { updateIntakeAction } from './actions';
+import { generateSystemPromptAction, updateIntakeAction } from './actions';
 import { initialUpdateIntakeState } from './intake-state';
 
 /** Agency-only editor: raw JSON catalogue, no wizard steps. The client's own
@@ -29,6 +30,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
   const [state, formAction, isPending] = useActionState(boundAction, initialUpdateIntakeState);
   const [mediaHandling, setMediaHandling] = useState(tenant.media_handling ?? 'match_catalogue');
   const [businessType, setBusinessType] = useState(tenant.business_type ?? 'product');
+  const [systemPrompt, setSystemPrompt] = useState(tenant.system_prompt ?? '');
   const [knowledge, setKnowledge] = useState<KnowledgeBaseState>(() => parseKnowledgeBase(tenant.knowledge_base));
   const [hours, setHours] = useState<BusinessHoursState>(() => parseBusinessHours(tenant.business_hours));
   const [timezone, setTimezone] = useState(tenant.timezone ?? '');
@@ -109,18 +111,20 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>2. Business nature</CardTitle>
+          <CardTitle>2. Assistant persona</CardTitle>
           <CardDescription>
-            What the business sells, its tone, and languages. Seeds the AI&apos;s system prompt.
+            The assistant&apos;s identity, voice, and scope. Generate it from a couple of answers, or edit it directly.
+            Catalogue, hours, and payment details are added automatically — no need to repeat them here.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Textarea
-            id="system_prompt"
-            name="system_prompt"
-            rows={4}
-            defaultValue={tenant.system_prompt}
-            placeholder="You are the AI assistant for…"
+          <input type="hidden" name="system_prompt" value={systemPrompt} />
+          <PromptArchitect
+            systemPrompt={systemPrompt}
+            onSystemPromptChange={setSystemPrompt}
+            businessType={businessType}
+            catalogueHint={tenant.catalog_freeform_text ?? undefined}
+            onGenerate={generateSystemPromptAction.bind(null, tenant.id)}
           />
         </CardContent>
       </Card>

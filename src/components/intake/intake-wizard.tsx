@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { PromptArchitect } from '@/components/intake/prompt-architect';
 import {
   BUSINESS_TYPE_OPTIONS,
   MEDIA_HANDLING_OPTIONS,
@@ -15,12 +16,14 @@ import {
   parseBusinessHours,
   parseKnowledgeBase,
   type FaqEntry,
+  type GenerateSystemPromptResult,
   type IntakeTenant,
+  type PromptArchitectFields,
 } from '@/components/intake/intake-shared';
 
 const STEP_TITLES = [
   'What kind of business is this?',
-  'Tell us about your business',
+  "Your assistant's personality",
   'What do you sell?',
   'Custom orders',
   'Photos & voice notes from customers',
@@ -46,12 +49,15 @@ export function IntakeWizard({
   isSubmitting,
   submitError,
   finishLabel = 'Finish setup',
+  onGeneratePrompt,
 }: {
   tenant: IntakeTenant;
   onFinish: (formData: FormData) => void;
   isSubmitting?: boolean;
   submitError?: string | null;
   finishLabel?: string;
+  /** Prompt Architect action (docs/19 O1). Omitted on the public demo (no tenant/LLM key). */
+  onGeneratePrompt?: (fields: PromptArchitectFields) => Promise<GenerateSystemPromptResult>;
 }) {
   const [step, setStep] = useState(0);
 
@@ -178,15 +184,19 @@ export function IntakeWizard({
       {step === 1 && (
         <Card>
           <CardHeader>
-            <CardTitle>Tell us about your business</CardTitle>
-            <CardDescription>What the business sells, its tone, and languages. Seeds the AI&apos;s system prompt.</CardDescription>
+            <CardTitle>Your assistant&apos;s personality</CardTitle>
+            <CardDescription>
+              Answer a couple of quick things and we&apos;ll write your assistant&apos;s instructions for you. You can
+              fine-tune the wording afterwards.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Textarea
-              rows={5}
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="You are the AI assistant for…"
+            <PromptArchitect
+              systemPrompt={systemPrompt}
+              onSystemPromptChange={setSystemPrompt}
+              businessType={businessType}
+              catalogueHint={catalogFreeform}
+              onGenerate={onGeneratePrompt}
             />
           </CardContent>
         </Card>

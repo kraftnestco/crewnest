@@ -114,6 +114,28 @@ export const VOICE_HANDLING_OPTIONS: Array<{ value: string; label: string; hint:
   },
 ];
 
+/**
+ * Guided inputs the Prompt Architect (docs/19 O1) composes a persona system
+ * prompt from. The server action supplies `businessName` from the tenant record;
+ * the client passes the rest.
+ */
+export interface PromptArchitectFields {
+  businessSummary?: string;
+  tone?: string;
+  boundaries?: string;
+  businessType?: string;
+  catalogueHint?: string;
+}
+
+export type GenerateSystemPromptResult = { prompt: string | null; error: string | null };
+
+export const TONE_OPTIONS: Array<{ value: string; label: string; hint: string }> = [
+  { value: 'friendly', label: 'Friendly & warm', hint: 'Approachable and upbeat, like a helpful shop assistant. (Default)' },
+  { value: 'professional', label: 'Professional & polished', hint: 'Clear, courteous, and businesslike.' },
+  { value: 'playful', label: 'Playful & casual', hint: 'Relaxed and fun, with a bit of personality.' },
+  { value: 'premium', label: 'Calm & premium', hint: 'Refined, understated, and high-end.' },
+];
+
 export const BUSINESS_TYPE_OPTIONS: Array<{ value: string; label: string; hint: string }> = [
   {
     value: 'product',

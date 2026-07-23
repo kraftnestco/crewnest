@@ -7,7 +7,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import * as tenants from '@/services/tenants';
 import { ingestTenantKnowledge } from '@/services/knowledge';
 import { parseCatalogueFreeform } from '@/services/ai/catalogueParser';
+import { composeSystemPrompt } from '@/services/ai/promptArchitect';
 import type { Json } from '@/types/database';
+import type { GenerateSystemPromptResult, PromptArchitectFields } from '@/components/intake/intake-shared';
 import type { UpdateIntakeState } from './intake-state';
 import { log } from '@/lib/log';
 
@@ -22,6 +24,47 @@ const VOICE_HANDLING_VALUES = ['ai_autonomous', 'human_review'] as const;
 const BUSINESS_TYPE_VALUES = ['product', 'service'] as const;
 /** App-level allow-list (docs/11 §2.3) — payment_method(s) are plain text/text[], not a DB enum. */
 const PAYMENT_METHOD_VALUES = ['cod', 'manual_transfer', 'gateway'] as const;
+
+/**
+ * Prompt Architect (docs/19 O1). Called imperatively from the intake UI to
+ * compose a persona `system_prompt` from the owner's guided answers. Same
+ * tenant-scoped auth as the save action; the tenant record supplies the business
+ * name so the client never has to. Read-only w.r.t. tenant data — only writes a
+ * usage_logs row (inside composeSystemPrompt) — so nothing to revalidate.
+ */
+export async function generateSystemPromptAction(
+  tenantId: string,
+  fields: PromptArchitectFields,
+): Promise<GenerateSystemPromptResult> {
+  const ctx = await getCallerContext();
+  if (!ctx) return { prompt: null, error: 'Unauthorized.' };
+  try {
+    assertTenantAccess(ctx, tenantId);
+  } catch {
+    return { prompt: null, error: 'Forbidden: tenant not accessible.' };
+  }
+  if (!ctx.isPlatformAdmin && !ctx.memberships.some((m) => m.tenantId === tenantId && m.role === 'tenant_admin')) {
+    return { prompt: null, error: 'Forbidden: only a tenant admin may edit business settings.' };
+  }
+
+  const tenant = await tenants.getById(tenantId);
+  if (!tenant) return { prompt: null, error: 'Tenant not found.' };
+
+  try {
+    const prompt = await composeSystemPrompt(tenant, {
+      businessName: tenant.businessName,
+      businessType: fields.businessType === 'service' ? 'service' : 'product',
+      businessSummary: fields.businessSummary,
+      tone: fields.tone,
+      boundaries: fields.boundaries,
+      catalogueHint: fields.catalogueHint,
+    });
+    return { prompt, error: null };
+  } catch (err) {
+    log.error('[intake] prompt architect failed', { tenantId, err });
+    return { prompt: null, error: "Couldn't write the instructions — please try again, or write them yourself." };
+  }
+}
 
 export async function updateIntakeAction(
   tenantId: string,
