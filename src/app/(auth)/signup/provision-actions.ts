@@ -87,19 +87,17 @@ export async function provisionTenantAction(input: {
 
   // Referral attribution (docs/19 G1) — best-effort. `RefCapture` stashed the
   // referrer's slug/id in the `cn_ref` cookie back on the landing page; record it
-  // on the new tenant. The `referred_by` column ships with the parked referral
-  // migration, so until that's applied this write no-ops on a missing column
-  // (logged, never fatal) — signup must never break on attribution. The cast
-  // bridges the gap before the column exists in the generated types.
+  // on the new tenant. Kept best-effort (logged, never fatal) so signup can never
+  // break on attribution.
   try {
     const cookieStore = await cookies();
     const ref = cookieStore.get('cn_ref')?.value?.trim();
     if (ref) {
       const { error: refErr } = await svc
         .from('tenants')
-        .update({ referred_by: ref } as unknown as never)
+        .update({ referred_by: ref })
         .eq('id', tenant.id);
-      if (refErr) log.warn('[signup] referral attribution deferred (migration pending?)', { tenantId: tenant.id });
+      if (refErr) log.warn('[signup] referral attribution failed to persist', { tenantId: tenant.id });
     }
   } catch (err) {
     log.warn('[signup] referral attribution failed', { tenantId: tenant.id, err });

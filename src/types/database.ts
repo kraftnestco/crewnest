@@ -96,6 +96,7 @@ export type Database = {
           message_retention_days: number | null;
           created_at: string;
           updated_at: string;
+          referred_by: string | null;
         };
         Insert: {
           id?: string;
@@ -149,6 +150,7 @@ export type Database = {
           message_retention_days?: number | null;
           created_at?: string;
           updated_at?: string;
+          referred_by?: string | null;
         };
         Update: {
           id?: string;
@@ -201,6 +203,7 @@ export type Database = {
           message_retention_days?: number | null;
           created_at?: string;
           updated_at?: string;
+          referred_by?: string | null;
         };
         Relationships: [];
       };
