@@ -199,7 +199,7 @@ export async function createOrderFromSummaryAction(sessionId: string, fields: Or
       link: status === 'pending' ? '/admin/orders?status=pending' : '/admin/orders',
     },
     tenant: {
-      title: status === 'pending' ? 'New order — awaiting your approval' : 'New order received',
+      title: status === 'pending' ? 'New order awaiting your approval' : 'New order received',
       body: fields.customerName || 'Customer',
       link: '/dashboard/orders',
     },

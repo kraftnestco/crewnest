@@ -67,7 +67,7 @@ export async function generateSystemPromptAction(
     return { prompt, error: null };
   } catch (err) {
     log.error('[intake] prompt architect failed', { tenantId, err });
-    return { prompt: null, error: "Couldn't write the instructions — please try again, or write them yourself." };
+    return { prompt: null, error: "Couldn't write the instructions. Please try again, or write them yourself." };
   }
 }
 
@@ -106,7 +106,7 @@ export async function importFromUrlAction(tenantId: string, rawUrl: string): Pro
     const message =
       err instanceof Error && err.message && err.message.length <= 200
         ? err.message
-        : "We couldn't read that link — check it opens in a browser, or fill in the steps yourself.";
+        : "We couldn't read that link. Check it opens in a browser, or fill in the steps yourself.";
     return { fields: null, summary: null, error: message };
   }
 }
@@ -176,7 +176,7 @@ export async function updateIntakeAction(
       try {
         catalogData = await parseCatalogueFreeform(tenant, catalogFreeformText);
       } catch {
-        return { error: "Couldn't process your catalogue text — please try again.", success: false };
+        return { error: "Couldn't process your catalogue text. Please try again.", success: false };
       }
     }
   }
@@ -186,7 +186,7 @@ export async function updateIntakeAction(
     try {
       knowledgeBase = JSON.parse(knowledgeBaseRaw) as Json;
     } catch {
-      return { error: 'Knowledge base was malformed — please retry.', success: false };
+      return { error: 'Knowledge base was malformed. Please retry.', success: false };
     }
   }
 
@@ -195,7 +195,7 @@ export async function updateIntakeAction(
     try {
       businessHours = JSON.parse(businessHoursRaw) as Json;
     } catch {
-      return { error: 'Business hours were malformed — please retry.', success: false };
+      return { error: 'Business hours were malformed. Please retry.', success: false };
     }
   }
 

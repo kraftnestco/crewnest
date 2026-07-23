@@ -160,7 +160,7 @@ export const BUSINESS_TYPE_OPTIONS: Array<{ value: string; label: string; hint: 
   {
     value: 'service',
     label: 'Service-based',
-    hint: 'Offers services — appointments/bookings, or custom quotes your team prices.',
+    hint: 'Offers services: appointments, bookings, or custom quotes your team prices.',
   },
 ];
 
@@ -174,7 +174,7 @@ export const PAYMENT_METHOD_OPTIONS: Array<{ value: string; label: string; hint:
   {
     value: 'gateway',
     label: 'Card/Online Payment',
-    hint: 'Coming soon — needs a payment provider connected first.',
+    hint: 'Coming soon. Needs a payment provider connected first.',
     disabled: true,
   },
 ];

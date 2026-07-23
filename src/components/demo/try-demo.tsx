@@ -88,7 +88,7 @@ export function TryDemo() {
       return;
     }
     if (!pendingFormData) {
-      setGateError('Something went wrong — please restart the demo.');
+      setGateError('Something went wrong. Please restart the demo.');
       return;
     }
 
@@ -108,7 +108,7 @@ export function TryDemo() {
       setDemoTenant(tenant);
       setPhase('chat');
     } catch {
-      setGateError('Something went wrong — please try again.');
+      setGateError('Something went wrong. Please try again.');
     } finally {
       setGateSubmitting(false);
     }

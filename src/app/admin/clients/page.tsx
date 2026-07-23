@@ -109,14 +109,14 @@ export default async function ClientsPage() {
             {error && (
               <TableRow>
                 <TableCell colSpan={5} className="py-8 text-center text-destructive">
-                  Couldn&apos;t load clients — please refresh and try again.
+                  Couldn&apos;t load clients. Please refresh and try again.
                 </TableCell>
               </TableRow>
             )}
             {!error && (!tenants || tenants.length === 0) && (
               <TableRow>
                 <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                  No clients yet — create your first one.
+                  No clients yet. Create your first one.
                 </TableCell>
               </TableRow>
             )}

@@ -66,7 +66,7 @@ export function InventoryPanel({
           router.refresh(); // reconcile with the server (covers concurrent order decrements)
         }
       } catch {
-        toast.error('Something went wrong — please try again.');
+        toast.error('Something went wrong. Please try again.');
       } finally {
         setBusyName(null);
       }
@@ -101,7 +101,7 @@ export function InventoryPanel({
       {tracked.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Stock tracking is optional. Set a count on any item below and your assistant will stop taking
-          orders once it sells out — and nudge you to restock. Leave an item untracked to keep it always
+          orders once it sells out, and nudge you to restock. Leave an item untracked to keep it always
           available.
         </p>
       ) : (

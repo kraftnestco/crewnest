@@ -70,7 +70,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
       <Card>
         <CardHeader>
           <CardTitle>1. Business type</CardTitle>
-          <CardDescription>Product or service — this decides how the AI handles orders vs bookings/quotes.</CardDescription>
+          <CardDescription>Product or service. This decides how the AI handles orders vs bookings/quotes.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <input type="hidden" name="business_type" value={businessType} />
@@ -100,7 +100,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
                 placeholder="https://calendly.com/…"
               />
               <p className="text-xs text-muted-foreground">
-                Set this if customers should book appointments directly — the AI shares the link instead of
+                Set this if customers should book appointments directly, and the AI shares the link instead of
                 collecting details. Leave blank and the AI will collect a quote request for your team to price
                 (appears in the approval queue on Orders; reply with the priced quote via chat take-over).
               </p>
@@ -114,7 +114,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
           <CardTitle>2. Assistant persona</CardTitle>
           <CardDescription>
             The assistant&apos;s identity, voice, and scope. Generate it from a couple of answers, or edit it directly.
-            Catalogue, hours, and payment details are added automatically — no need to repeat them here.
+            Catalogue, hours, and payment details are added automatically, so there's no need to repeat them here.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -134,7 +134,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
           <CardTitle>3. Standard catalogue</CardTitle>
           <CardDescription>
             Reference data the AI answers from (JSON). The client’s own words, if they’ve entered any, are shown
-            below for reference — this box is what the AI actually reads.
+            below for reference. This box is what the AI actually reads.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -231,7 +231,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
         <CardHeader>
           <CardTitle>7. Knowledge & FAQ</CardTitle>
           <CardDescription>
-            Answers the AI can give straight away — delivery, returns, location, and common questions, in your
+            Answers the AI can give straight away: delivery, returns, location, and common questions, in your
             own words.
           </CardDescription>
         </CardHeader>
@@ -406,7 +406,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
                     placeholder="JazzCash: 0300-1234567 (Business Name). Send the receipt screenshot after transfer."
                   />
                   <p className="text-xs text-muted-foreground">
-                    Shared with the customer word-for-word — the AI never edits or shortens this.
+                    Shared with the customer word-for-word. The AI never edits or shortens this.
                   </p>
                 </div>
               )}
@@ -425,7 +425,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
                 <div>
                   <p className="text-sm font-medium">Say orders are reserved until paid</p>
                   <p className="text-xs text-muted-foreground">
-                    Wording only — the AI mentions this, but payment is never required to place an order.
+                    Wording only. The AI mentions this, but payment is never required to place an order.
                   </p>
                 </div>
                 <Switch id="prepaid_required" name="prepaid_required" defaultChecked={tenant.prepaid_required} />

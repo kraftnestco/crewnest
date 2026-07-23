@@ -28,7 +28,7 @@ export function PaywallModal({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className={cn(displayFont.className, 'text-xl')}>Keep this AI for your business</DialogTitle>
-          <DialogDescription>Pick a plan to create your account — we&apos;ll set up the tenant from what you just built.</DialogDescription>
+          <DialogDescription>Pick a plan to create your account, and we&apos;ll set up the tenant from what you just built.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-3">
           {PAYWALL_PLANS.map((plan) => (

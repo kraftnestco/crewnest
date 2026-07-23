@@ -83,7 +83,7 @@ export function DemoChat({ demoTenant, businessName }: { demoTenant: DemoTenantI
     if (humanTakeover) {
       setTurns((t) => [
         ...t,
-        { role: 'note', content: 'Human takeover is on — a team member would reply here instead of the AI.' },
+        { role: 'note', content: 'Human takeover is on. A team member would reply here instead of the AI.' },
       ]);
       return;
     }
@@ -97,13 +97,13 @@ export function DemoChat({ demoTenant, businessName }: { demoTenant: DemoTenantI
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setTurns((t) => [...t, { role: 'assistant', content: data.error || 'Something went wrong — try again.' }]);
+        setTurns((t) => [...t, { role: 'assistant', content: data.error || 'Something went wrong. Try again.' }]);
         return;
       }
       setTurns((t) => [...t, { role: 'assistant', content: data.reply }]);
       if (data.orderCard) setOrderCard(data.orderCard);
     } catch {
-      setTurns((t) => [...t, { role: 'assistant', content: "Couldn't reach the demo assistant — try again." }]);
+      setTurns((t) => [...t, { role: 'assistant', content: "Couldn't reach the demo assistant. Try again." }]);
     } finally {
       setSending(false);
     }
@@ -117,8 +117,8 @@ export function DemoChat({ demoTenant, businessName }: { demoTenant: DemoTenantI
         role: 'note',
         content:
           next === 'confirmed'
-            ? '✅ Order approved from the command center — the customer would now get a confirmation message.'
-            : '❌ Order rejected from the command center — the customer would be notified and asked to revise it.',
+            ? '✅ Order approved from the command center. The customer would now get a confirmation message.'
+            : '❌ Order rejected from the command center. The customer would be notified and asked to revise it.',
       },
     ]);
     if (next === 'rejected') setOrderCard(null);
@@ -246,14 +246,14 @@ export function DemoChat({ demoTenant, businessName }: { demoTenant: DemoTenantI
             </div>
           ) : (
             <p className="rounded-lg border border-dashed border-input p-3 text-xs text-muted-foreground">
-              Ask the AI to place an order in the chat — it&apos;ll show up here, just like it would for your team.
+              Ask the AI to place an order in the chat and it&apos;ll show up here, just like it would for your team.
             </p>
           )}
 
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Same conversation, every skin</Label>
             <p className="text-xs text-muted-foreground">
-              Switching tabs only changes how the chat looks — it&apos;s the same AI, the same thread, across
+              Switching tabs only changes how the chat looks. It&apos;s the same AI, the same thread, across
               WhatsApp, Instagram DMs, and Messenger.
             </p>
           </div>

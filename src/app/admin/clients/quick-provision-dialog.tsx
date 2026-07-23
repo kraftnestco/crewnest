@@ -89,7 +89,7 @@ export function QuickProvisionDialog() {
               <DialogTitle>Quick provision a client</DialogTitle>
               <DialogDescription>
                 One form: create the client, pre-fill their profile from their website, and invite their
-                login — all at once.
+                login, all in one step.
               </DialogDescription>
             </DialogHeader>
 
@@ -104,7 +104,7 @@ export function QuickProvisionDialog() {
               </Label>
               <Input id="qp_import_url" name="import_url" type="url" placeholder="https://acmecakes.com" />
               <p className="text-xs text-muted-foreground">
-                We read the page and pre-fill their persona, catalogue, and FAQs. Nothing is invented — you
+                We read the page and pre-fill their persona, catalogue, and FAQs. Nothing is invented, and you
                 can edit it all in the intake.
               </p>
             </div>

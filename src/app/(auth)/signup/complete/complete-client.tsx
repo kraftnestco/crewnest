@@ -82,7 +82,7 @@ export function CompleteClient() {
     return (
       <Card className="mx-auto max-w-sm">
         <CardHeader>
-          <CardTitle>Thanks — request sent!</CardTitle>
+          <CardTitle>Thanks, request sent!</CardTitle>
           <CardDescription>
             Your AI employee is live on the free plan for now. Our team will reach out shortly to activate your paid
             plan.

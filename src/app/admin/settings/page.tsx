@@ -77,7 +77,7 @@ export default async function SettingsPage() {
               {error && (
                 <TableRow>
                   <TableCell colSpan={3} className="py-8 text-center text-destructive">
-                    Couldn&apos;t load platform admins — please refresh and try again.
+                    Couldn&apos;t load platform admins. Please refresh and try again.
                   </TableCell>
                 </TableRow>
               )}

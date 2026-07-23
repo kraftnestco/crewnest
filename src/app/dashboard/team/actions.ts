@@ -68,7 +68,7 @@ export async function changeMemberRoleAction(
   if (current.role === 'tenant_admin' && newRole !== 'tenant_admin') {
     const adminCount = await countTenantAdmins(tenantId);
     if (adminCount <= 1) {
-      return { error: "Can't demote the last admin — promote someone else first.", success: false };
+      return { error: "Can't demote the last admin. Promote someone else first.", success: false };
     }
   }
 
@@ -101,7 +101,7 @@ export async function removeMemberAction(tenantId: string, userId: string): Prom
   if (current.role === 'tenant_admin') {
     const adminCount = await countTenantAdmins(tenantId);
     if (adminCount <= 1) {
-      return { error: "Can't remove the last admin — promote someone else first.", success: false };
+      return { error: "Can't remove the last admin. Promote someone else first.", success: false };
     }
   }
 

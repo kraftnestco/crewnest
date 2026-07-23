@@ -7,7 +7,7 @@ import { TryDemo } from '@/components/demo/try-demo';
 
 export const metadata = {
   title: 'Try CrewNest for your business',
-  description: 'Answer a few questions about your business and chat with your own AI employee — free, no signup.',
+  description: 'Answer a few questions about your business and chat with your own AI employee. Free, no signup.',
 };
 
 export default function TryPage() {
@@ -33,7 +33,7 @@ export default function TryPage() {
             See your AI employee in action
           </h1>
           <p className="mt-2 text-muted-foreground text-balance">
-            Answer a few quick questions about your business, then chat with the AI it generates — free, no signup.
+            Answer a few quick questions about your business, then chat with the AI it generates. Free, no signup.
           </p>
         </div>
         <TryDemo />

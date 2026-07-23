@@ -31,7 +31,7 @@ export function OffboardTenantDialog({ tenantId, businessName }: { tenantId: str
 
   useEffect(() => {
     if (state.success) {
-      toast.success(`${businessName} offboarded — all data erased.`);
+      toast.success(`${businessName} offboarded. All data erased.`);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- closing the dialog is a reaction to the action result, not a render-time state sync
       setOpen(false);
     }

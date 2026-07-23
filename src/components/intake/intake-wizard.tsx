@@ -143,7 +143,7 @@ export function IntakeWizard({
         <Card>
           <CardHeader>
             <CardTitle>What kind of business is this?</CardTitle>
-            <CardDescription>Product or service — this decides how the AI handles orders vs bookings/quotes.</CardDescription>
+            <CardDescription>Product or service. This decides how the AI handles orders vs bookings/quotes.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex flex-col gap-2">
@@ -172,7 +172,7 @@ export function IntakeWizard({
                   placeholder="https://calendly.com/…"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Set this if customers should book appointments directly — the AI shares the link instead of
+                  Set this if customers should book appointments directly, and the AI shares the link instead of
                   collecting details. Leave blank and the AI will collect a quote request for your team to price.
                 </p>
               </div>
@@ -207,7 +207,7 @@ export function IntakeWizard({
           <CardHeader>
             <CardTitle>What do you sell?</CardTitle>
             <CardDescription>
-              List your items, services, or packages in your own words — prices, options, whatever you&apos;d tell a
+              List your items, services, or packages in your own words: prices, options, whatever you&apos;d tell a
               customer. We turn this into something your AI assistant can answer questions from.
             </CardDescription>
           </CardHeader>
@@ -292,7 +292,7 @@ export function IntakeWizard({
                 ))}
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                Videos are always held for a human to review — there&apos;s no auto-answer option for those yet.
+                Videos are always held for a human to review. There&apos;s no auto-answer option for those yet.
               </p>
             </div>
           </CardContent>
@@ -322,7 +322,7 @@ export function IntakeWizard({
           <CardHeader>
             <CardTitle>Common questions</CardTitle>
             <CardDescription>
-              Answers the AI can give straight away — delivery, returns, location, and common questions, in your own
+              Answers the AI can give straight away: delivery, returns, location, and common questions, in your own
               words.
             </CardDescription>
           </CardHeader>
@@ -472,7 +472,7 @@ export function IntakeWizard({
                       placeholder="JazzCash: 0300-1234567 (Business Name). Send the receipt screenshot after transfer."
                     />
                     <p className="text-xs text-muted-foreground">
-                      Shared with the customer word-for-word — the AI never edits or shortens this.
+                      Shared with the customer word-for-word. The AI never edits or shortens this.
                     </p>
                   </div>
                 )}

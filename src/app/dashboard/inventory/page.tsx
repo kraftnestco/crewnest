@@ -39,7 +39,7 @@ export default async function DashboardInventoryPage() {
     <div className="mx-auto max-w-3xl space-y-6 p-6">
       <PageHeader
         title="Inventory"
-        description="Set a stock count on any catalogue item — your assistant stops taking orders once it sells out, and we nudge you to restock. Tracking is optional and per item."
+        description="Set a stock count on any catalogue item. Your assistant stops taking orders once it sells out, and we nudge you to restock. Tracking is optional and per item."
       />
       <InventoryPanel tenantId={activeTenantId} items={items} />
     </div>

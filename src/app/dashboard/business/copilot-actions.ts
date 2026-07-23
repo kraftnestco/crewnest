@@ -85,7 +85,7 @@ export async function copilotTurnAction(
       reply: '',
       patch: {},
       hasMoneyChange: false,
-      error: "Something went wrong preparing that change — please try again, or rephrase it.",
+      error: "Something went wrong preparing that change. Please try again, or rephrase it.",
     };
   }
 }
@@ -116,7 +116,7 @@ export async function applyCopilotPatchAction(tenantId: string, rawPatch: unknow
     try {
       update.catalog_data = await parseCatalogueFreeform(tenant, patch.catalog_freeform_text);
     } catch {
-      return { success: false, error: "Couldn't process your catalogue text — please try again." };
+      return { success: false, error: "Couldn't process your catalogue text. Please try again." };
     }
   }
   if (patch.knowledge_base !== undefined) update.knowledge_base = patch.knowledge_base as Json;

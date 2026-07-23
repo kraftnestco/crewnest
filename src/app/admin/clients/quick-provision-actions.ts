@@ -112,7 +112,7 @@ export async function quickProvisionAction(
 
       const { error: updErr } = await supabase.from('tenants').update(update).eq('id', created.id);
       if (updErr) {
-        warnings.push("Imported the site but couldn't save every field — check the intake.");
+        warnings.push("Imported the site but couldn't save every field. Check the intake.");
         log.error('[quick-provision] import update failed', { tenantId: created.id, error: updErr.message });
       } else {
         embedNeeded = Boolean(update.catalog_freeform_text || update.knowledge_base);
@@ -120,7 +120,7 @@ export async function quickProvisionAction(
       }
     } catch (err) {
       warnings.push(
-        `Couldn't import from that link (${err instanceof Error ? err.message : 'unknown error'}). The client was still created — fill in their profile from the intake.`,
+        `Couldn't import from that link (${err instanceof Error ? err.message : 'unknown error'}). The client was still created. Fill in their profile from the intake.`,
       );
       log.error('[quick-provision] magic import failed', { tenantId: created.id, err });
     }

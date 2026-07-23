@@ -25,9 +25,9 @@ export function InviteClientDialog({ tenantId, businessName }: { tenantId: strin
     if (state.success) {
       toast.success(
         state.resent
-          ? 'Their previous invite had gone stale — sent a fresh code.'
+          ? 'Their previous invite had gone stale, so we sent a fresh code.'
           : state.alreadyRegistered
-            ? `This email is already registered — added to ${businessName}. They can sign in, or use "Forgot password" on the login page if needed.`
+            ? `This email is already registered, so we added them to ${businessName}. They can sign in, or use "Forgot password" on the login page if needed.`
             : 'Login invite sent.',
       );
       // eslint-disable-next-line react-hooks/set-state-in-effect -- closing the dialog is a reaction to the action result, not a render-time state sync

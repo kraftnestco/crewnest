@@ -32,7 +32,7 @@ export function IntakeSummary({ tenant, onEdit }: { tenant: IntakeTenant; onEdit
     {
       label: 'Custom orders',
       value: tenant.custom_orders_enabled
-        ? `On${tenant.custom_orders_require_approval ? ' — needs your approval' : ' — auto-sent'}`
+        ? `On${tenant.custom_orders_require_approval ? ', needs your approval' : ', auto-sent'}`
         : 'Off',
     },
     { label: 'Customer example media', value: mediaHandling },
@@ -48,7 +48,7 @@ export function IntakeSummary({ tenant, onEdit }: { tenant: IntakeTenant; onEdit
     {
       label: 'Payments',
       value: tenant.payments_enabled
-        ? `On — ${tenant.payment_methods.join(', ') || 'no method selected'} (${tenant.default_currency})`
+        ? `On, ${tenant.payment_methods.join(', ') || 'no method selected'} (${tenant.default_currency})`
         : 'Off',
     },
   ];

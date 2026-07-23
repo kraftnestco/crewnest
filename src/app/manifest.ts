@@ -11,7 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'CrewNest — AI employees for every channel',
     short_name: 'CrewNest',
     description:
-      'Run your business chats, orders, and AI employee from one place — WhatsApp, Instagram, Messenger, and website chat.',
+      'Run your business chats, orders, and AI employee from one place: WhatsApp, Instagram, Messenger, and website chat.',
     start_url: '/dashboard',
     display: 'standalone',
     background_color: '#fbfcfb',

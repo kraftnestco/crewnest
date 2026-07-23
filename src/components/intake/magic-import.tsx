@@ -36,7 +36,7 @@ export function MagicImport({
         setError(res.error ?? "We couldn't read that link.");
       }
     } catch {
-      setError("We couldn't read that link — check it opens in a browser, or fill in the steps yourself.");
+      setError("We couldn't read that link. Check it opens in a browser, or fill in the steps yourself.");
     } finally {
       setLoading(false);
     }

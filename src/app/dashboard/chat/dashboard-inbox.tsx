@@ -209,7 +209,7 @@ export function DashboardInbox({
             {visibleSessions.length === 0 && (
               <p className="p-4 text-center text-sm text-muted-foreground">
                 {sessions.length === 0
-                  ? 'No conversations yet — once a customer messages your business, it will show up here.'
+                  ? 'No conversations yet. Once a customer messages your business, it will show up here.'
                   : 'No conversations match your search.'}
               </p>
             )}

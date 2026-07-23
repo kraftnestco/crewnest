@@ -94,7 +94,7 @@ export function OrderSummaryDialog({ sessionId, paymentMethods }: { sessionId: s
             <div className="space-y-2">
               <Label>Items</Label>
               {draft.items.length === 0 && (
-                <p className="text-xs text-muted-foreground">No items drafted yet — add one below.</p>
+                <p className="text-xs text-muted-foreground">No items drafted yet. Add one below.</p>
               )}
               {draft.items.map((item, i) => (
                 <div key={i} className="flex items-center gap-2">

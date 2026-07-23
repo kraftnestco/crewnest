@@ -60,7 +60,7 @@ export default async function DashboardBusinessPage() {
           <h2 className="font-heading text-base font-semibold">Business details</h2>
         </div>
         <p className="mb-4 text-sm text-muted-foreground">
-          This is what your AI assistant uses to talk to customers — save any time and our team sees
+          This is what your AI assistant uses to talk to customers. Save any time and our team sees
           the update instantly.
         </p>
         <BusinessIntake tenant={tenant} />

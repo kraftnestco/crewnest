@@ -236,7 +236,7 @@ export async function offboardTenantAction(
 
   const confirmName = optionalString(formData.get('confirm_name')) ?? '';
   if (confirmName !== tenant.business_name) {
-    return { error: 'Business name did not match — nothing was deleted.', success: false };
+    return { error: 'Business name did not match, so nothing was deleted.', success: false };
   }
 
   try {

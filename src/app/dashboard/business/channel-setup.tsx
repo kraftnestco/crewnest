@@ -68,7 +68,7 @@ export function ChannelSetup({
 
   useEffect(() => {
     if (state.success) {
-      toast.success("Request sent — we'll be in touch.");
+      toast.success("Request sent. We'll be in touch.");
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing the form is a reaction to a successful submit, not a render-time state sync
       setSelected([]);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
@@ -134,7 +134,7 @@ export function ChannelSetup({
               <p className="text-sm font-medium">Request a new channel</p>
               <p className="text-xs text-muted-foreground">
                 You never need to share passwords or API keys with us. For WhatsApp/Messenger/Instagram
-                we&apos;ll ask you to add us as a Partner on your Meta Business Manager — we&apos;ll send
+                we&apos;ll ask you to add us as a Partner on your Meta Business Manager, then send
                 exact steps once you request setup below.
               </p>
             </div>

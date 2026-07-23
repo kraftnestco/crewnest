@@ -92,7 +92,7 @@ export function BusinessCopilot({ tenantId, businessName }: { tenantId: string; 
       } catch {
         setTurns((prev) => [
           ...prev,
-          { role: 'assistant', content: 'Something went wrong there — please try again in a moment.' },
+          { role: 'assistant', content: 'Something went wrong there. Please try again in a moment.' },
         ]);
       } finally {
         setThinking(false);
@@ -109,13 +109,13 @@ export function BusinessCopilot({ tenantId, businessName }: { tenantId: string; 
       const res = await applyCopilotPatchAction(tenantId, turn.patch);
       if (res.success) {
         setTurns((prev) => prev.map((t, i) => (i === index ? { ...t, status: 'applied' } : t)));
-        toast.success('Change applied — your assistant is using it now.');
+        toast.success('Change applied. Your assistant is using it now.');
         router.refresh();
       } else {
         toast.error(res.error ?? "That change couldn't be applied.");
       }
     } catch {
-      toast.error("That change couldn't be applied — please try again.");
+      toast.error("That change couldn't be applied. Please try again.");
     } finally {
       setApplyingIndex(null);
     }
@@ -420,7 +420,7 @@ function ProposedChangeCard({
       {hasMoneyChange && (
         <div className="flex items-start gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-700 dark:text-amber-300">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-          <span>This changes how customers pay you — please double-check it before applying.</span>
+          <span>This changes how customers pay you, so please double-check it before applying.</span>
         </div>
       )}
 

@@ -66,7 +66,7 @@ export function platformDotColor(platform: string) {
 /** Human labels for the persisted alert_signal column (docs/08 GUARDRAIL_RULES) — real, LLM-detected signals. */
 export const ALERT_SIGNAL_LABELS: Record<string, string> = {
   frustrated: 'Customer sounds frustrated or upset',
-  price_objection: 'Price objection — pushed back on cost',
+  price_objection: 'Price objection: pushed back on cost',
   product_doubt: 'Doubts about product/quality',
   cancellation_risk: 'Risk of cancellation',
 };
@@ -260,7 +260,7 @@ export function ConversationPane({
               sessionId={session.id}
               paymentMethods={tenant?.payments_enabled ? ((tenant.payment_methods as PaymentMethod[] | null) ?? []) : []}
             />
-            <div className="flex items-center gap-2" title={session.is_human_handoff ? 'The AI has stopped replying — you’re answering this chat yourself' : 'The AI is currently replying to this customer'}>
+            <div className="flex items-center gap-2" title={session.is_human_handoff ? 'The AI has stopped replying. You’re answering this chat yourself' : 'The AI is currently replying to this customer'}>
               <span className="text-xs font-medium text-muted-foreground">Human takeover</span>
               <Switch checked={session.is_human_handoff} onCheckedChange={handleTakeOver} disabled={isPending} />
             </div>
@@ -306,7 +306,7 @@ export function ConversationPane({
                     )}
                     {m.content}
                     {m.delivery_failed && (
-                      <p className="mt-1 text-xs font-medium text-destructive">Not delivered — customer may not have received this.</p>
+                      <p className="mt-1 text-xs font-medium text-destructive">Not delivered. The customer may not have received this.</p>
                     )}
                   </div>
                 </div>

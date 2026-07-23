@@ -68,10 +68,10 @@ export function PromptArchitect({
         onSystemPromptChange(res.prompt);
         setShowAdvanced(true);
       } else {
-        setGenError(res.error ?? 'Could not write the instructions — please try again.');
+        setGenError(res.error ?? 'Could not write the instructions. Please try again.');
       }
     } catch {
-      setGenError('Could not write the instructions — please try again.');
+      setGenError('Could not write the instructions. Please try again.');
     } finally {
       setGenerating(false);
     }
@@ -125,7 +125,7 @@ export function PromptArchitect({
           {generating ? 'Writing…' : hasPrompt ? 'Rewrite instructions' : "Write my assistant's instructions"}
         </Button>
         {hasPrompt && !generating && (
-          <span className="text-xs text-muted-foreground">Written — review it below, or tweak the wording anytime.</span>
+          <span className="text-xs text-muted-foreground">Written. Review it below, or tweak the wording anytime.</span>
         )}
       </div>
 
@@ -137,7 +137,7 @@ export function PromptArchitect({
           onClick={() => setShowAdvanced((v) => !v)}
           className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium"
         >
-          <span>Advanced — edit the instructions directly</span>
+          <span>Advanced: edit the instructions directly</span>
           <ChevronDown className={`size-4 text-muted-foreground transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
         </button>
         {showAdvanced && (
@@ -150,7 +150,7 @@ export function PromptArchitect({
             />
             <p className="mt-2 text-xs text-muted-foreground">
               These are the exact instructions your assistant follows. Your catalogue, hours, and payment details are
-              added automatically — you don&apos;t need to repeat them here.
+              added automatically, so you don&apos;t need to repeat them here.
             </p>
           </div>
         )}

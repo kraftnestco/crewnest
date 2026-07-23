@@ -27,12 +27,12 @@ export default function TermsPage() {
 
       <h2>Your responsibilities</h2>
       <ul>
-        <li>Provide accurate business information — prices, availability, and policies your AI relies on.</li>
+        <li>Provide accurate business information: prices, availability, and policies your AI relies on.</li>
         <li>
           Only connect channels and numbers you are authorized to use, and comply with the platform policies of
           the channels you connect (including Meta&apos;s WhatsApp Business and Messenger policies).
         </li>
-        <li>Use the service lawfully — no spam, deception, or prohibited goods.</li>
+        <li>Use the service lawfully: no spam, deception, or prohibited goods.</li>
         <li>Honor the orders and commitments your business (or your AI assistant on its behalf) makes to customers.</li>
       </ul>
 

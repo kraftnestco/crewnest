@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
 
   if (!env.MASTER_OPENROUTER_KEY) {
     log.error('[demo/chat] MASTER_OPENROUTER_KEY is not configured');
-    return json({ error: 'The demo assistant is unavailable right now — please try again shortly.' }, 502);
+    return json({ error: 'The demo assistant is unavailable right now. Please try again shortly.' }, 502);
   }
 
   const provider = getProvider(DEMO_LLM_PROVIDER);
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
       );
     } catch (err) {
       log.error('[demo/chat] provider call failed', { error: err instanceof Error ? err.message : String(err) });
-      return json({ error: 'The demo assistant is unavailable right now — please try again shortly.' }, 502);
+      return json({ error: 'The demo assistant is unavailable right now. Please try again shortly.' }, 502);
     }
 
     if (result.toolCalls?.length) {
@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!finalText) {
-    finalText = "Sorry, I'm having trouble replying right now — try rephrasing that?";
+    finalText = "Sorry, I'm having trouble replying right now. Could you try rephrasing that?";
   }
 
   return json({ reply: finalText, orderCard }, 200);
