@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, Info, HelpCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
@@ -136,7 +136,9 @@ export function ConversationPane({
   const [messagesLoading, setMessagesLoading] = useState(true);
   const [draft, setDraft] = useState('');
   const [isPending, startTransition] = useTransition();
-  const [showDetails, setShowDetails] = useState(true);
+  // Closed by default — an open drawer on every conversation makes the inbox
+  // feel cluttered. A slim rail peeks the important signals; the owner opens it.
+  const [showDetails, setShowDetails] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [loadedSessionId, setLoadedSessionId] = useState(session.id);
 
@@ -229,6 +231,10 @@ export function ConversationPane({
       toast.error(err instanceof Error ? err.message : 'Failed to resolve.');
     }
   }
+
+  const pendingClarification = parsePendingClarification(session.pending_clarification);
+  const hasClarification = pendingClarification !== null;
+  const hasAlert = Boolean(session.alert_signal);
 
   return (
     <>
@@ -341,15 +347,24 @@ export function ConversationPane({
         </div>
       </div>
 
-      {showDetails && (
-        <div className="flex min-h-0 w-72 shrink-0 flex-col border-l bg-muted/20">
-          <div className="flex h-14 shrink-0 items-center border-b px-4">
+      {showDetails ? (
+        <div className="animate-in slide-in-from-right-4 flex min-h-0 w-72 shrink-0 flex-col border-l bg-muted/20 duration-200 motion-reduce:animate-none">
+          <div className="flex h-14 shrink-0 items-center justify-between border-b px-4">
             <h3 className="text-sm font-semibold leading-none">Details</h3>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowDetails(false)}
+              aria-label="Hide details"
+            >
+              <PanelRightClose className="h-4 w-4" />
+            </Button>
           </div>
           <ScrollArea className="min-h-0 flex-1">
             <div className="space-y-5 p-4">
               <ClarificationPanel
-                pendingClarification={parsePendingClarification(session.pending_clarification)}
+                pendingClarification={pendingClarification}
                 onResolve={handleResolveClarification}
                 getAttachmentUrl={(path) => getClarificationMediaUrlAction(session.id, path)}
               />
@@ -416,6 +431,58 @@ export function ConversationPane({
               )}
             </div>
           </ScrollArea>
+        </div>
+      ) : (
+        /* Collapsed rail — the important signals peek from the side; click to open. */
+        <div className="flex w-11 shrink-0 flex-col items-center gap-1.5 border-l bg-muted/20 py-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowDetails(true)}
+            aria-label="Show details"
+            title="Show details"
+          >
+            <PanelRightOpen className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowDetails(true)}
+            aria-label="Conversation info"
+            title="Conversation info"
+          >
+            <Info className="h-4 w-4 text-muted-foreground" />
+          </Button>
+          {hasClarification && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowDetails(true)}
+              aria-label="Needs your input"
+              title="Needs your input"
+              className="relative"
+            >
+              <HelpCircle className="h-4 w-4 text-amber-500" />
+              <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-amber-500" />
+            </Button>
+          )}
+          {hasAlert && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowDetails(true)}
+              aria-label={alertSignalLabel(session.alert_signal!)}
+              title={alertSignalLabel(session.alert_signal!)}
+              className="relative"
+            >
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-destructive" />
+            </Button>
+          )}
         </div>
       )}
     </>

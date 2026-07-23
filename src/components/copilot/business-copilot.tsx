@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, ArrowUp, Check, Loader2, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, ArrowUp, CalendarClock, Check, Loader2, Plus, Sparkles, Truck, Wand2, X } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,12 +23,12 @@ import { MONEY_FIELDS, type CopilotMessage, type CopilotPatch } from '@/services
  * Business-details editor below reflects the committed change.
  */
 
-const SUGGESTIONS = [
-  'Add a new service to my catalogue',
-  'Close for the holidays',
-  'Change my delivery charges',
-  'Make my assistant sound more premium',
-] as const;
+const SUGGESTIONS: { label: string; icon: LucideIcon }[] = [
+  { label: 'Add a new service to my catalogue', icon: Plus },
+  { label: 'Close for the holidays', icon: CalendarClock },
+  { label: 'Change my delivery charges', icon: Truck },
+  { label: 'Make my assistant sound more premium', icon: Wand2 },
+];
 
 type ProposalStatus = 'pending' | 'applied' | 'dismissed' | 'superseded';
 
@@ -134,64 +135,63 @@ export function BusinessCopilot({ tenantId, businessName }: { tenantId: string; 
   const isEmpty = turns.length === 0;
 
   return (
-    <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
+    <div className="flex flex-col overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/10">
       {/* Header */}
-      <div className="flex items-center gap-2.5 border-b bg-primary/[0.03] px-4 py-3">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Sparkles className="size-4" />
-        </span>
+      <div className="flex items-center gap-3 border-b px-4 py-3">
+        <CopilotAvatar />
         <div className="min-w-0">
           <p className="font-heading text-sm font-semibold leading-tight">Business Copilot</p>
-          <p className="truncate text-xs text-muted-foreground">
-            Tell me what changed and I&apos;ll set it up for you to review.
-          </p>
+          <p className="truncate text-xs text-muted-foreground">Describe a change in plain words and I&apos;ll draft it for you</p>
         </div>
       </div>
 
       {/* Transcript */}
-      <div className="max-h-[26rem] min-h-[8rem] overflow-y-auto px-4 py-4">
+      <div className="max-h-[28rem] min-h-[9rem] overflow-y-auto px-4 py-5">
         {isEmpty ? (
-          <div className="flex flex-col items-center gap-4 py-6 text-center">
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Just say what&apos;s new about {businessName} in plain words — a new item, holiday hours, a price change —
-              and I&apos;ll prepare the exact update for you to approve.
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {SUGGESTIONS.map((s) => (
+          <div className="flex flex-col items-center gap-5 py-6 text-center">
+            <CopilotAvatar size="lg" />
+            <div className="space-y-1.5">
+              <p className="font-heading text-base font-semibold text-foreground">How can I help with {businessName}?</p>
+              <p className="mx-auto max-w-sm text-sm leading-relaxed text-muted-foreground">
+                Tell me what changed and I&apos;ll prepare the exact update for you to approve. Nothing is saved until you
+                tap Apply.
+              </p>
+            </div>
+            <div className="grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
+              {SUGGESTIONS.map(({ label, icon: Icon }) => (
                 <button
-                  key={s}
+                  key={label}
                   type="button"
-                  onClick={() => send(s)}
-                  className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  onClick={() => send(label)}
+                  className="group flex items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2.5 text-left text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
                 >
-                  {s}
+                  <Icon className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                  <span className="leading-tight">{label}</span>
                 </button>
               ))}
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            {turns.map((turn, i) => (
-              <div key={i}>
-                <MessageBubble role={turn.role} content={turn.content} />
-                {turn.patch && (
-                  <ProposedChangeCard
-                    patch={turn.patch}
-                    hasMoneyChange={Boolean(turn.hasMoneyChange)}
-                    status={turn.status ?? 'pending'}
-                    applying={applyingIndex === i}
-                    onApply={() => apply(i)}
-                    onDismiss={() => dismiss(i)}
-                  />
-                )}
-              </div>
-            ))}
-            {thinking && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-                <span>Working on it…</span>
-              </div>
+          <div className="space-y-6">
+            {turns.map((turn, i) =>
+              turn.role === 'user' ? (
+                <UserMessage key={i} content={turn.content} />
+              ) : (
+                <AssistantMessage key={i} content={turn.content}>
+                  {turn.patch && (
+                    <ProposedChangeCard
+                      patch={turn.patch}
+                      hasMoneyChange={Boolean(turn.hasMoneyChange)}
+                      status={turn.status ?? 'pending'}
+                      applying={applyingIndex === i}
+                      onApply={() => apply(i)}
+                      onDismiss={() => dismiss(i)}
+                    />
+                  )}
+                </AssistantMessage>
+              ),
             )}
+            {thinking && <ThinkingRow />}
           </div>
         )}
         <div ref={bottomRef} />
@@ -199,7 +199,7 @@ export function BusinessCopilot({ tenantId, businessName }: { tenantId: string; 
 
       {/* Composer */}
       <div className="border-t p-3">
-        <div className="flex items-end gap-2 rounded-xl border border-input bg-background px-2.5 py-2 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+        <div className="flex items-end gap-2 rounded-2xl border border-input bg-background px-3 py-2 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -215,31 +215,65 @@ export function BusinessCopilot({ tenantId, businessName }: { tenantId: string; 
             onClick={() => send(input)}
             disabled={thinking || !input.trim()}
             aria-label="Send"
-            className="shrink-0 rounded-lg"
+            className="size-8 shrink-0 rounded-full"
           >
             {thinking ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
           </Button>
         </div>
         <p className="mt-2 px-1 text-[0.7rem] leading-relaxed text-muted-foreground">
-          The copilot only prepares changes — nothing is saved until you tap Apply. It can&apos;t touch billing, your
-          plan, connected accounts, or API keys.
+          Nothing is saved until you tap Apply. The copilot can&apos;t touch billing, your plan, connected accounts, or
+          API keys.
         </p>
       </div>
     </div>
   );
 }
 
-function MessageBubble({ role, content }: { role: 'user' | 'assistant'; content: string }) {
-  const isUser = role === 'user';
+/** Gradient sparkle mark used in the header, empty state, and beside every reply. */
+function CopilotAvatar({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
+  const lg = size === 'lg';
   return (
-    <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
-      <div
-        className={cn(
-          'max-w-[85%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap',
-          isUser ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground',
-        )}
-      >
+    <span
+      className={cn(
+        'flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-sm',
+        lg ? 'size-11' : 'size-8',
+      )}
+    >
+      <Sparkles className={lg ? 'size-5' : 'size-4'} />
+    </span>
+  );
+}
+
+function UserMessage({ content }: { content: string }) {
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-1 flex justify-end duration-300 motion-reduce:animate-none">
+      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-muted px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap text-foreground">
         {content}
+      </div>
+    </div>
+  );
+}
+
+function AssistantMessage({ content, children }: { content: string; children?: React.ReactNode }) {
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-1 flex gap-3 duration-300 motion-reduce:animate-none">
+      <CopilotAvatar />
+      <div className="min-w-0 flex-1 space-y-3 pt-1">
+        <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">{content}</p>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ThinkingRow() {
+  return (
+    <div className="flex gap-3">
+      <CopilotAvatar />
+      <div className="flex items-center gap-1 pt-3">
+        <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.3s]" />
+        <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.15s]" />
+        <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/50" />
       </div>
     </div>
   );

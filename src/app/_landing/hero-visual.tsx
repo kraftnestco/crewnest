@@ -9,19 +9,26 @@ import {
   PackageX,
   LifeBuoy,
   Radio,
+  ChevronLeft,
+  Phone,
+  Video,
+  Plus,
+  Smile,
+  Mic,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PLATFORMS, PlatformBadge, type PlatformId } from './platform-icons';
 
 /**
  * Hero showcase — an auto-playing "full picture" of the platform, not just a
- * chat mock. Two synced panels: the customer conversation on the left and the
- * owner's live dashboard on the right, reacting in real time. One choreographed
- * loop walks a whole business flow — browse → order → EasyPaisa payment →
- * confirmed, stock auto-decrementing to sold-out along the way — then switches
- * channel (WhatsApp → Instagram) for a human-handoff scene. Fully scripted: no
- * backend, no tokens, no abuse surface. Honours prefers-reduced-motion with a
- * static filled snapshot.
+ * chat mock. Two synced panels: the customer conversation on the left (skinned
+ * to look like the real WhatsApp / Instagram / Messenger app it's arriving on)
+ * and the owner's live dashboard on the right, reacting in real time. One
+ * choreographed loop walks a whole business flow — browse → order → EasyPaisa
+ * payment → confirmed, stock auto-decrementing to sold-out along the way — then
+ * switches channel (WhatsApp → Instagram) for a human-handoff scene. Fully
+ * scripted: no backend, no tokens, no abuse surface. Honours
+ * prefers-reduced-motion with a static filled snapshot.
  */
 
 type OrderStatus = 'none' | 'new' | 'awaiting' | 'paid' | 'confirmed';
@@ -49,6 +56,7 @@ interface DemoState {
 }
 
 const PRODUCT = 'Sea Green Kurta';
+const CUSTOMER = 'Ayesha Khan';
 
 const START: DemoState = {
   channel: 'whatsapp',
@@ -150,6 +158,9 @@ const SCRIPT: { delay: number; step: (s: DemoState) => DemoState }[] = [
       ...s,
       channel: 'instagram',
       typing: false,
+      handoff: false,
+      stockVisible: false,
+      orderStatus: 'none',
       messages: [{ id: 9, role: 'customer', text: 'Hi! My kurta arrived with a small tear 😞 can you help?' }],
     }),
   },
@@ -182,6 +193,103 @@ const ALERT_META: Record<AlertKind, { icon: typeof ShoppingBag; cls: string }> =
   handoff: { icon: LifeBuoy, cls: 'text-violet-600 dark:text-violet-400' },
 };
 
+/** Per-channel visual skin so the left panel reads as the real app it arrived on. */
+const SKIN: Record<
+  PlatformId,
+  {
+    header: string;
+    sub: string;
+    area: string;
+    doodle: boolean;
+    incoming: string;
+    outgoing: string;
+    tick: string;
+    accent: string;
+  }
+> = {
+  whatsapp: {
+    header: 'bg-[#008069] text-white dark:bg-[#202c33]',
+    sub: 'text-white/75',
+    area: 'bg-[#efeae2] dark:bg-[#0b141a]',
+    doodle: true,
+    incoming: 'bg-white text-[#111b21] rounded-bl-sm dark:bg-[#202c33] dark:text-[#e9edef]',
+    outgoing: 'bg-[#d9fdd3] text-[#111b21] rounded-br-sm dark:bg-[#005c4b] dark:text-[#e9edef]',
+    tick: 'text-[#53bdeb]',
+    accent: 'bg-[#008069] text-white',
+  },
+  instagram: {
+    header: 'bg-white text-[#262626] dark:bg-[#0a0a0a] dark:text-white',
+    sub: 'text-[#8e8e8e]',
+    area: 'bg-white dark:bg-black',
+    doodle: false,
+    incoming: 'bg-[#efefef] text-[#262626] rounded-bl-sm dark:bg-[#262626] dark:text-white',
+    outgoing: 'bg-gradient-to-br from-[#5b51d8] via-[#d92d84] to-[#f9ce34] text-white rounded-br-sm',
+    tick: 'text-white/80',
+    accent: 'bg-gradient-to-br from-[#d92d84] to-[#5b51d8] text-white',
+  },
+  messenger: {
+    header: 'bg-white text-[#050505] dark:bg-[#0a0a0a] dark:text-white',
+    sub: 'text-[#65676b]',
+    area: 'bg-white dark:bg-black',
+    doodle: false,
+    incoming: 'bg-[#f0f0f0] text-[#050505] rounded-bl-sm dark:bg-[#303030] dark:text-white',
+    outgoing: 'bg-gradient-to-br from-[#00b2ff] to-[#006aff] text-white rounded-br-sm',
+    tick: 'text-white/80',
+    accent: 'bg-[#0084ff] text-white',
+  },
+  web: {
+    header: 'bg-card text-foreground',
+    sub: 'text-muted-foreground',
+    area: 'bg-muted/30',
+    doodle: false,
+    incoming: 'bg-muted text-foreground rounded-bl-sm',
+    outgoing: 'bg-foreground text-background rounded-br-sm',
+    tick: 'text-emerald-400',
+    accent: 'bg-foreground text-background',
+  },
+};
+
+/** Faint tiled doodle backdrop — the signature WhatsApp chat texture. */
+function ChatBackdrop() {
+  return (
+    <svg
+      aria-hidden
+      className="pointer-events-none absolute inset-0 h-full w-full text-[#3f3222] opacity-[0.05] dark:text-white dark:opacity-[0.035]"
+    >
+      <defs>
+        <pattern id="cn-wa-doodle" width="90" height="90" patternUnits="userSpaceOnUse">
+          <g fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+            {/* chat bubble */}
+            <rect x="8" y="10" width="18" height="13" rx="4" />
+            <path d="M13 23l-1 4 5-4" />
+            {/* heart */}
+            <path d="M64 27c-7-5-10-9-10-13a4 4 0 0 1 10-2 4 4 0 0 1 10 2c0 4-3 8-10 13z" />
+            {/* smiley */}
+            <circle cx="20" cy="62" r="8" />
+            <circle cx="17" cy="60" r="0.9" />
+            <circle cx="23" cy="60" r="0.9" />
+            <path d="M16 65a5 4 0 0 0 8 0" />
+            {/* camera */}
+            <rect x="52" y="58" width="20" height="14" rx="3" />
+            <circle cx="62" cy="65" r="4" />
+            <path d="M57 58l2-3h6l2 3" />
+            {/* music note */}
+            <path d="M78 34v10" />
+            <circle cx="76" cy="44" r="2" />
+            <path d="M78 34l7-1.5v9" />
+            <circle cx="83" cy="41.5" r="2" />
+            {/* phone */}
+            <path d="M34 33c0-1.2 1-2 2-2l1.8 3-1.4 1.4a8 8 0 0 0 4 4l1.4-1.4 3 1.8c0 1-.8 2-2 2-5 0-9.8-4.8-9.8-9.8z" />
+          </g>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#cn-wa-doodle)" />
+    </svg>
+  );
+}
+
+const clock = (id: number) => `11:${(20 + id).toString().padStart(2, '0')}`;
+
 function reducer(_s: DemoState, step: (s: DemoState) => DemoState): DemoState {
   return step(_s);
 }
@@ -205,9 +313,12 @@ export function HeroVisual() {
     return () => clearTimeout(timer);
   }, []);
 
+  const skin = SKIN[state.channel];
+  const platform = PLATFORMS[state.channel];
   const visible = state.messages.slice(-4);
   const feed = state.alerts.slice(-3);
   const hasActivity = state.orderStatus !== 'none' || state.stockVisible || state.alerts.length > 0;
+  const initial = CUSTOMER.charAt(0);
 
   return (
     <div
@@ -232,60 +343,93 @@ export function HeroVisual() {
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1.25fr_1fr]">
-        {/* ── Customer chat ─────────────────────────────────────────── */}
-        <div className="flex flex-col rounded-2xl bg-card p-3.5 shadow-xl ring-1 ring-foreground/10">
-          <div className="flex items-center justify-between gap-2 border-b border-border pb-2.5">
-            <div className="flex items-center gap-2">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
-                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-              </span>
-              <span className="text-xs font-medium text-muted-foreground">Live · AI Employee</span>
+        {/* ── Customer chat (skinned per channel) ───────────────────── */}
+        <div className="flex flex-col overflow-hidden rounded-2xl bg-card shadow-xl ring-1 ring-foreground/10">
+          {/* App-style header */}
+          <div className={cn('flex items-center gap-2.5 px-3 py-2.5', skin.header)}>
+            <ChevronLeft className="size-5 shrink-0 opacity-70" />
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-black/10 text-sm font-semibold dark:bg-white/15">
+              {initial}
+            </span>
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate text-sm font-semibold">{CUSTOMER}</p>
+              <p className={cn('truncate text-[11px]', skin.sub)}>
+                {state.typing ? <span className="italic">typing…</span> : 'online'}
+              </p>
             </div>
-            {state.handoff ? (
-              <span className="flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-600 dark:text-violet-400">
-                <LifeBuoy className="size-3" />
-                Owner joining
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <PlatformBadge platform={state.channel} className="size-5 rounded-md" iconClassName="size-3" />
-                {PLATFORMS[state.channel].label}
-              </span>
-            )}
+            <PlatformBadge platform={state.channel} className="size-6 rounded-lg" iconClassName="size-3.5" />
+            <Video className="size-5 shrink-0 opacity-70" />
+            <Phone className="size-4 shrink-0 opacity-70" />
           </div>
 
-          <div className="flex min-h-[188px] flex-col justify-end gap-2 pt-3">
-            {visible.map((m) =>
-              m.role === 'customer' ? (
-                <div
-                  key={m.id}
-                  className="max-w-[88%] self-start rounded-2xl rounded-bl-sm bg-muted px-3 py-2 text-sm text-foreground"
-                >
-                  {m.text}
-                </div>
-              ) : (
-                <div
-                  key={m.id}
-                  className="max-w-[88%] self-end rounded-2xl rounded-br-sm bg-foreground px-3 py-2 text-sm text-background"
-                >
-                  {m.text}
-                </div>
-              ),
-            )}
+          {/* Conversation area */}
+          <div className={cn('relative flex min-h-[236px] flex-col justify-end gap-1.5 px-3 py-3', skin.area)}>
+            {skin.doodle && <ChatBackdrop />}
 
-            {state.typing && (
-              <div className="flex items-center gap-1 self-end rounded-2xl rounded-br-sm bg-foreground/10 px-3 py-2.5">
-                <span className="size-1.5 animate-bounce rounded-full bg-foreground/50 [animation-delay:-0.3s]" />
-                <span className="size-1.5 animate-bounce rounded-full bg-foreground/50 [animation-delay:-0.15s]" />
-                <span className="size-1.5 animate-bounce rounded-full bg-foreground/50" />
+            <div className="relative flex flex-col gap-1.5">
+              <div className="mb-1 flex justify-center">
+                <span className="rounded-md bg-black/5 px-2 py-0.5 text-[10px] font-medium text-foreground/50 shadow-sm dark:bg-white/10 dark:text-white/50">
+                  Today
+                </span>
               </div>
-            )}
+
+              {visible.map((m) => (
+                <div
+                  key={m.id}
+                  className={cn(
+                    'flex motion-reduce:animate-none',
+                    m.role === 'customer'
+                      ? 'animate-in fade-in slide-in-from-left-2 justify-start duration-300'
+                      : 'animate-in fade-in slide-in-from-right-2 justify-end duration-300',
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'max-w-[82%] rounded-2xl px-2.5 py-1.5 text-[13px] leading-snug shadow-sm',
+                      m.role === 'customer' ? skin.incoming : skin.outgoing,
+                    )}
+                  >
+                    <span>{m.text}</span>
+                    <span className="mt-0.5 flex items-center justify-end gap-1 text-[10px] opacity-70">
+                      {m.role === 'ai' && <Sparkles className="size-2.5" />}
+                      {clock(m.id)}
+                      {m.role === 'ai' && <CheckCheck className={cn('size-3', skin.tick)} />}
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              {state.handoff && (
+                <div className="animate-in fade-in zoom-in-95 mt-1 flex justify-center duration-300 motion-reduce:animate-none">
+                  <span className="flex items-center gap-1 rounded-full bg-violet-500/15 px-2.5 py-0.5 text-[10px] font-medium text-violet-700 shadow-sm dark:text-violet-300">
+                    <LifeBuoy className="size-3" />
+                    The owner joined the chat
+                  </span>
+                </div>
+              )}
+
+              {state.typing && (
+                <div className="animate-in fade-in zoom-in-95 flex justify-start duration-200 motion-reduce:animate-none">
+                  <div className={cn('flex items-center gap-1 rounded-2xl rounded-bl-sm px-3 py-2.5 shadow-sm', skin.incoming)}>
+                    <span className="size-1.5 animate-bounce rounded-full bg-current opacity-40 [animation-delay:-0.3s]" />
+                    <span className="size-1.5 animate-bounce rounded-full bg-current opacity-40 [animation-delay:-0.15s]" />
+                    <span className="size-1.5 animate-bounce rounded-full bg-current opacity-40" />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="mt-2.5 flex items-center gap-1 border-t border-border pt-2.5 text-[11px] text-muted-foreground">
-            <CheckCheck className="size-3.5 text-emerald-500" />
-            Synced to your dashboard
+          {/* App-style input bar */}
+          <div className={cn('flex items-center gap-2 px-2.5 py-2', skin.area)}>
+            <div className="flex flex-1 items-center gap-2 rounded-full bg-card px-3 py-1.5 text-muted-foreground shadow-sm ring-1 ring-foreground/5">
+              <Smile className="size-4 shrink-0 opacity-60" />
+              <span className="flex-1 truncate text-xs">Message</span>
+              <Plus className="size-4 shrink-0 opacity-60" />
+            </div>
+            <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full shadow-sm', skin.accent)}>
+              <Mic className="size-4" />
+            </span>
           </div>
         </div>
 
@@ -321,12 +465,12 @@ export function HeroVisual() {
 
           {/* Order card */}
           {state.orderStatus !== 'none' && (
-            <div className="rounded-xl border border-border bg-background/60 p-2.5">
+            <div className="animate-in fade-in slide-in-from-right-2 rounded-xl border border-border bg-background/60 p-2.5 duration-300 motion-reduce:animate-none">
               <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                 <span className="text-[11px] font-medium text-muted-foreground">Order #1042</span>
                 <span
                   className={cn(
-                    'rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset',
+                    'rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset transition-colors duration-300',
                     STATUS_META[state.orderStatus].cls,
                   )}
                 >
@@ -342,13 +486,13 @@ export function HeroVisual() {
 
           {/* Inventory row */}
           {state.stockVisible && (
-            <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background/60 px-2.5 py-2">
+            <div className="animate-in fade-in slide-in-from-right-2 flex items-center justify-between gap-2 rounded-xl border border-border bg-background/60 px-2.5 py-2 duration-300 motion-reduce:animate-none">
               <span className="truncate text-xs text-foreground">
                 {PRODUCT} · <span className="text-muted-foreground">M</span>
               </span>
               <span
                 className={cn(
-                  'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset',
+                  'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset transition-colors duration-300',
                   state.stock === 0
                     ? 'bg-red-500/10 text-red-600 ring-red-500/20 dark:text-red-400'
                     : 'bg-amber-500/10 text-amber-600 ring-amber-500/20 dark:text-amber-400',
@@ -365,7 +509,10 @@ export function HeroVisual() {
               {feed.map((a) => {
                 const Icon = ALERT_META[a.kind].icon;
                 return (
-                  <div key={a.id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <div
+                    key={a.id}
+                    className="animate-in fade-in slide-in-from-bottom-1 flex items-center gap-1.5 text-[11px] text-muted-foreground duration-300 motion-reduce:animate-none"
+                  >
                     <Icon className={cn('size-3.5 shrink-0', ALERT_META[a.kind].cls)} />
                     <span className="truncate">{a.text}</span>
                   </div>

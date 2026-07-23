@@ -28,7 +28,7 @@ const STEPS = [
     icon: ClipboardList,
     title: 'Tell us about your business',
     description:
-      'Share your catalogue, hours, and how you like to talk to customers. That becomes your AI employee’s knowledge — nothing generic.',
+      'Share your catalogue, hours, and how you like to talk to customers. That becomes the knowledge your AI employee answers from.',
   },
   {
     icon: Cable,
@@ -40,7 +40,7 @@ const STEPS = [
     icon: Rocket,
     title: 'Your AI starts working',
     description:
-      'It answers customers, takes orders, and collects payments — while you watch everything live and step in whenever you want.',
+      'It answers customers, takes orders, and collects payments while you watch everything live and step in whenever you want.',
   },
 ];
 
@@ -53,12 +53,12 @@ const FEATURES = [
   {
     icon: Sparkles,
     title: 'Grounded in your business',
-    description: 'Replies pull from your actual catalogue and brand voice — never generic, off-the-shelf answers.',
+    description: 'Every reply pulls from your actual catalogue and brand voice, never a generic script.',
   },
   {
     icon: PackageCheck,
     title: 'Orders captured automatically',
-    description: 'Confirmed orders are logged and pushed straight to your WhatsApp — no manual data entry.',
+    description: 'Confirmed orders are logged and pushed straight to your WhatsApp, with no manual data entry.',
   },
   {
     icon: UserCheck,
@@ -70,11 +70,11 @@ const FEATURES = [
 const FAQS = [
   {
     q: 'Do I need any technical setup?',
-    a: 'No. You tell us about your business and we handle everything technical — connecting WhatsApp, Instagram, Messenger, and your website chat. Most businesses go live without touching a single setting.',
+    a: 'No. You tell us about your business and we handle everything technical, including connecting WhatsApp, Instagram, Messenger, and your website chat. Most businesses go live without touching a single setting.',
   },
   {
     q: 'How does the AI know my products and prices?',
-    a: 'Your AI employee is grounded in the catalogue, hours, policies, and FAQs you give it. It only answers from your business information — it doesn’t invent products or make up prices.',
+    a: 'Your AI employee is grounded in the catalogue, hours, policies, and FAQs you give it. It only answers from your business information, so it never invents products or makes up prices.',
   },
   {
     q: 'What happens when the AI isn’t sure about something?',
@@ -82,15 +82,15 @@ const FAQS = [
   },
   {
     q: 'Can it really take orders and payments?',
-    a: 'Yes. It confirms items, collects delivery details, supports cash on delivery and bank/wallet transfers with receipt screenshots, and logs every order to your dashboard — with your approval step included if you want one.',
+    a: 'Yes. It confirms items, collects delivery details, supports cash on delivery and bank/wallet transfers with receipt screenshots, and logs every order to your dashboard, with an approval step if you want one.',
   },
   {
     q: 'Will it work with my existing WhatsApp number?',
-    a: 'Yes — we connect your existing WhatsApp Business number, and your customers keep messaging the number they already know.',
+    a: 'Yes. We connect your existing WhatsApp Business number, and your customers keep messaging the number they already know.',
   },
   {
     q: 'Can I try it before paying?',
-    a: 'Yes. Build a working demo of your AI employee in minutes — free, no card required. The free plan lets you keep it running with a daily conversation cap, and you can upgrade whenever you’re ready.',
+    a: 'Yes. Build a working demo of your AI employee in minutes, free and with no card required. The free plan lets you keep it running with a daily conversation cap, and you can upgrade whenever you’re ready.',
   },
 ];
 
@@ -149,11 +149,11 @@ export default function Home() {
               </h1>
               <p className="mt-4 max-w-xl text-lg text-muted-foreground text-balance">
                 CrewNest gives your business an AI employee that answers customers across WhatsApp, Facebook,
-                Instagram, and your website — grounded in your catalogue, with a human always one tap away.
+                Instagram, and your website. Every answer is grounded in your catalogue, with a human one tap away.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link href="/try" className={cn(buttonVariants({ size: 'lg' }), 'w-full sm:w-auto')}>
-                  Try it for your business — free
+                  Try it free for your business
                 </Link>
                 <Link
                   href="/login?redirect=/dashboard"
@@ -187,7 +187,7 @@ export default function Home() {
           <div className="mx-auto max-w-2xl text-center">
             <Badge variant="secondary">How it works</Badge>
             <h2 className={cn(displayFont.className, 'mt-4 text-3xl tracking-tight text-balance')}>
-              Live in three steps — we do the technical part.
+              Live in three steps. We do the technical part.
             </h2>
             <p className="mt-3 text-muted-foreground text-balance">
               Built for business owners, not developers. If you can fill in a form, you can hire an AI employee.
@@ -316,10 +316,10 @@ export default function Home() {
               Hire your first AI employee today.
             </h2>
             <p className="max-w-xl text-muted-foreground text-balance">
-              See it answering questions about your own business in minutes — before you pay anything.
+              See it answering questions about your own business in minutes, before you pay anything.
             </p>
             <Link href="/try" className={cn(buttonVariants({ size: 'lg' }))}>
-              Try it for your business — free
+              Try it free for your business
             </Link>
           </div>
         </section>
