@@ -126,33 +126,35 @@ export function NotificationBell({
             </button>
           )}
         </div>
-        <ScrollArea className="max-h-96">
-          {notifications.length === 0 ? (
-            <p className="p-6 text-center text-sm text-muted-foreground">You&apos;re all caught up.</p>
-          ) : (
-            <div className="flex flex-col p-1.5">
-              {notifications.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => handleOpen(n)}
-                  className="flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/60"
-                >
-                  <span
-                    className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${n.isRead ? 'bg-transparent' : 'bg-primary'}`}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-xs font-medium">{n.title}</span>
-                      <span className="shrink-0 text-[10px] text-muted-foreground">{relativeTime(n.createdAt)}</span>
+        <div className="flex max-h-96 flex-col">
+          <ScrollArea className="min-h-0 flex-1">
+            {notifications.length === 0 ? (
+              <p className="p-6 text-center text-sm text-muted-foreground">You&apos;re all caught up.</p>
+            ) : (
+              <div className="flex flex-col p-1.5">
+                {notifications.map((n) => (
+                  <button
+                    key={n.id}
+                    type="button"
+                    onClick={() => handleOpen(n)}
+                    className="flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/60"
+                  >
+                    <span
+                      className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${n.isRead ? 'bg-transparent' : 'bg-primary'}`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-xs font-medium">{n.title}</span>
+                        <span className="shrink-0 text-[10px] text-muted-foreground">{relativeTime(n.createdAt)}</span>
+                      </div>
+                      {n.body && <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{n.body}</p>}
                     </div>
-                    {n.body && <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{n.body}</p>}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </ScrollArea>
+                  </button>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
