@@ -156,10 +156,10 @@ export default function Home() {
                   Try it free for your business
                 </Link>
                 <Link
-                  href="/login?redirect=/dashboard"
+                  href="/signup"
                   className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'w-full sm:w-auto')}
                 >
-                  Sign in as client
+                  Sign up
                 </Link>
               </div>
             </div>
