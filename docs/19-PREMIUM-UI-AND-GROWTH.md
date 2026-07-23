@@ -50,9 +50,18 @@ else is generated, reviewed once, and live.
   (`intake-form.tsx` §2); both call `generateSystemPromptAction` (tenant-scoped, in intake `actions.ts`).
   Regenerable anytime (the dashboard reopens the same wizard). Public demo has no tenant/LLM key, so
   `PromptArchitect` degrades to the plain textarea when `onGenerate` is absent — demo path unchanged.
-- **O2. Magic Import**: paste website URL (later: FB page via token) → server-side fetch →
-  LLM extracts business type, catalogue draft, hours, FAQs, tone → prefills the entire intake
-  wizard for one-click confirm. [OPUS] extraction prompt.
+- **O2. Magic Import** — ✅ SHIPPED. `services/ai/magicImport.ts` (mirrors `catalogueParser.ts`:
+  `server-only` → SSRF-guarded fetch → conservative extract-only LLM call → `usage_logs`) reads the
+  owner's website/FB/IG page and returns a draft `{business_type, system_prompt, catalog_freeform_text,
+  knowledge_base}`. The extraction prompt transcribes **only** what's on the page (never invents prices/
+  hours/policies); the persona reuses the O1 Prompt Architect so imported and hand-built tenants match.
+  SSRF guard resolves DNS + blocks loopback/private/link-local/CGNAT/multicast (v4+v6) and re-validates
+  every redirect hop (bounded loop, 8s timeout, 1.5 MB / 12 k-char caps). Server action
+  `importFromUrlAction` (tenant-scoped auth, in intake `actions.ts`); shared `components/intake/
+  magic-import.tsx` (URL box → Import). `dashboard/business/business-intake.tsx` overlays the returned
+  draft onto the tenant prop and remounts `IntakeWizard` via `key` so its mount-time initializers pick
+  up the values; **nothing persists until the owner completes the existing Save**. FB-page-via-token
+  import stays for after Meta embedded signup (O3).
 - **O3. Meta embedded signup**: replace manual token paste with click-to-connect OAuth
   (locked decision said "later" — pulled forward; token paste is the step non-technical clients
   cannot do). Vault columns unchanged.

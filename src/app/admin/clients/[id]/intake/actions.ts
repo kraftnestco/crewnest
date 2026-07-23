@@ -8,8 +8,13 @@ import * as tenants from '@/services/tenants';
 import { ingestTenantKnowledge } from '@/services/knowledge';
 import { parseCatalogueFreeform } from '@/services/ai/catalogueParser';
 import { composeSystemPrompt } from '@/services/ai/promptArchitect';
+import { magicImportFromUrl } from '@/services/ai/magicImport';
 import type { Json } from '@/types/database';
-import type { GenerateSystemPromptResult, PromptArchitectFields } from '@/components/intake/intake-shared';
+import type {
+  GenerateSystemPromptResult,
+  MagicImportResult,
+  PromptArchitectFields,
+} from '@/components/intake/intake-shared';
 import type { UpdateIntakeState } from './intake-state';
 import { log } from '@/lib/log';
 
@@ -63,6 +68,46 @@ export async function generateSystemPromptAction(
   } catch (err) {
     log.error('[intake] prompt architect failed', { tenantId, err });
     return { prompt: null, error: "Couldn't write the instructions — please try again, or write them yourself." };
+  }
+}
+
+/**
+ * Magic Import (docs/19 O2). Fetches the owner's website/social URL server-side
+ * and returns a draft profile that the intake UI overlays for one-click confirm.
+ * Same tenant-scoped auth as the save action. Read-only w.r.t. tenant data (only
+ * writes usage_logs inside magicImportFromUrl), so nothing to revalidate. Never
+ * persists — the owner reviews and the existing save is the only write.
+ */
+export async function importFromUrlAction(tenantId: string, rawUrl: string): Promise<MagicImportResult> {
+  const ctx = await getCallerContext();
+  if (!ctx) return { fields: null, summary: null, error: 'Unauthorized.' };
+  try {
+    assertTenantAccess(ctx, tenantId);
+  } catch {
+    return { fields: null, summary: null, error: 'Forbidden: tenant not accessible.' };
+  }
+  if (!ctx.isPlatformAdmin && !ctx.memberships.some((m) => m.tenantId === tenantId && m.role === 'tenant_admin')) {
+    return { fields: null, summary: null, error: 'Forbidden: only a tenant admin may edit business settings.' };
+  }
+
+  const url = rawUrl.trim();
+  if (!url) return { fields: null, summary: null, error: 'Paste your website or social page link first.' };
+
+  const tenant = await tenants.getById(tenantId);
+  if (!tenant) return { fields: null, summary: null, error: 'Tenant not found.' };
+
+  try {
+    const { fields, summary } = await magicImportFromUrl(tenant, url);
+    return { fields, summary, error: null };
+  } catch (err) {
+    log.error('[intake] magic import failed', { tenantId, err });
+    // The service throws Error objects with owner-friendly messages (bad URL,
+    // unreachable, unreadable page). Surface those; fall back to generic otherwise.
+    const message =
+      err instanceof Error && err.message && err.message.length <= 200
+        ? err.message
+        : "We couldn't read that link — check it opens in a browser, or fill in the steps yourself.";
+    return { fields: null, summary: null, error: message };
   }
 }
 

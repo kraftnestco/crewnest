@@ -1,4 +1,4 @@
-import type { Database } from '@/types/database';
+import type { Database, Json } from '@/types/database';
 
 /** Fields the intake flow reads/writes — shared by the admin form and the client wizard. */
 export type IntakeTenant = Pick<
@@ -128,6 +128,21 @@ export interface PromptArchitectFields {
 }
 
 export type GenerateSystemPromptResult = { prompt: string | null; error: string | null };
+
+/**
+ * Magic Import (docs/19 O2). The owner pastes a website/social URL; the server
+ * fetches it, extracts a business profile, and returns a draft that overlays the
+ * intake wizard for a one-click confirm. `fields` mirror the tenant columns the
+ * wizard prefills from; nothing is persisted until the owner saves.
+ */
+export interface MagicImportFields {
+  business_type?: string;
+  system_prompt?: string;
+  catalog_freeform_text?: string;
+  knowledge_base?: Json;
+}
+
+export type MagicImportResult = { fields: MagicImportFields | null; summary: string | null; error: string | null };
 
 export const TONE_OPTIONS: Array<{ value: string; label: string; hint: string }> = [
   { value: 'friendly', label: 'Friendly & warm', hint: 'Approachable and upbeat, like a helpful shop assistant. (Default)' },
