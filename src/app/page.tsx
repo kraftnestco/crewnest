@@ -141,7 +141,7 @@ export default function Home() {
             }}
           />
 
-          <div className="mx-auto grid w-full max-w-5xl items-center gap-12 px-6 py-20 lg:grid-cols-[1.1fr_1fr] lg:py-28">
+          <div className="mx-auto grid w-full max-w-5xl items-center gap-12 px-6 py-20 lg:grid-cols-[1fr_1.2fr] lg:py-28">
             <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
               <Badge variant="secondary">Multi-channel AI employee</Badge>
               <h1 className={cn(displayFont.className, 'mt-4 text-4xl tracking-tight text-balance sm:text-5xl')}>
