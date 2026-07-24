@@ -5,14 +5,18 @@ import { NotificationBell } from '@/components/notification-bell';
 import { AccountMenu } from '@/components/account-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Logomark } from '@/app/_landing/logomark';
+import { TopbarHeadingSlot, TopbarActionsSlot } from '@/components/topbar-heading';
 
 /**
  * Slim top bar (docs/14 §4.2/§7.1) hosting the notification bell + account menu.
+ * Also hosts the active page's title/description/actions on desktop
+ * (`TopbarHeadingSlot`/`TopbarActionsSlot`, published by that page's `PageHeader`)
+ * so they're always visible without scrolling down into the page body.
  * Mounted once per shell layout. Server Component: fetches the initial notification
  * list/count and the Realtime access token server-side (same reason as inbox.tsx —
  * the auth cookie is HttpOnly, so the browser client can't read its own session).
  */
-export async function AppTopbar({ accountHref, title }: { accountHref: string; title?: string }) {
+export async function AppTopbar({ accountHref }: { accountHref: string }) {
   const [ctx, supabase] = await Promise.all([getCallerContext(), createSupabaseServerClient()]);
 
   const {
@@ -29,9 +33,10 @@ export async function AppTopbar({ accountHref, title }: { accountHref: string; t
           <Logomark className="size-7" />
           <span className="font-hero-display text-sm">CrewNest</span>
         </span>
-        {title ? <p className="hidden truncate text-sm font-medium text-foreground lg:block">{title}</p> : null}
+        <TopbarHeadingSlot />
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        <TopbarActionsSlot />
         <ThemeToggle />
         <NotificationBell
           initialNotifications={notifications}

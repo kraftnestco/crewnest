@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 /**
@@ -8,17 +8,23 @@ import { cn } from '@/lib/utils';
  * no propose/apply concepts (those stay in each copilot's own patch/action UI).
  */
 
-/** Gradient sparkle mark used in the header, empty state, and beside every reply. */
+/** KraftNest mark on the CrewNest brand green — used in the header, empty state, and beside every reply. */
 export function CopilotAvatar({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
   const lg = size === 'lg';
   return (
     <span
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-sm',
-        lg ? 'size-11' : 'size-8',
+        'flex shrink-0 items-center justify-center rounded-xl bg-primary shadow-sm',
+        lg ? 'size-11 p-2.5' : 'size-8 p-1.5',
       )}
     >
-      <Sparkles className={lg ? 'size-5' : 'size-4'} />
+      <Image
+        src="/kraftnest-mark.png"
+        alt="CrewAI"
+        width={44}
+        height={44}
+        className="h-full w-full object-contain"
+      />
     </span>
   );
 }

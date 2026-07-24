@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getCallerContext } from '@/lib/auth/context';
 import { Button } from '@/components/ui/button';
 import { AppTopbar } from '@/components/app-topbar';
+import { TopbarHeadingProvider } from '@/components/topbar-heading';
 import { Logomark } from '@/app/_landing/logomark';
 import { signOutAction } from './actions';
 import { AdminNav, AdminTabBar } from './admin-nav';
@@ -37,29 +38,31 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="flex min-h-screen">
-      {/* Desktop sidebar — hidden below lg; phones use the bottom tab bar instead. */}
-      <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
-        <div className="flex items-center gap-2.5 p-4">
-          <Logomark className="size-7" />
-          <p className="font-hero-display text-sm">CrewNest</p>
+    <TopbarHeadingProvider>
+      <div className="flex min-h-screen">
+        {/* Desktop sidebar — hidden below lg; phones use the bottom tab bar instead. */}
+        <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
+          <div className="flex items-center gap-2.5 p-4">
+            <Logomark className="size-7" />
+            <p className="font-hero-display text-sm">CrewNest</p>
+          </div>
+          <AdminNav />
+          <div className="border-t border-sidebar-border p-3">
+            <p className="truncate px-1 text-xs text-muted-foreground">{ctx.fullName || ctx.email}</p>
+            <form action={signOutAction} className="mt-2">
+              <Button type="submit" variant="outline" size="sm" className="w-full">
+                Sign out
+              </Button>
+            </form>
+          </div>
+        </aside>
+        <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
+          <AppTopbar accountHref="/admin/account" />
+          {/* pb-16 keeps content clear of the fixed mobile tab bar. */}
+          <main className="min-h-0 flex-1 overflow-y-auto pb-16 lg:pb-0">{children}</main>
+          <AdminTabBar />
         </div>
-        <AdminNav />
-        <div className="border-t border-sidebar-border p-3">
-          <p className="truncate px-1 text-xs text-muted-foreground">{ctx.fullName || ctx.email}</p>
-          <form action={signOutAction} className="mt-2">
-            <Button type="submit" variant="outline" size="sm" className="w-full">
-              Sign out
-            </Button>
-          </form>
-        </div>
-      </aside>
-      <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
-        <AppTopbar accountHref="/admin/account" />
-        {/* pb-16 keeps content clear of the fixed mobile tab bar. */}
-        <main className="min-h-0 flex-1 overflow-y-auto pb-16 lg:pb-0">{children}</main>
-        <AdminTabBar />
       </div>
-    </div>
+    </TopbarHeadingProvider>
   );
 }

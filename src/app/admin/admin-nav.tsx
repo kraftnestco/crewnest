@@ -7,7 +7,7 @@ import { SidebarNav, MobileTabBar, type NavItem } from '@/components/app-nav';
  * Agency-admin nav items (docs/19, Phase U2). One list drives both the desktop
  * sidebar and the mobile bottom tab bar. Overview is exact-match so it doesn't
  * stay lit on every /admin child route. Mobile caps at the first five
- * (`MobileTabBar` slices), so the review/setup surfaces (Copilot, Analytics,
+ * (`MobileTabBar` slices), so the review/setup surfaces (CrewAI, Analytics,
  * Settings) sit last as the desktop-only tail (docs/20 §1.4/§2.4) — System
  * health remains the mobile triage surface.
  */
@@ -17,7 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/clients', label: 'Clients', icon: Building2 },
   { href: '/admin/chat', label: 'Live Inbox', shortLabel: 'Inbox', icon: MessagesSquare },
   { href: '/admin/orders', label: 'Orders', icon: Package },
-  { href: '/admin/copilot', label: 'Copilot', icon: Sparkles },
+  { href: '/admin/copilot', label: 'CrewAI', icon: Sparkles },
   { href: '/admin/analytics', label: 'Analytics', icon: ChartNoAxesColumn },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];

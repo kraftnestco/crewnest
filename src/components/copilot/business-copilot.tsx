@@ -174,20 +174,20 @@ export function BusinessCopilot({
   const isEmpty = turns.length === 0;
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/10">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/10">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b px-4 py-3">
+      <div className="flex shrink-0 items-center gap-3 border-b px-4 py-3">
         <CopilotAvatar />
         <div className="min-w-0">
-          <p className="font-heading text-sm font-semibold leading-tight">Business Copilot</p>
+          <p className="font-heading text-sm font-semibold leading-tight">CrewAI</p>
           <p className="truncate text-xs text-muted-foreground">Describe a change in plain words and I&apos;ll draft it for you</p>
         </div>
       </div>
 
-      {overview && <OverviewPanel overview={overview} />}
+      {overview && <div className="shrink-0"><OverviewPanel overview={overview} /></div>}
 
       {/* Transcript */}
-      <div className="max-h-[28rem] min-h-[9rem] overflow-y-auto px-4 py-5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
         {isEmpty ? (
           <div className="flex flex-col items-center gap-5 py-6 text-center">
             <CopilotAvatar size="lg" />
@@ -248,7 +248,7 @@ export function BusinessCopilot({
       </div>
 
       {/* Composer */}
-      <div className="border-t p-3">
+      <div className="shrink-0 border-t p-3">
         <div className="flex items-end gap-2 rounded-2xl border border-input bg-background px-3 py-2 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
           <Textarea
             value={input}
