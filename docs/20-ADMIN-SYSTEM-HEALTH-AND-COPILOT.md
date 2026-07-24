@@ -12,7 +12,7 @@
 
 ---
 
-## Part 1 — Admin System Health page (`/admin/health`)
+## Part 1 — Admin System Health page (`/admin/health`) — ✅ SHIPPED 2026-07-24
 
 A triage dashboard aggregating the operational signals that already live in the DB. Pure
 implementation over existing columns — **no new backend table, no migration.**

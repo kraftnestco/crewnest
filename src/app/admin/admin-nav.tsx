@@ -1,15 +1,18 @@
 'use client';
 
-import { LayoutDashboard, Building2, MessagesSquare, Package, ChartNoAxesColumn, Settings } from 'lucide-react';
+import { LayoutDashboard, Activity, Building2, MessagesSquare, Package, ChartNoAxesColumn, Settings } from 'lucide-react';
 import { SidebarNav, MobileTabBar, type NavItem } from '@/components/app-nav';
 
 /**
  * Agency-admin nav items (docs/19, Phase U2). One list drives both the desktop
  * sidebar and the mobile bottom tab bar. Overview is exact-match so it doesn't
- * stay lit on every /admin child route.
+ * stay lit on every /admin child route. Mobile caps at the first five
+ * (`MobileTabBar` slices), so the two review/setup surfaces (Analytics,
+ * Settings) sit last as the desktop-only tail (docs/20 §1.4).
  */
 const NAV_ITEMS: NavItem[] = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
+  { href: '/admin/health', label: 'System health', shortLabel: 'Health', icon: Activity },
   { href: '/admin/clients', label: 'Clients', icon: Building2 },
   { href: '/admin/chat', label: 'Live Inbox', shortLabel: 'Inbox', icon: MessagesSquare },
   { href: '/admin/orders', label: 'Orders', icon: Package },
