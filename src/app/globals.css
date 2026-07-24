@@ -145,8 +145,11 @@
  */
 .font-hero-display {
   font-family: var(--font-hero);
-  font-weight: 900;
-  font-variation-settings: 'opsz' 72;
+  font-weight: 600;
+  /* Fraunces: large optical size for grand display cut, SOFT rounds the
+     terminals (the "smooth" the brand wanted), WONK 0 keeps letters composed. */
+  font-variation-settings: 'opsz' 96, 'SOFT' 60, 'WONK' 0;
+  letter-spacing: -0.01em;
 }
 
 @keyframes float {

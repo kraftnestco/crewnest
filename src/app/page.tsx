@@ -141,7 +141,9 @@ export default function Home() {
             }}
           />
 
-          <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-6 py-20 lg:grid-cols-[1fr_1.2fr] lg:py-28">
+          {/* items-start (not center) so the growing chat demo doesn't push the
+              headline/CTA column down as messages type into the taller visual. */}
+          <div className="mx-auto grid w-full max-w-7xl items-start gap-12 px-6 py-20 lg:grid-cols-[1fr_1.2fr] lg:py-28">
             <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
               <Badge variant="secondary">Multi-channel AI employee</Badge>
               <h1 className={cn('font-hero-display', 'mt-4 text-4xl tracking-tight text-balance sm:text-5xl')}>

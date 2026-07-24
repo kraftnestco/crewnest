@@ -48,7 +48,7 @@ export function TopbarHeadingSlot() {
   const heading = ctx?.heading;
   if (!heading) return null;
   return (
-    <p className="hidden min-w-0 truncate font-hero-display text-lg lg:block">{heading.title}</p>
+    <p className="hidden min-w-0 truncate font-hero-display text-2xl leading-none lg:block">{heading.title}</p>
   );
 }
 

@@ -67,7 +67,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="flex items-center gap-3 p-4">
             <Logomark className="size-8" />
             <div className="min-w-0">
-              <p className="font-hero-display text-xl leading-none tracking-wide">CrewNest</p>
+              <p className="font-hero-display text-2xl leading-none">CrewNest</p>
               <p className="mt-1 truncate text-[0.7rem] text-muted-foreground">By KraftNest Automations</p>
             </div>
           </div>

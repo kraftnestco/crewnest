@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Search, TriangleAlert } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { usePublishTopbarHeading } from '@/components/topbar-heading';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -42,6 +43,9 @@ export function DashboardInbox({
   const [platformFilter, setPlatformFilter] = useState('all');
   const [query, setQuery] = useState('');
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+
+  // Fill the otherwise-empty desktop topbar (this page has no PageHeader).
+  usePublishTopbarHeading({ title: 'My Inbox' });
 
   const selected = sessions.find((s) => s.id === selectedId) ?? null;
 
@@ -111,13 +115,11 @@ export function DashboardInbox({
   return (
     <div className="flex h-full overflow-hidden bg-background text-foreground">
       <div className="flex min-h-0 w-80 shrink-0 flex-col border-r bg-muted/20">
-        <div className="flex h-14 shrink-0 items-center border-b px-4">
-          <div>
-            <h2 className="font-heading text-sm font-semibold leading-none">My Inbox</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {sessions.length} conversation{sessions.length === 1 ? '' : 's'}
-            </p>
-          </div>
+        <div className="flex h-14 shrink-0 items-center justify-between border-b px-4">
+          <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Conversations</h2>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground tabular-nums">
+            {sessions.length}
+          </span>
         </div>
 
         <div className="shrink-0 border-b p-2">
