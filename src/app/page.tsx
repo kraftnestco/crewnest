@@ -101,7 +101,7 @@ export default function Home() {
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
             <Logomark />
-            <span className={cn(displayFont.className, 'text-lg font-semibold')}>
+            <span className={cn('font-hero-display', 'text-lg')}>
               Crew<span className="font-normal text-muted-foreground">Nest</span>
             </span>
           </div>
@@ -144,7 +144,7 @@ export default function Home() {
           <div className="mx-auto grid w-full max-w-5xl items-center gap-12 px-6 py-20 lg:grid-cols-[1fr_1.2fr] lg:py-28">
             <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
               <Badge variant="secondary">Multi-channel AI employee</Badge>
-              <h1 className={cn(displayFont.className, 'mt-4 text-4xl tracking-tight text-balance sm:text-5xl')}>
+              <h1 className={cn('font-hero-display', 'mt-4 text-4xl tracking-tight text-balance sm:text-5xl')}>
                 Your business, answered instantly.
               </h1>
               <p className="mt-4 max-w-xl text-lg text-muted-foreground text-balance">
@@ -331,7 +331,7 @@ export default function Home() {
             <div className="max-w-xs">
               <div className="flex items-center gap-2">
                 <Logomark className="size-6" />
-                <span className={cn(displayFont.className, 'font-semibold')}>CrewNest</span>
+                <span className="font-hero-display">CrewNest</span>
               </div>
               <p className="mt-3 text-sm text-muted-foreground">
                 AI employees that answer your customers, take orders, and never miss a message.

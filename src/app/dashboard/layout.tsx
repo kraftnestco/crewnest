@@ -66,7 +66,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="flex items-center gap-2.5 p-4">
           <Logomark className="size-7" />
           <div className="min-w-0">
-            <p className="font-heading text-sm font-semibold">CrewNest</p>
+            <p className="font-hero-display text-sm">CrewNest</p>
             <p className="truncate text-xs text-muted-foreground">{activeTenantName}</p>
           </div>
         </div>

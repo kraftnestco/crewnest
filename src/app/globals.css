@@ -137,6 +137,18 @@
   }
 }
 
+/*
+ * Reserved for the marketing hero headline and the "CrewNest" wordmark only.
+ * Dials the Big Shoulders variable font to its Display-cut optical size
+ * (next/font only exposes the base family, not separate Display/Text
+ * instances) at its heaviest weight.
+ */
+.font-hero-display {
+  font-family: var(--font-hero);
+  font-weight: 900;
+  font-variation-settings: 'opsz' 72;
+}
+
 @keyframes float {
   0%,
   100% {

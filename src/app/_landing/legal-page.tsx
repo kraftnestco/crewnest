@@ -24,7 +24,7 @@ export function LegalPage({
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-6 py-3">
           <Link href="/" className="flex items-center gap-2">
             <Logomark />
-            <span className={cn(displayFont.className, 'text-lg font-semibold')}>
+            <span className={cn('font-hero-display', 'text-lg')}>
               Crew<span className="font-normal text-muted-foreground">Nest</span>
             </span>
           </Link>

@@ -1,13 +1,21 @@
-import { Bird } from 'lucide-react';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
+/**
+ * The actual favicon/app-icon asset (public/icons/icon-192.png), not a
+ * recreated glyph — every on-page "CrewNest" lockup should be pixel-identical
+ * to the browser-tab/home-screen icon, not a different color and a different
+ * bird drawn from a generic lucide icon.
+ */
 export function Logomark({ className }: { className?: string }) {
   return (
-    <span className={cn('relative inline-flex size-8 shrink-0 items-center justify-center', className)}>
-      <span className="absolute inset-0 -rotate-6 rounded-lg bg-foreground/15" />
-      <span className="relative flex size-7 rotate-3 items-center justify-center rounded-lg bg-foreground text-background shadow-sm">
-        <Bird className="size-4" />
-      </span>
-    </span>
+    <Image
+      src="/icons/icon-192.png"
+      alt=""
+      width={32}
+      height={32}
+      priority
+      className={cn('size-8 shrink-0 rounded-[22.5%]', className)}
+    />
   );
 }

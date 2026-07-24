@@ -228,3 +228,40 @@ admin copilot has no cards (read-only), just prose replies.
   service client (admin already sees all tenants via RLS).
 - Do **not** stage or apply `0029_reliability.sql`; blocked-sends/dead-letter cards wait for it.
 - Never change a tenant's `llm_provider`/`llm_model` (there is deliberately no such capability here).
+
+---
+
+## Pending tasks — queued, not yet designed
+
+Captured from the user 2026-07-24. Not scoped or security-reviewed yet; each needs its own design pass
+(the admin half in particular touches fleet-wide data the same way Part 2 does, so it should get an
+[OPUS]-frozen security contract before Sonnet builds it, exactly like §2.1 above).
+
+3. **Move both chatbots onto their home pages, with stats folded into the chat as an overview, plus
+   time-windowed business Q&A and (for admin) error tracking.**
+   - **Tenant side:** put the Business Copilot (docs/19 O5) directly on `/dashboard` (the tenant home
+     page), not only on `/dashboard/business`. The stat cards currently on `/dashboard` should be
+     re-presented **inside** the copilot as an opening "overview" turn/card (not just left sitting
+     beside the chat as a separate widget) — i.e. the chat itself leads with the tenant's current
+     numbers, then takes questions.
+   - **Admin side:** put the Admin Copilot (Part 2 above) on `/admin` (the agency home page), same
+     pattern — the System Health + needs-attention numbers become the copilot's opening overview turn,
+     not just a separate page the operator has to click to.
+   - **New capability both copilots need that neither has today:** the ability to answer
+     **time-windowed** questions — "how were orders today / this week / this month" — and general
+     "how's my business doing" / "what's going on with Client X" questions. Today: the Business
+     Copilot (docs/19 O5) has zero read-tools (persona/catalogue/hours tools only, all write-staging),
+     and the Admin Copilot (§2.2 above) has **no tools at all**, just a static snapshot string. Getting
+     real "today vs. this week vs. this month" numbers means either (a) expanding the snapshot to
+     include multiple pre-aggregated time windows, or (b) adding bounded, read-only query tools scoped
+     the same way as everything else in this doc (tenant-scoped only for the Business Copilot;
+     allowlisted aggregates only, no PII/content/secrets, for the Admin Copilot). Option (b) is a bigger
+     surface and needs its own [OPUS] security pass before it's built — don't let Sonnet freelance new
+     DB-reading tools into either copilot without that.
+   - **Admin error tracking:** the admin copilot answering "any errors?" should draw on exactly the
+     signals Part 1's System Health already aggregates (failed deliveries, failed payments, cost
+     alerts, alert_signal breakdown) — no new error-tracking system needed, just make sure the
+     time-windowed snapshot/tools expose those same counts per-window (today/week/month), not only the
+     current-snapshot totals Part 1 already has.
+   - Still bound by every rule in §2.1: no secrets, no customer PII/message content, master key for
+     admin, tenant-scoped RLS for the business copilot, no silent writes.
