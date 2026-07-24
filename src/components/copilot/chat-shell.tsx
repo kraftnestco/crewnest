@@ -71,11 +71,16 @@ export function ThinkingRow() {
 /**
  * The "keypad" — a floating pill composer docked over the transcript rather
  * than boxed into the layout with a hard border. Mirrors the Ghawas/Khizr
- * home mockup's `.composer-dock`: an absolutely-positioned bar with a
- * gradient-fade backdrop (so it reads as floating above the scroll, not a
- * flush footer) and a rounded pill that lifts slightly on focus. Meant to sit
- * inside a `relative` wrapper alongside the scrollable transcript, not the
- * whole card, so it only floats over the messages — not the header.
+ * home mockup's `.composer-dock`: a gradient-fade backdrop (so it reads as
+ * floating above the scroll, not a flush footer) and a rounded pill that lifts
+ * slightly on focus.
+ *
+ * Two positioning modes:
+ * - `absolute` (default) — floats over a `relative` inner-scroll transcript,
+ *   for the confined full-height chat (the Admin Copilot's dedicated page).
+ * - `sticky` — pins to the bottom of the *page* scroll, for the Business
+ *   Copilot on the home surface where the whole page scrolls instead of the
+ *   chat being trapped in its own little box. Clears the mobile tab bar.
  */
 export function ComposerDock({
   value,
@@ -85,6 +90,7 @@ export function ComposerDock({
   disabled,
   placeholder,
   footer,
+  mode = 'absolute',
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -93,10 +99,22 @@ export function ComposerDock({
   disabled: boolean;
   placeholder: string;
   footer?: ReactNode;
+  mode?: 'absolute' | 'sticky';
 }) {
+  const floating = mode === 'absolute';
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-card via-card/95 to-transparent px-4 pt-10 pb-4">
-      <div className="pointer-events-auto mx-auto flex max-w-2xl items-end gap-2 rounded-2xl border border-border/80 bg-background py-1.5 pr-1.5 pl-4 shadow-lg shadow-foreground/10 transition-all duration-150 focus-within:-translate-y-0.5 focus-within:border-primary/40 focus-within:shadow-xl">
+    <div
+      className={cn(
+        'z-10 bg-gradient-to-t from-card via-card/95 to-transparent px-4 pt-10 pb-4',
+        floating ? 'pointer-events-none absolute inset-x-0 bottom-0' : 'sticky bottom-16 lg:bottom-0',
+      )}
+    >
+      <div
+        className={cn(
+          'mx-auto flex max-w-2xl items-end gap-2 rounded-2xl border border-border/80 bg-background py-1.5 pr-1.5 pl-4 shadow-lg shadow-foreground/10 transition-all duration-150 focus-within:-translate-y-0.5 focus-within:border-primary/40 focus-within:shadow-xl',
+          floating && 'pointer-events-auto',
+        )}
+      >
         <Textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -118,7 +136,12 @@ export function ComposerDock({
         </Button>
       </div>
       {footer && (
-        <p className="pointer-events-none mx-auto mt-2 max-w-2xl px-1 text-center text-[0.7rem] leading-relaxed text-muted-foreground">
+        <p
+          className={cn(
+            'mx-auto mt-2 max-w-2xl px-1 text-center text-[0.7rem] leading-relaxed text-muted-foreground',
+            floating && 'pointer-events-none',
+          )}
+        >
           {footer}
         </p>
       )}

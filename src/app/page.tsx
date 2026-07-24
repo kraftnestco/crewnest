@@ -98,7 +98,7 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
             <Logomark />
             <span className={cn('font-hero-display', 'text-lg')}>
@@ -141,7 +141,7 @@ export default function Home() {
             }}
           />
 
-          <div className="mx-auto grid w-full max-w-5xl items-center gap-12 px-6 py-20 lg:grid-cols-[1fr_1.2fr] lg:py-28">
+          <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-6 py-20 lg:grid-cols-[1fr_1.2fr] lg:py-28">
             <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
               <Badge variant="secondary">Multi-channel AI employee</Badge>
               <h1 className={cn('font-hero-display', 'mt-4 text-4xl tracking-tight text-balance sm:text-5xl')}>
@@ -170,7 +170,7 @@ export default function Home() {
 
         {/* Channel strip — honest social proof until real customer logos exist. */}
         <section className="border-y border-border bg-card">
-          <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-4 px-6 py-8 sm:flex-row sm:justify-between">
+          <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-4 px-6 py-8 sm:flex-row sm:justify-between">
             <p className="text-sm font-medium text-muted-foreground">Works where your customers already are</p>
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
               {CHANNELS.map((id) => (
@@ -183,7 +183,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="how-it-works" className="mx-auto w-full max-w-5xl scroll-mt-20 px-6 py-20">
+        <section id="how-it-works" className="mx-auto w-full max-w-7xl scroll-mt-20 px-6 py-20">
           <div className="mx-auto max-w-2xl text-center">
             <Badge variant="secondary">How it works</Badge>
             <h2 className={cn(displayFont.className, 'mt-4 text-3xl tracking-tight text-balance')}>
@@ -213,7 +213,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="features" className="mx-auto w-full max-w-5xl scroll-mt-20 px-6 pb-20">
+        <section id="features" className="mx-auto w-full max-w-7xl scroll-mt-20 px-6 pb-20">
           <div className="grid gap-4 sm:grid-cols-2">
             {FEATURES.map((feature) => (
               <TiltCard key={feature.title} max={5}>
@@ -233,7 +233,7 @@ export default function Home() {
         </section>
 
         <section id="pricing" className="scroll-mt-20 border-t border-border bg-card">
-          <div className="mx-auto w-full max-w-5xl px-6 py-20">
+          <div className="mx-auto w-full max-w-7xl px-6 py-20">
             <div className="mx-auto max-w-2xl text-center">
               <Badge variant="secondary">Pricing</Badge>
               <h2 className={cn(displayFont.className, 'mt-4 text-3xl tracking-tight text-balance')}>
@@ -311,7 +311,7 @@ export default function Home() {
         </section>
 
         <section className="border-t border-border bg-card">
-          <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-5 px-6 py-16 text-center">
+          <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-5 px-6 py-16 text-center">
             <h2 className={cn(displayFont.className, 'text-3xl tracking-tight text-balance')}>
               Hire your first AI employee today.
             </h2>
@@ -326,7 +326,7 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-border">
-        <div className="mx-auto w-full max-w-5xl px-6 py-10">
+        <div className="mx-auto w-full max-w-7xl px-6 py-10">
           <div className="flex flex-col gap-8 sm:flex-row sm:justify-between">
             <div className="max-w-xs">
               <div className="flex items-center gap-2">

@@ -28,7 +28,7 @@ export function PageHeader({
   return (
     <div className="flex items-start justify-between gap-4 lg:hidden">
       <div>
-        <h1 className="font-hero-display text-xl">{title}</h1>
+        <h1 className="font-hero-display text-2xl">{title}</h1>
         {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

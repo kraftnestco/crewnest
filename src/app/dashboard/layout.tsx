@@ -56,7 +56,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
     log.error('[dashboard/layout] member tenants lookup failed', { userId: ctx.userId, error: tenantsError.message });
   }
   const tenantNameMap = new Map((memberTenants ?? []).map((t) => [t.id, t.business_name]));
-  const activeTenantName = activeTenantId ? (tenantNameMap.get(activeTenantId) ?? 'My Business') : 'My Business';
 
   const showBusiness = activeMembership?.role === 'tenant_admin';
 
@@ -65,11 +64,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="flex min-h-screen">
         {/* Desktop sidebar — hidden below lg; phones use the bottom tab bar instead. */}
         <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
-          <div className="flex items-center gap-2.5 p-4">
-            <Logomark className="size-7" />
+          <div className="flex items-center gap-3 p-4">
+            <Logomark className="size-8" />
             <div className="min-w-0">
-              <p className="font-hero-display text-sm">CrewNest</p>
-              <p className="truncate text-xs text-muted-foreground">{activeTenantName}</p>
+              <p className="font-hero-display text-xl leading-none tracking-wide">CrewNest</p>
+              <p className="mt-1 truncate text-[0.7rem] text-muted-foreground">By KraftNest Automations</p>
             </div>
           </div>
           {ctx.memberships.length > 1 && (

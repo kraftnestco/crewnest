@@ -31,7 +31,7 @@ export async function AppTopbar({ accountHref }: { accountHref: string }) {
         {/* Brand shows here on mobile only — the sidebar (which carries it on desktop) is hidden below lg. */}
         <span className="flex items-center gap-2 lg:hidden">
           <Logomark className="size-7" />
-          <span className="font-hero-display text-sm">CrewNest</span>
+          <span className="font-hero-display text-base tracking-wide">CrewNest</span>
         </span>
         <TopbarHeadingSlot />
       </div>

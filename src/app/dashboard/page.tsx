@@ -126,7 +126,7 @@ export default async function DashboardHomePage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6 p-6">
       <PageHeader
         title={`Welcome back${tenant ? `, ${tenant.business_name}` : ''}`}
         description="Here's what's happening with your AI assistant."

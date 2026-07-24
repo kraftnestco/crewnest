@@ -74,6 +74,9 @@ export function BusinessCopilot({
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Only chase the bottom once a conversation is underway — on the empty home
+    // surface this would otherwise auto-scroll the whole page down on load.
+    if (turns.length === 0) return;
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [turns, thinking]);
 
@@ -173,9 +176,9 @@ export function BusinessCopilot({
   const isEmpty = turns.length === 0;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/10">
+    <div className="flex flex-col rounded-2xl bg-card ring-1 ring-foreground/10">
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-3 border-b px-4 py-3">
+      <div className="flex items-center gap-3 border-b px-4 py-3">
         <CopilotAvatar />
         <div className="min-w-0">
           <p className="font-heading text-sm font-semibold leading-tight">CrewAI</p>
@@ -183,12 +186,11 @@ export function BusinessCopilot({
         </div>
       </div>
 
-      {overview && <div className="shrink-0"><OverviewPanel overview={overview} /></div>}
+      {overview && <OverviewPanel overview={overview} />}
 
-      {/* Transcript + floating composer */}
-      <div className="relative min-h-0 flex-1">
-        <div className="h-full overflow-y-auto px-4 pt-5 pb-32">
-          {isEmpty ? (
+      {/* Transcript — grows with the page (whole page scrolls; composer is sticky below) */}
+      <div className="min-h-[24rem] px-4 pt-6 pb-4">
+        {isEmpty ? (
             <div className="flex flex-col items-center gap-5 py-6 text-center">
               <CopilotAvatar size="lg" />
               <div className="space-y-1.5">
@@ -244,19 +246,20 @@ export function BusinessCopilot({
               {thinking && <ThinkingRow />}
             </div>
           )}
-          <div ref={bottomRef} />
+          {/* scroll-mb clears the sticky composer so the last reply never lands under it */}
+          <div ref={bottomRef} className="scroll-mb-28" />
         </div>
 
-        <ComposerDock
-          value={input}
-          onChange={setInput}
-          onKeyDown={onComposerKeyDown}
-          onSend={() => send(input)}
-          disabled={thinking}
-          placeholder="Tell me what changed…"
-          footer="Nothing is saved until you tap Apply. The copilot can't touch billing, your plan, connected accounts, or API keys."
-        />
-      </div>
+      <ComposerDock
+        mode="sticky"
+        value={input}
+        onChange={setInput}
+        onKeyDown={onComposerKeyDown}
+        onSend={() => send(input)}
+        disabled={thinking}
+        placeholder="Tell me what changed…"
+        footer="Nothing is saved until you tap Apply. The copilot can't touch billing, your plan, connected accounts, or API keys."
+      />
     </div>
   );
 }
@@ -292,22 +295,37 @@ function OverviewPanel({ overview }: { overview: CopilotOverview }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 divide-x divide-y divide-border border-b sm:grid-cols-4 sm:divide-y-0">
-      {cells.map((cell) =>
-        cell.href ? (
-          <Link key={cell.label} href={cell.href} className="px-3.5 py-2.5 transition-colors hover:bg-muted/40">
-            <p className={cn('text-lg font-semibold tabular-nums', cell.muted && 'text-muted-foreground')}>
-              {cell.value}
-            </p>
-            <p className="mt-0.5 truncate text-[0.7rem] text-muted-foreground">{cell.label}</p>
-          </Link>
-        ) : (
-          <div key={cell.label} className="px-3.5 py-2.5">
-            <p className="text-lg font-semibold tabular-nums">{cell.value}</p>
-            <p className="mt-0.5 truncate text-[0.7rem] text-muted-foreground">{cell.label}</p>
-          </div>
-        ),
-      )}
+    <div className="border-b px-2 py-2 sm:px-3 sm:py-3">
+      <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+        {cells.map((cell) => {
+          const inner = (
+            <>
+              <p
+                className={cn(
+                  'text-xl font-semibold tabular-nums leading-none',
+                  cell.muted ? 'text-muted-foreground/50' : 'text-foreground',
+                )}
+              >
+                {cell.value}
+              </p>
+              <p className="mt-1.5 truncate text-[0.7rem] leading-tight text-muted-foreground">{cell.label}</p>
+            </>
+          );
+          return cell.href ? (
+            <Link
+              key={cell.label}
+              href={cell.href}
+              className="rounded-lg px-3 py-2 transition-colors hover:bg-muted/60"
+            >
+              {inner}
+            </Link>
+          ) : (
+            <div key={cell.label} className="px-3 py-2">
+              {inner}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
