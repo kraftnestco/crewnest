@@ -12,7 +12,7 @@ export default async function SignupPage({
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-sm rounded-xl bg-card p-6 ring-1 ring-foreground/10">
         <div className="mb-6">
-          <h1 className="font-heading text-lg font-semibold">Create your account</h1>
+          <h1 className="font-hero-display text-lg">Create your account</h1>
           <p className="text-sm text-muted-foreground">
             We&apos;ll set up your AI employee from what you just built in the demo.
           </p>

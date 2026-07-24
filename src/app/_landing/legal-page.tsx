@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Logomark } from './logomark';
-import { displayFont } from './fonts';
 
 /**
  * Shared shell for the static legal pages (/privacy, /terms) — Phase U3.
@@ -35,7 +34,7 @@ export function LegalPage({
       </header>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-14">
-        <h1 className={cn(displayFont.className, 'text-3xl tracking-tight')}>{title}</h1>
+        <h1 className={cn('font-hero-display', 'text-3xl tracking-tight')}>{title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">Last updated: {updated}</p>
         <div className="mt-8 flex flex-col gap-6 text-sm leading-relaxed text-foreground/85 [&_h2]:font-heading [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-foreground [&_ul]:flex [&_ul]:list-disc [&_ul]:flex-col [&_ul]:gap-1.5 [&_ul]:pl-5">
           {children}

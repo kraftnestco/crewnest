@@ -25,7 +25,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="w-full max-w-sm rounded-xl bg-card p-6 text-center ring-1 ring-foreground/10">
-          <h1 className="font-heading text-lg font-semibold">Access pending</h1>
+          <h1 className="font-hero-display text-lg">Access pending</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Your account isn&apos;t linked to a business yet. Ask your CrewNest contact to grant access.
           </p>

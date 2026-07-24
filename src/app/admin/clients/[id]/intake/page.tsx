@@ -22,7 +22,7 @@ export default async function ClientIntakePage({ params }: { params: Promise<{ i
         <Link href="/admin/clients" className="text-xs text-muted-foreground underline underline-offset-2">
           ← Clients
         </Link>
-        <h1 className="font-heading text-xl font-semibold">Intake for {tenant.business_name}</h1>
+        <h1 className="font-hero-display text-xl">Intake for {tenant.business_name}</h1>
         <p className="text-sm text-muted-foreground">
           Configure how the AI describes this business, its catalogue, and how it handles custom orders and
           customer-sent example media.
