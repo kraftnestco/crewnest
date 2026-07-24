@@ -1,13 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUp, Loader2, Search, TrendingDown, Truck, Users } from 'lucide-react';
+import { Search, TrendingDown, Truck, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { adminCopilotTurnAction } from '@/app/admin/copilot-actions';
 import type { CopilotMessage } from '@/services/ai/copilot/tiers';
-import { CopilotAvatar, UserMessage, AssistantMessage, ThinkingRow } from './chat-shell';
+import { CopilotAvatar, UserMessage, AssistantMessage, ThinkingRow, ComposerDock } from './chat-shell';
 
 /**
  * Admin Copilot — the Claude-style chat for the agency operator (docs/20 Part 2).
@@ -89,71 +87,56 @@ export function AdminCopilot() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
-        {isEmpty ? (
-          <div className="flex flex-col items-center gap-5 py-6 text-center">
-            <CopilotAvatar size="lg" />
-            <div className="space-y-1.5">
-              <p className="font-heading text-base font-semibold text-foreground">What do you want to check on?</p>
-              <p className="mx-auto max-w-sm text-sm leading-relaxed text-muted-foreground">
-                I can triage what needs attention, or pull up a specific client or customer by name. I can&apos;t
-                change anything — just look things up.
-              </p>
+      <div className="relative min-h-0 flex-1">
+        <div className="h-full overflow-y-auto px-4 pt-5 pb-32">
+          {isEmpty ? (
+            <div className="flex flex-col items-center gap-5 py-6 text-center">
+              <CopilotAvatar size="lg" />
+              <div className="space-y-1.5">
+                <p className="font-heading text-base font-semibold text-foreground">What do you want to check on?</p>
+                <p className="mx-auto max-w-sm text-sm leading-relaxed text-muted-foreground">
+                  I can triage what needs attention, or pull up a specific client or customer by name. I can&apos;t
+                  change anything — just look things up.
+                </p>
+              </div>
+              <div className="grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
+                {SUGGESTIONS.map(({ label, icon: Icon }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => send(label)}
+                    className="group flex items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2.5 text-left text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  >
+                    <Icon className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                    <span className="leading-tight">{label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
-              {SUGGESTIONS.map(({ label, icon: Icon }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => send(label)}
-                  className="group flex items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2.5 text-left text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
-                >
-                  <Icon className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                  <span className="leading-tight">{label}</span>
-                </button>
-              ))}
+          ) : (
+            <div className="space-y-6">
+              {turns.map((turn, i) =>
+                turn.role === 'user' ? (
+                  <UserMessage key={i} content={turn.content} />
+                ) : (
+                  <AssistantMessage key={i} content={turn.content} />
+                ),
+              )}
+              {thinking && <ThinkingRow />}
             </div>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {turns.map((turn, i) =>
-              turn.role === 'user' ? (
-                <UserMessage key={i} content={turn.content} />
-              ) : (
-                <AssistantMessage key={i} content={turn.content} />
-              ),
-            )}
-            {thinking && <ThinkingRow />}
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
-
-      <div className="shrink-0 border-t p-3">
-        <div className="flex items-end gap-2 rounded-2xl border border-input bg-background px-3 py-2 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onComposerKeyDown}
-            placeholder="Ask about a client or customer…"
-            rows={1}
-            disabled={thinking}
-            className="max-h-40 min-h-0 flex-1 resize-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
-          />
-          <Button
-            type="button"
-            size="icon"
-            onClick={() => send(input)}
-            disabled={thinking || !input.trim()}
-            aria-label="Send"
-            className="size-8 shrink-0 rounded-full"
-          >
-            {thinking ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
-          </Button>
+          )}
+          <div ref={bottomRef} />
         </div>
-        <p className="mt-2 px-1 text-[0.7rem] leading-relaxed text-muted-foreground">
-          Advisory only — I can&apos;t change settings, message customers, or take any action.
-        </p>
+
+        <ComposerDock
+          value={input}
+          onChange={setInput}
+          onKeyDown={onComposerKeyDown}
+          onSend={() => send(input)}
+          disabled={thinking}
+          placeholder="Ask about a client or customer…"
+          footer="Advisory only — I can't change settings, message customers, or take any action."
+        />
       </div>
     </div>
   );

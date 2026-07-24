@@ -1,4 +1,8 @@
 import Image from 'next/image';
+import { ArrowUp, Loader2 } from 'lucide-react';
+import type { KeyboardEvent, ReactNode } from 'react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 /**
@@ -60,6 +64,64 @@ export function ThinkingRow() {
         <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.15s]" />
         <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/50" />
       </div>
+    </div>
+  );
+}
+
+/**
+ * The "keypad" — a floating pill composer docked over the transcript rather
+ * than boxed into the layout with a hard border. Mirrors the Ghawas/Khizr
+ * home mockup's `.composer-dock`: an absolutely-positioned bar with a
+ * gradient-fade backdrop (so it reads as floating above the scroll, not a
+ * flush footer) and a rounded pill that lifts slightly on focus. Meant to sit
+ * inside a `relative` wrapper alongside the scrollable transcript, not the
+ * whole card, so it only floats over the messages — not the header.
+ */
+export function ComposerDock({
+  value,
+  onChange,
+  onKeyDown,
+  onSend,
+  disabled,
+  placeholder,
+  footer,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
+  onSend: () => void;
+  disabled: boolean;
+  placeholder: string;
+  footer?: ReactNode;
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-card via-card/95 to-transparent px-4 pt-10 pb-4">
+      <div className="pointer-events-auto mx-auto flex max-w-2xl items-end gap-2 rounded-2xl border border-border/80 bg-background py-1.5 pr-1.5 pl-4 shadow-lg shadow-foreground/10 transition-all duration-150 focus-within:-translate-y-0.5 focus-within:border-primary/40 focus-within:shadow-xl">
+        <Textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder={placeholder}
+          rows={1}
+          disabled={disabled}
+          className="max-h-40 min-h-0 flex-1 resize-none border-0 bg-transparent px-0 py-2.5 shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
+        />
+        <Button
+          type="button"
+          size="icon"
+          onClick={onSend}
+          disabled={disabled || !value.trim()}
+          aria-label="Send"
+          className="size-9 shrink-0 rounded-full"
+        >
+          {disabled ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+        </Button>
+      </div>
+      {footer && (
+        <p className="pointer-events-none mx-auto mt-2 max-w-2xl px-1 text-center text-[0.7rem] leading-relaxed text-muted-foreground">
+          {footer}
+        </p>
+      )}
     </div>
   );
 }

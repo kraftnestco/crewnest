@@ -37,16 +37,18 @@ export function usePublishTopbarHeading(heading: TopbarHeading) {
   }, [heading.title, heading.description, heading.actions]);
 }
 
-/** Rendered in the topbar (desktop only) to show whichever page is currently mounted. */
+/**
+ * Rendered in the topbar (desktop only) to show whichever page is currently
+ * mounted. Title only — no description/subtext here, the topbar row is too
+ * slim for two lines; the full title+description pairing still shows inline
+ * on mobile via `PageHeader`'s `lg:hidden` block.
+ */
 export function TopbarHeadingSlot() {
   const ctx = useContext(TopbarHeadingContext);
   const heading = ctx?.heading;
   if (!heading) return null;
   return (
-    <div className="hidden min-w-0 lg:block">
-      <p className="truncate text-sm font-medium text-foreground">{heading.title}</p>
-      {heading.description && <p className="truncate text-xs text-muted-foreground">{heading.description}</p>}
-    </div>
+    <p className="hidden min-w-0 truncate font-hero-display text-base lg:block">{heading.title}</p>
   );
 }
 

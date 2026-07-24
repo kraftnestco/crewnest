@@ -3,16 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, ArrowUp, CalendarClock, Check, Loader2, Plus, Truck, Wand2, X } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Check, Loader2, Plus, Truck, Wand2, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { applyCopilotActionAction, applyCopilotPatchAction, copilotTurnAction } from '@/app/dashboard/business/copilot-actions';
 import type { CopilotMessage, CopilotPatch } from '@/services/ai/copilot/tiers';
 import { describeCopilotAction, type CopilotAction } from '@/services/ai/copilot/actions';
-import { CopilotAvatar, UserMessage, AssistantMessage, ThinkingRow } from './chat-shell';
+import { CopilotAvatar, UserMessage, AssistantMessage, ThinkingRow, ComposerDock } from './chat-shell';
 
 /**
  * Business Copilot — the Claude-style chat on the tenant home page (docs/19 O5).
@@ -186,94 +185,77 @@ export function BusinessCopilot({
 
       {overview && <div className="shrink-0"><OverviewPanel overview={overview} /></div>}
 
-      {/* Transcript */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
-        {isEmpty ? (
-          <div className="flex flex-col items-center gap-5 py-6 text-center">
-            <CopilotAvatar size="lg" />
-            <div className="space-y-1.5">
-              <p className="font-heading text-base font-semibold text-foreground">How can I help with {businessName}?</p>
-              <p className="mx-auto max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Tell me what changed and I&apos;ll prepare the exact update for you to approve. Nothing is saved until you
-                tap Apply.
-              </p>
+      {/* Transcript + floating composer */}
+      <div className="relative min-h-0 flex-1">
+        <div className="h-full overflow-y-auto px-4 pt-5 pb-32">
+          {isEmpty ? (
+            <div className="flex flex-col items-center gap-5 py-6 text-center">
+              <CopilotAvatar size="lg" />
+              <div className="space-y-1.5">
+                <p className="font-heading text-base font-semibold text-foreground">How can I help with {businessName}?</p>
+                <p className="mx-auto max-w-sm text-sm leading-relaxed text-muted-foreground">
+                  Tell me what changed and I&apos;ll prepare the exact update for you to approve. Nothing is saved until
+                  you tap Apply.
+                </p>
+              </div>
+              <div className="grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
+                {SUGGESTIONS.map(({ label, icon: Icon }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => send(label)}
+                    className="group flex items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2.5 text-left text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  >
+                    <Icon className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                    <span className="leading-tight">{label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
-              {SUGGESTIONS.map(({ label, icon: Icon }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => send(label)}
-                  className="group flex items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2.5 text-left text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
-                >
-                  <Icon className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                  <span className="leading-tight">{label}</span>
-                </button>
-              ))}
+          ) : (
+            <div className="space-y-6">
+              {turns.map((turn, i) =>
+                turn.role === 'user' ? (
+                  <UserMessage key={i} content={turn.content} />
+                ) : (
+                  <AssistantMessage key={i} content={turn.content}>
+                    {turn.patch && (
+                      <ProposedChangeCard
+                        patch={turn.patch}
+                        hasMoneyChange={Boolean(turn.hasMoneyChange)}
+                        status={turn.patchStatus ?? 'pending'}
+                        applying={applying?.index === i && applying.kind === 'patch'}
+                        onApply={() => apply(i, 'patch')}
+                        onDismiss={() => dismiss(i, 'patch')}
+                      />
+                    )}
+                    {turn.action && (
+                      <ProposedActionCard
+                        action={turn.action}
+                        status={turn.actionStatus ?? 'pending'}
+                        applying={applying?.index === i && applying.kind === 'action'}
+                        onApply={() => apply(i, 'action')}
+                        onDismiss={() => dismiss(i, 'action')}
+                      />
+                    )}
+                  </AssistantMessage>
+                ),
+              )}
+              {thinking && <ThinkingRow />}
             </div>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {turns.map((turn, i) =>
-              turn.role === 'user' ? (
-                <UserMessage key={i} content={turn.content} />
-              ) : (
-                <AssistantMessage key={i} content={turn.content}>
-                  {turn.patch && (
-                    <ProposedChangeCard
-                      patch={turn.patch}
-                      hasMoneyChange={Boolean(turn.hasMoneyChange)}
-                      status={turn.patchStatus ?? 'pending'}
-                      applying={applying?.index === i && applying.kind === 'patch'}
-                      onApply={() => apply(i, 'patch')}
-                      onDismiss={() => dismiss(i, 'patch')}
-                    />
-                  )}
-                  {turn.action && (
-                    <ProposedActionCard
-                      action={turn.action}
-                      status={turn.actionStatus ?? 'pending'}
-                      applying={applying?.index === i && applying.kind === 'action'}
-                      onApply={() => apply(i, 'action')}
-                      onDismiss={() => dismiss(i, 'action')}
-                    />
-                  )}
-                </AssistantMessage>
-              ),
-            )}
-            {thinking && <ThinkingRow />}
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Composer */}
-      <div className="shrink-0 border-t p-3">
-        <div className="flex items-end gap-2 rounded-2xl border border-input bg-background px-3 py-2 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onComposerKeyDown}
-            placeholder="Tell me what changed…"
-            rows={1}
-            disabled={thinking}
-            className="max-h-40 min-h-0 flex-1 resize-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
-          />
-          <Button
-            type="button"
-            size="icon"
-            onClick={() => send(input)}
-            disabled={thinking || !input.trim()}
-            aria-label="Send"
-            className="size-8 shrink-0 rounded-full"
-          >
-            {thinking ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
-          </Button>
+          )}
+          <div ref={bottomRef} />
         </div>
-        <p className="mt-2 px-1 text-[0.7rem] leading-relaxed text-muted-foreground">
-          Nothing is saved until you tap Apply. The copilot can&apos;t touch billing, your plan, connected accounts, or
-          API keys.
-        </p>
+
+        <ComposerDock
+          value={input}
+          onChange={setInput}
+          onKeyDown={onComposerKeyDown}
+          onSend={() => send(input)}
+          disabled={thinking}
+          placeholder="Tell me what changed…"
+          footer="Nothing is saved until you tap Apply. The copilot can't touch billing, your plan, connected accounts, or API keys."
+        />
       </div>
     </div>
   );
