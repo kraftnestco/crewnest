@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { AlertTriangle, ArrowUp, CalendarClock, Check, Loader2, Plus, Sparkles, Truck, Wand2, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -12,16 +13,27 @@ import { applyCopilotPatchAction, copilotTurnAction } from '@/app/dashboard/busi
 import { MONEY_FIELDS, type CopilotMessage, type CopilotPatch } from '@/services/ai/copilot/tiers';
 
 /**
- * Business Copilot — the Claude-style chat in "My Business" (docs/19 O5). The
- * owner types plain language ("add bridal makeup for 15000", "close 24–26 Dec for
- * Eid") and the copilot proposes the exact profile edit as a `ProposedChangeCard`;
- * the owner commits it with one tap. Nothing is saved until Apply.
+ * Business Copilot — the Claude-style chat on the tenant home page (docs/19 O5).
+ * The owner types plain language ("add bridal makeup for 15000", "close 24–26 Dec
+ * for Eid") and the copilot proposes the exact profile edit as a
+ * `ProposedChangeCard`; the owner commits it with one tap. Nothing is saved until
+ * Apply. When an `overview` is passed (home page only), it renders the tenant's
+ * needs-attention/activity snapshot inside the panel instead of as separate cards
+ * on the page — the stats live with the assistant that can act on them.
  *
  * The safety spine lives on the server (propose/apply split in copilot-actions.ts):
  * this component only renders the transcript, sends turns to `copilotTurnAction`,
  * and — on Apply — calls `applyCopilotPatchAction` then `router.refresh()` so the
- * Business-details editor below reflects the committed change.
+ * Business-details editor on /dashboard/business reflects the committed change.
  */
+
+export interface CopilotOverview {
+  hasActivity: boolean;
+  connectedChannels: string[];
+  needsAttention: { key: string; label: string; count: number; href: string }[];
+  stats: { label: string; value: number }[];
+  avgRating: { value: number; count: number } | null;
+}
 
 const SUGGESTIONS: { label: string; icon: LucideIcon }[] = [
   { label: 'Add a new service to my catalogue', icon: Plus },
@@ -43,7 +55,15 @@ interface Turn {
 
 const MONEY_FIELD_SET: ReadonlySet<string> = new Set(MONEY_FIELDS);
 
-export function BusinessCopilot({ tenantId, businessName }: { tenantId: string; businessName: string }) {
+export function BusinessCopilot({
+  tenantId,
+  businessName,
+  overview,
+}: {
+  tenantId: string;
+  businessName: string;
+  overview?: CopilotOverview;
+}) {
   const router = useRouter();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
@@ -145,6 +165,8 @@ export function BusinessCopilot({ tenantId, businessName }: { tenantId: string; 
         </div>
       </div>
 
+      {overview && <OverviewPanel overview={overview} />}
+
       {/* Transcript */}
       <div className="max-h-[28rem] min-h-[9rem] overflow-y-auto px-4 py-5">
         {isEmpty ? (
@@ -225,6 +247,57 @@ export function BusinessCopilot({ tenantId, businessName }: { tenantId: string; 
           API keys.
         </p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The former standalone home-page stat cards (needs-attention, activity teaser,
+ * rating), now folded into the copilot panel itself — the assistant that can act
+ * on the business sits right next to the numbers describing it.
+ */
+function OverviewPanel({ overview }: { overview: CopilotOverview }) {
+  if (!overview.hasActivity) {
+    return (
+      <div className="border-b px-4 py-2.5 text-xs text-muted-foreground">
+        {overview.connectedChannels.length > 0
+          ? `Live on ${overview.connectedChannels.join(', ')} — no conversations yet.`
+          : 'Almost ready — finish channel setup below to go live.'}
+      </div>
+    );
+  }
+
+  const cells: { label: string; value: string | number; muted: boolean; href?: string }[] = [
+    ...overview.needsAttention.map((c) => ({ label: c.label, value: c.count, muted: c.count === 0, href: c.href })),
+    ...overview.stats.map((s) => ({ label: s.label, value: s.value, muted: false })),
+    ...(overview.avgRating
+      ? [
+          {
+            label: `Rating (${overview.avgRating.count})`,
+            value: `${overview.avgRating.value.toFixed(1)}★`,
+            muted: false,
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <div className="grid grid-cols-2 divide-x divide-y divide-border border-b sm:grid-cols-4 sm:divide-y-0">
+      {cells.map((cell) =>
+        cell.href ? (
+          <Link key={cell.label} href={cell.href} className="px-3.5 py-2.5 transition-colors hover:bg-muted/40">
+            <p className={cn('text-lg font-semibold tabular-nums', cell.muted && 'text-muted-foreground')}>
+              {cell.value}
+            </p>
+            <p className="mt-0.5 truncate text-[0.7rem] text-muted-foreground">{cell.label}</p>
+          </Link>
+        ) : (
+          <div key={cell.label} className="px-3.5 py-2.5">
+            <p className="text-lg font-semibold tabular-nums">{cell.value}</p>
+            <p className="mt-0.5 truncate text-[0.7rem] text-muted-foreground">{cell.label}</p>
+          </div>
+        ),
+      )}
     </div>
   );
 }

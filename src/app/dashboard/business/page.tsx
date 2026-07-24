@@ -4,7 +4,6 @@ import { Store } from 'lucide-react';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
-import { BusinessCopilot } from '@/components/copilot/business-copilot';
 import { ChannelSetup } from './channel-setup';
 import { BusinessIntake } from './business-intake';
 
@@ -38,8 +37,6 @@ export default async function DashboardBusinessPage() {
         title="My Business"
         description={`Tell your AI assistant about ${tenant.business_name} and manage which channels it talks to customers on. Technical setup (API keys, tokens) is always handled by our team.`}
       />
-
-      <BusinessCopilot tenantId={activeTenantId} businessName={tenant.business_name} />
 
       <ChannelSetup
         tenantId={activeTenantId}

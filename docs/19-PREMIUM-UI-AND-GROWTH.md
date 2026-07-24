@@ -75,13 +75,17 @@ else is generated, reviewed once, and live.
   `quick-provision-dialog.tsx` (Sparkles trigger) with a success screen showing the widget key
   (copy button) + any warnings; wired beside `NewClientDialog` on `admin/clients/page.tsx`. Turns
   onboarding from a multi-session chore into one form.
-- **O5. Business Copilot** — ✅ SHIPPED. A Claude-style chat at the top of `dashboard/business`
-  (`components/copilot/business-copilot.tsx`) where the non-technical owner types plain language
+- **O5. Business Copilot** — ✅ SHIPPED. A Claude-style chat on the tenant home page (`/dashboard`,
+  `components/copilot/business-copilot.tsx`) where the non-technical owner types plain language
   ("add bridal makeup for 15000", "close 24–26 Dec for Eid", "we take bank transfer now", "make my
   assistant sound more premium") and the copilot proposes the exact profile edit as a
-  **ProposedChangeCard** the owner commits with one tap. It's the friendly front door; the intake
-  wizard stays underneath as the precise/manual editor. Reuses O1 Prompt Architect and O2 Magic
-  Import as tools.
+  **ProposedChangeCard** the owner commits with one tap. `/dashboard/business` keeps the precise
+  manual editor (intake wizard + channel setup) underneath it conceptually, just on its own page now.
+  Reuses O1 Prompt Architect and O2 Magic Import as tools. Originally shipped mounted on
+  `dashboard/business`; relocated to the home page 2026-07-24 with the home page's needs-attention/
+  activity stats folded into the panel as an `overview` prop (`OverviewPanel` in the same file) instead
+  of standalone cards — same underlying queries, so the two can't drift. Staff (`tenant_agent`, who
+  can't edit the business) still see the plain stat cards with no copilot, unchanged.
   - **Safety spine — propose/apply split.** The LLM **never writes to the DB**; it only proposes a
     structured `CopilotPatch`, and a deterministic, auth-checked applier commits it. Two server
     actions in `app/dashboard/business/copilot-actions.ts`, both gated exactly like the intake actions

@@ -155,6 +155,7 @@ export async function applyCopilotPatchAction(tenantId: string, rawPatch: unknow
     });
   }
 
+  revalidatePath('/dashboard');
   revalidatePath('/dashboard/business');
   revalidatePath('/admin/clients');
   revalidatePath(`/admin/clients/${tenantId}/intake`);

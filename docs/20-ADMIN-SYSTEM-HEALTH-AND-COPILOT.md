@@ -239,11 +239,16 @@ Captured from the user 2026-07-24. Not scoped or security-reviewed yet; each nee
 
 3. **Move both chatbots onto their home pages, with stats folded into the chat as an overview, plus
    time-windowed business Q&A and (for admin) error tracking.**
-   - **Tenant side:** put the Business Copilot (docs/19 O5) directly on `/dashboard` (the tenant home
-     page), not only on `/dashboard/business`. The stat cards currently on `/dashboard` should be
-     re-presented **inside** the copilot as an opening "overview" turn/card (not just left sitting
-     beside the chat as a separate widget) — i.e. the chat itself leads with the tenant's current
-     numbers, then takes questions.
+   - **Tenant side: ✅ SHIPPED 2026-07-24.** The Business Copilot (docs/19 O5) now lives directly on
+     `/dashboard` (the tenant home page) instead of `/dashboard/business` — see docs/19 O5 for the
+     detail. Built as a **static overview panel** inside the copilot card (`OverviewPanel` in
+     `business-copilot.tsx`), fed by the same server-computed needs-attention/teaser/rating numbers the
+     page already queried — deliberately *not* an LLM-narrated opening turn, since the numbers are
+     deterministic and real-time; routing them through the model would add latency, cost, and
+     hallucination risk for zero benefit. This does **not** give the copilot any new read capability —
+     it still has zero read-tools, same as before. The "New capability" and "Admin error tracking"
+     bullets below (time-windowed Q&A the model can actually answer questions about) are still queued
+     and unscoped.
    - **Admin side:** put the Admin Copilot (Part 2 above) on `/admin` (the agency home page), same
      pattern — the System Health + needs-attention numbers become the copilot's opening overview turn,
      not just a separate page the operator has to click to.

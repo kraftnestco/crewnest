@@ -10,8 +10,7 @@ import { FREE_PLAN_DAILY_SESSION_CAP } from '@/lib/constants';
 import { PageHeader } from '@/components/page-header';
 import { EmptyState } from '@/components/empty-state';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { BusinessCopilot, type CopilotOverview } from '@/components/copilot/business-copilot';
 
 const NEEDS_ATTENTION_CARDS = [
   { key: 'ordersToApprove', label: 'Pending orders', href: '/dashboard/orders?status=pending' },
@@ -110,6 +109,22 @@ export default async function DashboardHomePage() {
   const hasActivity = teaser.some((t) => t.value > 0);
   const attentionTotal = NEEDS_ATTENTION_CARDS.reduce((sum, c) => sum + needsAttention[c.key], 0);
 
+  // Feeds the copilot's folded-in overview panel (tenant_admin only — see below).
+  // Kept as a plain object built from the same queries above rather than a new
+  // fetch, so the two surfaces can never disagree.
+  const overview: CopilotOverview = {
+    hasActivity,
+    connectedChannels,
+    needsAttention: NEEDS_ATTENTION_CARDS.map((c) => ({
+      key: c.key,
+      label: c.label,
+      count: needsAttention[c.key],
+      href: c.href,
+    })),
+    stats: teaser,
+    avgRating: avgRating !== null ? { value: avgRating, count: ratings.length } : null,
+  };
+
   return (
     <div className="space-y-6 p-6">
       <PageHeader
@@ -132,7 +147,13 @@ export default async function DashboardHomePage() {
         </div>
       )}
 
-      {!hasActivity ? (
+      {canEditBusiness ? (
+        // Owners get the copilot as the home surface — needs-attention/activity
+        // stats live inside it as an overview instead of as separate cards.
+        <BusinessCopilot tenantId={activeTenantId} businessName={tenant?.business_name ?? 'your business'} overview={overview} />
+      ) : !hasActivity ? (
+        // Staff (tenant_agent) can't edit the business, so they keep the plain
+        // stat view — no copilot, nothing to fold it into.
         <EmptyState
           icon={Rocket}
           title={
@@ -141,13 +162,6 @@ export default async function DashboardHomePage() {
               : 'Your AI assistant is almost ready'
           }
           hint="This is where your customer chats and orders will show up once conversations start coming in."
-          cta={
-            connectedChannels.length === 0 && canEditBusiness ? (
-              <Link href="/dashboard/business" className={cn(buttonVariants({ size: 'sm' }))}>
-                Finish channel setup
-              </Link>
-            ) : undefined
-          }
         />
       ) : (
         <>
