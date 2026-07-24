@@ -1,3 +1,15 @@
+# CrewNest
+
+> **New here / picking this up? START WITH [`handoff.md`](handoff.md)** — it's the single entry point:
+> what CrewNest is, how to run + deploy, what's already shipped, the ordered remaining-work backlog,
+> when to switch to Opus vs. Sonnet, and the manual/ops checklist to make it fully functional. Then read
+> `CLAUDE.md` + `AGENTS.md` (how-we-work rules) and `docs/` (architecture source of truth).
+
+Multi-tenant AI-employee SaaS for small businesses (WhatsApp / Messenger / Instagram / web-widget). Live
+at `crewnest-rouge.vercel.app` (Vercel + Supabase). The generic Next.js notes below are boilerplate.
+
+---
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
