@@ -99,11 +99,13 @@ export default function Home() {
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-2">
+          {/* Matches the dashboard sidebar lockup exactly (mark + wordmark + subtext). */}
+          <div className="flex items-center gap-3">
             <Logomark />
-            <span className={cn('font-hero-display', 'text-lg')}>
-              Crew<span className="font-normal text-muted-foreground">Nest</span>
-            </span>
+            <div className="min-w-0">
+              <p className="font-logo text-2xl leading-none">CrewNest</p>
+              <p className="mt-1 truncate text-[0.7rem] text-muted-foreground">By KraftNest Automations</p>
+            </div>
           </div>
           <nav className="flex items-center gap-1.5 sm:gap-2">
             <div className="mr-2 hidden items-center gap-1 md:flex">
@@ -333,7 +335,7 @@ export default function Home() {
             <div className="max-w-xs">
               <div className="flex items-center gap-2">
                 <Logomark className="size-6" />
-                <span className="font-hero-display">CrewNest</span>
+                <span className="font-logo text-lg">CrewNest</span>
               </div>
               <p className="mt-3 text-sm text-muted-foreground">
                 AI employees that answer your customers, take orders, and never miss a message.

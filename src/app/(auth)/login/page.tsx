@@ -29,7 +29,7 @@ export default async function LoginPage({
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-sm rounded-xl bg-card p-6 ring-1 ring-foreground/10">
         <div className="mb-6">
-          <h1 className="font-hero-display text-lg">CrewNest</h1>
+          <h1 className="font-logo text-lg">CrewNest</h1>
           <p className="text-sm text-muted-foreground">
             {existingAccountEmail
               ? `Currently signed in as ${existingAccountEmail}. Sign in below to switch accounts.`

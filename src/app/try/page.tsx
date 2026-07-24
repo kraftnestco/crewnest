@@ -16,9 +16,7 @@ export default function TryPage() {
         <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link href="/" className="flex items-center gap-2">
             <Logomark />
-            <span className={cn('font-hero-display', 'text-lg')}>
-              Crew<span className="font-normal text-muted-foreground">Nest</span>
-            </span>
+            <span className="font-logo text-lg">CrewNest</span>
           </Link>
           <Link href="/login?redirect=/dashboard" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
             Sign in
