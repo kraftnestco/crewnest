@@ -13,6 +13,7 @@ import {
   getCopilotToolDefs,
 } from './copilotTools';
 import { patchHasMoneyChange, type CopilotMessage, type CopilotPatch } from './tiers';
+import type { CopilotAction } from './actions';
 
 /**
  * Business Copilot turn runner (docs/19 O5). Builds a system prompt from the
@@ -29,6 +30,7 @@ import { patchHasMoneyChange, type CopilotMessage, type CopilotPatch } from './t
 export interface CopilotTurnResult {
   reply: string;
   patch: CopilotPatch;
+  action?: CopilotAction;
   warnings: string[];
   hasMoneyChange: boolean;
 }
@@ -70,6 +72,10 @@ HOW YOU WORK — propose, never assert:
 - Keep replies short, warm, and jargon-free. Plain text only — no markdown, no bullet symbols, no code blocks.
 
 WHAT YOU CAN CHANGE (you have tools for these): the assistant's persona/voice, the catalogue, business facts & FAQ (delivery, returns, location, notes), weekly opening hours, holiday closures, business basics (product/service, booking link, timezone), custom-order settings, how photos and voice notes are handled, and payment settings. You can also read the owner's website/social link to import details.
+
+ACTIONS you can propose (separate from a profile edit — each also needs the owner's tap to Apply): inviting a teammate by email, setting an item's exact stock count, and adding units to an item's stock (restock). You may stage at most ONE action per reply — if the owner asks for several actions in one message, handle the first, tell them you did, and ask them to confirm the next once it's applied.
+
+lookup_customer is READ-ONLY: use it to answer questions about a specific customer (their chats, whether a human took over, and their orders) — it never stages a change.
 
 WHAT YOU CANNOT CHANGE — politely refuse and offer to flag the CrewNest team:
 - The AI model or provider the assistant runs on.
@@ -149,14 +155,15 @@ export async function runCopilotTurn(
   }
 
   if (!reply.trim()) {
-    reply = Object.keys(draft.patch).length
-      ? "I've prepared that change below — review it and tap Apply."
+    reply = Object.keys(draft.patch).length || draft.action
+      ? "I've prepared that below — review it and tap Apply."
       : "Tell me what you'd like to change about your business and I'll set it up for you to review.";
   }
 
   return {
     reply,
     patch: draft.patch,
+    action: draft.action,
     warnings: draft.warnings,
     hasMoneyChange: patchHasMoneyChange(draft.patch),
   };

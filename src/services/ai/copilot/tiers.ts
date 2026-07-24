@@ -22,6 +22,7 @@
  * `CopilotPatch` type and `MONEY_FIELDS` to render the preview + money banner.
  */
 import { z } from 'zod';
+import type { CopilotAction } from './actions';
 
 const faqEntrySchema = z.object({ q: z.string(), a: z.string() });
 
@@ -124,10 +125,11 @@ export interface CopilotMessage {
   content: string;
 }
 
-/** Result of `copilotTurnAction` — the reply + the staged (not yet applied) patch. */
+/** Result of `copilotTurnAction` — the reply + the staged (not yet applied) patch/action. */
 export interface CopilotTurnState {
   reply: string;
   patch: CopilotPatch;
+  action?: CopilotAction;
   hasMoneyChange: boolean;
   error: string | null;
 }

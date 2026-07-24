@@ -3,14 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, ArrowUp, CalendarClock, Check, Loader2, Plus, Sparkles, Truck, Wand2, X } from 'lucide-react';
+import { AlertTriangle, ArrowUp, CalendarClock, Check, Loader2, Plus, Truck, Wand2, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { applyCopilotPatchAction, copilotTurnAction } from '@/app/dashboard/business/copilot-actions';
-import { MONEY_FIELDS, type CopilotMessage, type CopilotPatch } from '@/services/ai/copilot/tiers';
+import { applyCopilotActionAction, applyCopilotPatchAction, copilotTurnAction } from '@/app/dashboard/business/copilot-actions';
+import type { CopilotMessage, CopilotPatch } from '@/services/ai/copilot/tiers';
+import { describeCopilotAction, type CopilotAction } from '@/services/ai/copilot/actions';
+import { CopilotAvatar, UserMessage, AssistantMessage, ThinkingRow } from './chat-shell';
 
 /**
  * Business Copilot — the Claude-style chat on the tenant home page (docs/19 O5).
@@ -47,13 +49,14 @@ type ProposalStatus = 'pending' | 'applied' | 'dismissed' | 'superseded';
 interface Turn {
   role: 'user' | 'assistant';
   content: string;
-  /** Present on assistant turns that staged a change. */
+  /** Present on assistant turns that staged a profile edit. Independent of `action` — a turn may stage both. */
   patch?: CopilotPatch;
   hasMoneyChange?: boolean;
-  status?: ProposalStatus;
+  patchStatus?: ProposalStatus;
+  /** Present on assistant turns that staged an imperative action (invite/inventory). */
+  action?: CopilotAction;
+  actionStatus?: ProposalStatus;
 }
-
-const MONEY_FIELD_SET: ReadonlySet<string> = new Set(MONEY_FIELDS);
 
 export function BusinessCopilot({
   tenantId,
@@ -68,7 +71,7 @@ export function BusinessCopilot({
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
-  const [applyingIndex, setApplyingIndex] = useState<number | null>(null);
+  const [applying, setApplying] = useState<{ index: number; kind: 'patch' | 'action' } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -94,18 +97,24 @@ export function BusinessCopilot({
           setTurns((prev) => [...prev, { role: 'assistant', content: result.error as string }]);
           return;
         }
-        const staged = Object.keys(result.patch).length > 0;
+        const stagedPatch = Object.keys(result.patch).length > 0;
+        const stagedAction = Boolean(result.action);
         setTurns((prev) => {
-          // A fresh proposal supersedes any earlier still-pending one to avoid stale applies.
-          const next = staged
-            ? prev.map((t) => (t.status === 'pending' ? { ...t, status: 'superseded' as const } : t))
-            : prev;
+          // A fresh proposal supersedes any earlier still-pending one (of the same kind) to avoid stale applies.
+          const next = prev.map((t) => ({
+            ...t,
+            patchStatus: stagedPatch && t.patchStatus === 'pending' ? ('superseded' as const) : t.patchStatus,
+            actionStatus: stagedAction && t.actionStatus === 'pending' ? ('superseded' as const) : t.actionStatus,
+          }));
           return [
             ...next,
             {
               role: 'assistant',
               content: result.reply,
-              ...(staged ? { patch: result.patch, hasMoneyChange: result.hasMoneyChange, status: 'pending' as const } : {}),
+              ...(stagedPatch
+                ? { patch: result.patch, hasMoneyChange: result.hasMoneyChange, patchStatus: 'pending' as const }
+                : {}),
+              ...(stagedAction ? { action: result.action, actionStatus: 'pending' as const } : {}),
             },
           ];
         });
@@ -121,15 +130,23 @@ export function BusinessCopilot({
     [tenantId, thinking, turns],
   );
 
-  async function apply(index: number) {
+  async function apply(index: number, kind: 'patch' | 'action') {
     const turn = turns[index];
-    if (!turn?.patch || applyingIndex !== null) return;
-    setApplyingIndex(index);
+    const payload = kind === 'patch' ? turn?.patch : turn?.action;
+    if (!payload || applying !== null) return;
+    setApplying({ index, kind });
     try {
-      const res = await applyCopilotPatchAction(tenantId, turn.patch);
+      const res =
+        kind === 'patch'
+          ? await applyCopilotPatchAction(tenantId, turn.patch)
+          : await applyCopilotActionAction(tenantId, turn.action);
       if (res.success) {
-        setTurns((prev) => prev.map((t, i) => (i === index ? { ...t, status: 'applied' } : t)));
-        toast.success('Change applied. Your assistant is using it now.');
+        setTurns((prev) =>
+          prev.map((t, i) =>
+            i === index ? { ...t, [kind === 'patch' ? 'patchStatus' : 'actionStatus']: 'applied' } : t,
+          ),
+        );
+        toast.success(kind === 'patch' ? 'Change applied. Your assistant is using it now.' : 'Done.');
         router.refresh();
       } else {
         toast.error(res.error ?? "That change couldn't be applied.");
@@ -137,12 +154,14 @@ export function BusinessCopilot({
     } catch {
       toast.error("That change couldn't be applied. Please try again.");
     } finally {
-      setApplyingIndex(null);
+      setApplying(null);
     }
   }
 
-  function dismiss(index: number) {
-    setTurns((prev) => prev.map((t, i) => (i === index ? { ...t, status: 'dismissed' } : t)));
+  function dismiss(index: number, kind: 'patch' | 'action') {
+    setTurns((prev) =>
+      prev.map((t, i) => (i === index ? { ...t, [kind === 'patch' ? 'patchStatus' : 'actionStatus']: 'dismissed' } : t)),
+    );
   }
 
   function onComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -204,10 +223,19 @@ export function BusinessCopilot({
                     <ProposedChangeCard
                       patch={turn.patch}
                       hasMoneyChange={Boolean(turn.hasMoneyChange)}
-                      status={turn.status ?? 'pending'}
-                      applying={applyingIndex === i}
-                      onApply={() => apply(i)}
-                      onDismiss={() => dismiss(i)}
+                      status={turn.patchStatus ?? 'pending'}
+                      applying={applying?.index === i && applying.kind === 'patch'}
+                      onApply={() => apply(i, 'patch')}
+                      onDismiss={() => dismiss(i, 'patch')}
+                    />
+                  )}
+                  {turn.action && (
+                    <ProposedActionCard
+                      action={turn.action}
+                      status={turn.actionStatus ?? 'pending'}
+                      applying={applying?.index === i && applying.kind === 'action'}
+                      onApply={() => apply(i, 'action')}
+                      onDismiss={() => dismiss(i, 'action')}
                     />
                   )}
                 </AssistantMessage>
@@ -298,56 +326,6 @@ function OverviewPanel({ overview }: { overview: CopilotOverview }) {
           </div>
         ),
       )}
-    </div>
-  );
-}
-
-/** Gradient sparkle mark used in the header, empty state, and beside every reply. */
-function CopilotAvatar({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
-  const lg = size === 'lg';
-  return (
-    <span
-      className={cn(
-        'flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-sm',
-        lg ? 'size-11' : 'size-8',
-      )}
-    >
-      <Sparkles className={lg ? 'size-5' : 'size-4'} />
-    </span>
-  );
-}
-
-function UserMessage({ content }: { content: string }) {
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-1 flex justify-end duration-300 motion-reduce:animate-none">
-      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-muted px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-        {content}
-      </div>
-    </div>
-  );
-}
-
-function AssistantMessage({ content, children }: { content: string; children?: React.ReactNode }) {
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-1 flex gap-3 duration-300 motion-reduce:animate-none">
-      <CopilotAvatar />
-      <div className="min-w-0 flex-1 space-y-3 pt-1">
-        <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">{content}</p>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function ThinkingRow() {
-  return (
-    <div className="flex gap-3">
-      <CopilotAvatar />
-      <div className="flex items-center gap-1 pt-3">
-        <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.3s]" />
-        <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.15s]" />
-        <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/50" />
-      </div>
     </div>
   );
 }
@@ -511,6 +489,59 @@ function ProposedChangeCard({
           </div>
         ))}
       </dl>
+
+      {!settled && (
+        <div className="flex items-center justify-end gap-2 border-t bg-muted/30 px-3.5 py-2.5">
+          <Button type="button" variant="ghost" size="sm" onClick={onDismiss} disabled={applying}>
+            <X className="size-3.5" /> Dismiss
+          </Button>
+          <Button type="button" size="sm" onClick={onApply} disabled={applying}>
+            {applying ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+            {applying ? 'Applying…' : 'Apply'}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ proposed action */
+
+function ProposedActionCard({
+  action,
+  status,
+  applying,
+  onApply,
+  onDismiss,
+}: {
+  action: CopilotAction;
+  status: ProposalStatus;
+  applying: boolean;
+  onApply: () => void;
+  onDismiss: () => void;
+}) {
+  const settled = status !== 'pending';
+
+  return (
+    <div
+      className={cn(
+        'mt-2 ml-0 overflow-hidden rounded-xl border transition-opacity',
+        status === 'applied' ? 'border-primary/40' : 'border-border',
+        settled && status !== 'applied' && 'opacity-70',
+      )}
+    >
+      <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3.5 py-2">
+        <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Proposed action</p>
+        {status === 'applied' && (
+          <span className="flex items-center gap-1 text-xs font-medium text-primary">
+            <Check className="size-3.5" /> Applied
+          </span>
+        )}
+        {status === 'dismissed' && <span className="text-xs text-muted-foreground">Dismissed</span>}
+        {status === 'superseded' && <span className="text-xs text-muted-foreground">Replaced by a newer change</span>}
+      </div>
+
+      <p className="px-3.5 py-3 text-sm text-foreground">{describeCopilotAction(action)}</p>
 
       {!settled && (
         <div className="flex items-center justify-end gap-2 border-t bg-muted/30 px-3.5 py-2.5">

@@ -9,6 +9,9 @@ import { ingestTenantKnowledge } from '@/services/knowledge';
 import { parseCatalogueFreeform } from '@/services/ai/catalogueParser';
 import { runCopilotTurn } from '@/services/ai/copilot/runCopilotTurn';
 import { validatePatch, type ApplyPatchState, type CopilotMessage, type CopilotTurnState } from '@/services/ai/copilot/tiers';
+import { validateCopilotAction, type ApplyActionResult } from '@/services/ai/copilot/actions';
+import { inviteMember } from '@/services/teamMembers';
+import { setItemStockAction, restockItemAction } from '@/app/dashboard/inventory/inventory-actions';
 import type { Database, Json } from '@/types/database';
 import { log } from '@/lib/log';
 
@@ -28,6 +31,12 @@ import { log } from '@/lib/log';
  * Both are gated exactly like the intake actions: caller must be a platform_admin
  * or a tenant_admin OF THIS TENANT. A jailbroken copilot can therefore only ever
  * touch the caller's own tenant profile, and only its allowlisted columns.
+ *
+ * `applyCopilotActionAction` is the same idea for a staged `CopilotAction`
+ * (invite/inventory — see actions.ts): re-checks auth, re-validates against the
+ * `.strict()` action schema, then dispatches to the SAME already-auth-checked
+ * functions the manual dashboard flows use (`inviteMember`, `setItemStockAction`,
+ * `restockItemAction`) rather than duplicating their logic.
  */
 
 type TenantUpdate = Database['public']['Tables']['tenants']['Update'];
@@ -78,7 +87,13 @@ export async function copilotTurnAction(
 
   try {
     const result = await runCopilotTurn(tenant, extra?.catalog_freeform_text ?? null, clean);
-    return { reply: result.reply, patch: result.patch, hasMoneyChange: result.hasMoneyChange, error: null };
+    return {
+      reply: result.reply,
+      patch: result.patch,
+      action: result.action,
+      hasMoneyChange: result.hasMoneyChange,
+      error: null,
+    };
   } catch (err) {
     log.error('[copilot] turn failed', { tenantId, err });
     return {
@@ -160,4 +175,35 @@ export async function applyCopilotPatchAction(tenantId: string, rawPatch: unknow
   revalidatePath('/admin/clients');
   revalidatePath(`/admin/clients/${tenantId}/intake`);
   return { success: true, error: null };
+}
+
+/**
+ * Commit a copilot-proposed action. Re-validates against the `.strict()` action
+ * schema (defense-in-depth against a hand-forged payload), then dispatches to the
+ * SAME function the manual dashboard flow uses for that operation — never a
+ * second implementation of the write.
+ */
+export async function applyCopilotActionAction(tenantId: string, rawAction: unknown): Promise<ApplyActionResult> {
+  const gate = await requireTenantAdmin(tenantId);
+  if (!gate.ok) return { success: false, error: gate.error };
+
+  const validated = validateCopilotAction(rawAction);
+  if (!validated.ok) return { success: false, error: validated.error };
+  const action = validated.action;
+
+  switch (action.type) {
+    case 'invite_team_member': {
+      const result = await inviteMember(tenantId, action.email, action.role);
+      if (result.success) revalidatePath('/dashboard/team');
+      return { success: result.success, error: result.error };
+    }
+    case 'set_stock': {
+      const result = await setItemStockAction(tenantId, action.itemName, action.stock);
+      return { success: result.success, error: result.error };
+    }
+    case 'restock': {
+      const result = await restockItemAction(tenantId, action.itemName, action.addUnits);
+      return { success: result.success, error: result.error };
+    }
+  }
 }

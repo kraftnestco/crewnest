@@ -174,3 +174,13 @@ export const MIN_CSAT_SAMPLE = 5;
  * redeliver a webhook after a few days, so idempotency only needs this horizon.
  */
 export const WEBHOOK_EVENTS_RETENTION_DAYS = 30;
+
+/**
+ * Roles a tenant_admin or agency staff may assign via invite/change-role -
+ * never `platform_admin` (agency-only, docs/18 §5 guardrail 2). Lives here
+ * (not `services/teamMembers.ts`, which is `server-only`) because the Business
+ * Copilot's action schema (`services/ai/copilot/actions.ts`) needs it in the
+ * client bundle too, to render a proposed invite's role label.
+ */
+export const MEMBER_ROLE_VALUES = ['tenant_admin', 'tenant_agent'] as const;
+export type AssignableMemberRole = (typeof MEMBER_ROLE_VALUES)[number];

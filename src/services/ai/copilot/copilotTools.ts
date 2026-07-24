@@ -4,6 +4,9 @@ import type { LlmToolCall, LlmToolDef } from '@/services/ai/provider';
 import type { BusinessType, MediaHandling, PaymentMethod, Tenant, VoiceHandling } from '@/types/domain';
 import type { Closure } from '@/services/hours';
 import type { CopilotPatch } from './tiers';
+import { MEMBER_ROLE_VALUES } from '@/services/teamMembers';
+import type { CopilotAction } from './actions';
+import { createServiceClient } from '@/lib/supabase/service';
 import {
   type FaqEntry,
   type HourRow,
@@ -65,6 +68,8 @@ export interface CopilotDraft {
   tenant: TenantForCopilot;
   snapshot: CopilotSnapshot;
   patch: CopilotPatch;
+  /** Staged imperative operation (invite/inventory) — separate from `patch` since it calls an existing action, not a column write. Only one action may be staged per turn. */
+  action?: CopilotAction;
   warnings: string[];
 }
 
@@ -607,6 +612,252 @@ const importFromUrlTool: CopilotTool = {
   },
 };
 
+const inviteTeamMemberTool: CopilotTool = {
+  def: {
+    name: 'invite_team_member',
+    description:
+      'Invite a new teammate to help run this business by email. Role is "tenant_admin" (full access, same as ' +
+      'the owner) or "tenant_agent" (works the inbox/orders, no billing/team/settings access). This PROPOSES the ' +
+      'invite — nothing is sent until the owner reviews and approves it.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['email', 'role'],
+      properties: {
+        email: { type: 'string', description: "The teammate's email address." },
+        role: {
+          type: 'string',
+          enum: [...MEMBER_ROLE_VALUES],
+          description: '"tenant_admin" for full access, "tenant_agent" for limited access.',
+        },
+      },
+    },
+  },
+  argsSchema: z.object({
+    email: z.string().trim().email(),
+    role: z.enum(MEMBER_ROLE_VALUES),
+  }),
+  async execute(args, draft) {
+    const a = args as { email: string; role: (typeof MEMBER_ROLE_VALUES)[number] };
+    draft.action = { type: 'invite_team_member', email: a.email.trim(), role: a.role };
+    return `Staged an invite for ${a.email} as ${a.role === 'tenant_admin' ? 'an admin' : 'an agent'}.`;
+  },
+};
+
+const setInventoryStockTool: CopilotTool = {
+  def: {
+    name: 'set_inventory_stock',
+    description:
+      'Set the exact stock count for one catalogue item by name, e.g. "set Bridal Lehenga stock to 5". Use ' +
+      'restock_inventory instead when the owner describes an ADDITION rather than the exact new total. This ' +
+      'PROPOSES the change — nothing updates until the owner approves it.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['item_name', 'stock'],
+      properties: {
+        item_name: { type: 'string', description: 'The catalogue item name, as it appears in the catalogue.' },
+        stock: { type: 'integer', minimum: 0, description: 'The exact new stock count.' },
+      },
+    },
+  },
+  argsSchema: z.object({
+    item_name: z.string().trim().min(1),
+    stock: z.number().int().min(0),
+  }),
+  async execute(args, draft) {
+    const a = args as { item_name: string; stock: number };
+    draft.action = { type: 'set_stock', itemName: a.item_name.trim(), stock: a.stock };
+    return `Staged setting "${a.item_name.trim()}" stock to ${a.stock}.`;
+  },
+};
+
+const restockInventoryTool: CopilotTool = {
+  def: {
+    name: 'restock_inventory',
+    description:
+      'Add units to an item\'s current stock, e.g. "restock 10 more Bridal Lehengas" or "we got 20 more units in". ' +
+      'Use this instead of set_inventory_stock when the owner is describing an ADDITION rather than stating the ' +
+      'exact new total. This PROPOSES the change — nothing updates until the owner approves it.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['item_name', 'add_units'],
+      properties: {
+        item_name: { type: 'string', description: 'The catalogue item name, as it appears in the catalogue.' },
+        add_units: { type: 'integer', minimum: 1, description: 'How many units to add to the current stock.' },
+      },
+    },
+  },
+  argsSchema: z.object({
+    item_name: z.string().trim().min(1),
+    add_units: z.number().int().positive(),
+  }),
+  async execute(args, draft) {
+    const a = args as { item_name: string; add_units: number };
+    draft.action = { type: 'restock', itemName: a.item_name.trim(), addUnits: a.add_units };
+    return `Staged adding ${a.add_units} units to "${a.item_name.trim()}".`;
+  },
+};
+
+/* ---------------------------------------------------------------- lookup_customer */
+
+const LOOKUP_LIMIT = 5;
+const MESSAGE_PREVIEW_LIMIT = 8;
+const MESSAGE_CONTENT_CHARS = 240;
+
+/** Escape ilike wildcards in user-provided search text before building a LIKE pattern. */
+function ilikePattern(q: string): string {
+  return `%${q.replace(/[%_]/g, '\\$&')}%`;
+}
+
+function formatOrderLine(o: {
+  status: string;
+  payment_status: string;
+  items: unknown;
+  amount_total: number | null;
+  currency: string | null;
+  created_at: string;
+}): string {
+  const items = Array.isArray(o.items)
+    ? o.items
+        .filter(isRecord)
+        .map((i) => (typeof i.name === 'string' ? `${i.name}${typeof i.qty === 'number' ? ` x${i.qty}` : ''}` : ''))
+        .filter(Boolean)
+        .join(', ')
+    : '';
+  const total = o.amount_total !== null ? `${o.amount_total} ${o.currency ?? ''}`.trim() : '';
+  return [o.created_at.slice(0, 10), `status: ${o.status}`, `payment: ${o.payment_status}`, items, total]
+    .filter(Boolean)
+    .join(' — ');
+}
+
+/**
+ * Live DB read scoped to this tenant only — surfaces the same chat/order data
+ * the owner already sees on /dashboard/chat and /dashboard/orders, just found by
+ * name/phone instead of by scrolling. Uses the service client (like every other
+ * tenant-scoped read in services/*.ts) but every query is hard-filtered to
+ * `draft.tenant.id`, and search text goes through parameterised `.ilike()` calls
+ * (never string-interpolated into a PostgREST `.or()` filter) so a customer name
+ * containing filter-syntax characters can't affect the query.
+ */
+async function lookupCustomer(tenantId: string, query: string): Promise<string> {
+  const q = query.trim();
+  if (!q) return 'Please provide a customer name or phone number to search for.';
+
+  const client = createServiceClient();
+  const pattern = ilikePattern(q);
+
+  const [byNameSessions, byIdSessions, byNameOrders, byPhoneOrders] = await Promise.all([
+    client
+      .from('chat_sessions')
+      .select('id, customer_name, external_user_id, platform, is_human_handoff, alert_signal, summary, created_at')
+      .eq('tenant_id', tenantId)
+      .ilike('customer_name', pattern)
+      .order('created_at', { ascending: false })
+      .limit(LOOKUP_LIMIT),
+    client
+      .from('chat_sessions')
+      .select('id, customer_name, external_user_id, platform, is_human_handoff, alert_signal, summary, created_at')
+      .eq('tenant_id', tenantId)
+      .ilike('external_user_id', pattern)
+      .order('created_at', { ascending: false })
+      .limit(LOOKUP_LIMIT),
+    client
+      .from('orders')
+      .select('id, customer_name, customer_phone, status, payment_status, items, amount_total, currency, created_at')
+      .eq('tenant_id', tenantId)
+      .ilike('customer_name', pattern)
+      .order('created_at', { ascending: false })
+      .limit(LOOKUP_LIMIT),
+    client
+      .from('orders')
+      .select('id, customer_name, customer_phone, status, payment_status, items, amount_total, currency, created_at')
+      .eq('tenant_id', tenantId)
+      .ilike('customer_phone', pattern)
+      .order('created_at', { ascending: false })
+      .limit(LOOKUP_LIMIT),
+  ]);
+
+  for (const r of [byNameSessions, byIdSessions, byNameOrders, byPhoneOrders]) {
+    if (r.error) throw r.error;
+  }
+
+  const sessionsById = new Map((byNameSessions.data ?? []).concat(byIdSessions.data ?? []).map((s) => [s.id, s]));
+  const sessions = Array.from(sessionsById.values())
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+    .slice(0, LOOKUP_LIMIT);
+
+  const ordersById = new Map((byNameOrders.data ?? []).concat(byPhoneOrders.data ?? []).map((o) => [o.id, o]));
+  const orders = Array.from(ordersById.values())
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+    .slice(0, LOOKUP_LIMIT);
+
+  if (!sessions.length && !orders.length) return `No customer matching "${q}" was found.`;
+
+  const lines: string[] = [];
+
+  if (sessions.length) {
+    lines.push('Chats:');
+    for (const s of sessions) {
+      const label = s.customer_name || s.external_user_id;
+      const handoff = s.is_human_handoff ? 'handed off to a human' : 'AI handling';
+      const alert = s.alert_signal ? `, alert: ${s.alert_signal}` : '';
+      lines.push(`- ${label} (${s.platform}) — ${handoff}${alert}, last active ${s.created_at.slice(0, 10)}`);
+      if (s.summary) lines.push(`  summary: ${s.summary.slice(0, MESSAGE_CONTENT_CHARS)}`);
+    }
+
+    const mostRecentSessionId = sessions[0]?.id;
+    if (mostRecentSessionId) {
+      const { data: messages, error: messagesError } = await client
+        .from('chat_messages')
+        .select('role, content, created_at')
+        .eq('tenant_id', tenantId)
+        .eq('session_id', mostRecentSessionId)
+        .order('created_at', { ascending: false })
+        .limit(MESSAGE_PREVIEW_LIMIT);
+      if (messagesError) throw messagesError;
+      if (messages?.length) {
+        lines.push('Recent messages (most recent chat, newest first):');
+        for (const m of messages) {
+          lines.push(`  [${m.role}] ${m.content.slice(0, MESSAGE_CONTENT_CHARS)}`);
+        }
+      }
+    }
+  }
+
+  if (orders.length) {
+    lines.push('Orders:');
+    for (const o of orders) lines.push(`- ${o.customer_name ?? o.customer_phone ?? 'unknown'}: ${formatOrderLine(o)}`);
+  }
+
+  return lines.join('\n');
+}
+
+const lookupCustomerTool: CopilotTool = {
+  def: {
+    name: 'lookup_customer',
+    description:
+      'Look up ONE specific customer of this business by name or phone number: their recent chat conversations ' +
+      '(is it AI-handled or handed off, any alert, a summary, and recent messages) and their recent orders (status, ' +
+      'payment, items, total). Use this when the owner asks about a named customer, e.g. "what\'s going on with ' +
+      'Ayesha\'s order" or "did Bilal ever reply". Read-only — does not propose any change.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['query'],
+      properties: {
+        query: { type: 'string', description: "The customer's name or phone number, as the owner said it." },
+      },
+    },
+  },
+  argsSchema: z.object({ query: z.string().min(1) }),
+  async execute(args, draft) {
+    const a = args as { query: string };
+    return lookupCustomer(draft.tenant.id, a.query);
+  },
+};
+
 const COPILOT_TOOLS: CopilotTool[] = [
   updatePersonaTool,
   reviseCatalogueTool,
@@ -619,6 +870,10 @@ const COPILOT_TOOLS: CopilotTool[] = [
   setMediaVoiceTool,
   configurePaymentsTool,
   importFromUrlTool,
+  inviteTeamMemberTool,
+  setInventoryStockTool,
+  restockInventoryTool,
+  lookupCustomerTool,
 ];
 
 export function getCopilotToolDefs(): LlmToolDef[] {

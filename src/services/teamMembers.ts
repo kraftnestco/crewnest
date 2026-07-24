@@ -1,6 +1,7 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
 import type { Database } from '@/types/database';
+import { MEMBER_ROLE_VALUES, type AssignableMemberRole } from '@/lib/constants';
 
 /**
  * Tenant team membership (docs/18 §5, Stage V) + the agency's own client-login
@@ -12,9 +13,8 @@ import type { Database } from '@/types/database';
  * dashboard flow).
  */
 
-/** Roles a tenant_admin or agency staff may assign via invite/change-role — never `platform_admin` (agency-only, docs/18 §5 guardrail 2). */
-export const MEMBER_ROLE_VALUES = ['tenant_admin', 'tenant_agent'] as const;
-export type AssignableMemberRole = (typeof MEMBER_ROLE_VALUES)[number];
+/** Re-exported for existing callers; the values themselves live in `lib/constants.ts` (not server-only). */
+export { MEMBER_ROLE_VALUES, type AssignableMemberRole };
 
 export interface InviteMemberResult {
   error: string | null;
