@@ -507,18 +507,21 @@ function ProposedChangeCard({
 
 /* ------------------------------------------------------------ proposed action */
 
-function ProposedActionCard({
+export function ProposedActionCard({
   action,
   status,
   applying,
   onApply,
   onDismiss,
+  targetLabel,
 }: {
   action: CopilotAction;
   status: ProposalStatus;
   applying: boolean;
   onApply: () => void;
   onDismiss: () => void;
+  /** Optional context line above the description — the admin copilot uses this to show which client the action targets. */
+  targetLabel?: string;
 }) {
   const settled = status !== 'pending';
 
@@ -541,7 +544,10 @@ function ProposedActionCard({
         {status === 'superseded' && <span className="text-xs text-muted-foreground">Replaced by a newer change</span>}
       </div>
 
-      <p className="px-3.5 py-3 text-sm text-foreground">{describeCopilotAction(action)}</p>
+      <div className="px-3.5 py-3">
+        {targetLabel && <p className="mb-1 text-xs font-medium text-muted-foreground">{targetLabel}</p>}
+        <p className="text-sm text-foreground">{describeCopilotAction(action)}</p>
+      </div>
 
       {!settled && (
         <div className="flex items-center justify-end gap-2 border-t bg-muted/30 px-3.5 py-2.5">

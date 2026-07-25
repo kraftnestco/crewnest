@@ -3,17 +3,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, TrendingDown, Truck, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { adminCopilotTurnAction } from '@/app/admin/copilot-actions';
+import { toast } from 'sonner';
+import { adminCopilotTurnAction, applyAdminCopilotActionAction } from '@/app/admin/copilot-actions';
 import type { CopilotMessage } from '@/services/ai/copilot/tiers';
+import type { CopilotAction } from '@/services/ai/copilot/actions';
 import { CopilotAvatar, UserMessage, AssistantMessage, ThinkingRow, ComposerDock } from './chat-shell';
+import { ProposedActionCard } from './business-copilot';
 
 /**
- * Admin Copilot — the Claude-style chat for the agency operator (docs/20 Part 2).
- * Unlike the Business Copilot, this is ADVISORY ONLY: there is no propose/apply
- * split, no cards, no writes anywhere in the path — every reply is plain prose.
- * The operator asks about clients or customers by name; the server-side loop
+ * Admin Copilot — the Claude-style chat for the agency operator (docs/20 Part 2,
+ * extended per HANDOFF-followups-admin.md item 2). Mostly advisory: the operator
+ * asks about clients or customers by name and the server-side loop
  * (`adminCopilotTurnAction`) answers from a pre-built snapshot plus two
- * read-only lookup tools (`lookup_tenant`, `lookup_customer`).
+ * read-only lookup tools. It can ALSO propose one of three actions on a NAMED
+ * client — invite a teammate, set stock, restock — reusing the exact
+ * propose/apply/card spine the Business Copilot uses (`ProposedActionCard`):
+ * nothing writes until the operator taps Apply, which calls
+ * `applyAdminCopilotActionAction` (the only writer in this path).
  */
 
 const SUGGESTIONS: { label: string; icon: LucideIcon }[] = [
@@ -23,15 +29,21 @@ const SUGGESTIONS: { label: string; icon: LucideIcon }[] = [
   { label: "Find a customer's order status", icon: Users },
 ];
 
+type ProposalStatus = 'pending' | 'applied' | 'dismissed' | 'superseded';
+
 interface Turn {
   role: 'user' | 'assistant';
   content: string;
+  /** Present on assistant turns that staged an action targeting a named client. */
+  staged?: { action: CopilotAction; tenantId: string; businessName: string };
+  actionStatus?: ProposalStatus;
 }
 
 export function AdminCopilot() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
+  const [applying, setApplying] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,10 +64,25 @@ export function AdminCopilot() {
 
       try {
         const result = await adminCopilotTurnAction(history);
-        setTurns((prev) => [
-          ...prev,
-          { role: 'assistant', content: result.error ? result.error : result.reply },
-        ]);
+        if (result.error) {
+          setTurns((prev) => [...prev, { role: 'assistant', content: result.error as string }]);
+          return;
+        }
+        setTurns((prev) => {
+          // A fresh proposal supersedes any earlier still-pending one, same rule as the Business Copilot.
+          const next = prev.map((t) => ({
+            ...t,
+            actionStatus: result.staged && t.actionStatus === 'pending' ? ('superseded' as const) : t.actionStatus,
+          }));
+          return [
+            ...next,
+            {
+              role: 'assistant',
+              content: result.reply,
+              ...(result.staged ? { staged: result.staged, actionStatus: 'pending' as const } : {}),
+            },
+          ];
+        });
       } catch {
         setTurns((prev) => [
           ...prev,
@@ -67,6 +94,29 @@ export function AdminCopilot() {
     },
     [thinking, turns],
   );
+
+  async function apply(index: number) {
+    const turn = turns[index];
+    if (!turn?.staged || applying !== null) return;
+    setApplying(index);
+    try {
+      const res = await applyAdminCopilotActionAction(turn.staged.tenantId, turn.staged.action);
+      if (res.success) {
+        setTurns((prev) => prev.map((t, i) => (i === index ? { ...t, actionStatus: 'applied' } : t)));
+        toast.success('Done.');
+      } else {
+        toast.error(res.error ?? "That action couldn't be applied.");
+      }
+    } catch {
+      toast.error("That action couldn't be applied. Please try again.");
+    } finally {
+      setApplying(null);
+    }
+  }
+
+  function dismiss(index: number) {
+    setTurns((prev) => prev.map((t, i) => (i === index ? { ...t, actionStatus: 'dismissed' } : t)));
+  }
 
   function onComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -95,8 +145,8 @@ export function AdminCopilot() {
               <div className="space-y-1.5">
                 <p className="font-heading text-base font-semibold text-foreground">What do you want to check on?</p>
                 <p className="mx-auto max-w-sm text-sm leading-relaxed text-muted-foreground">
-                  I can triage what needs attention, or pull up a specific client or customer by name. I can&apos;t
-                  change anything — just look things up.
+                  I can triage what needs attention, pull up a specific client or customer by name, or prepare an
+                  invite/restock for a named client — you approve every change before it happens.
                 </p>
               </div>
               <div className="grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
@@ -119,7 +169,18 @@ export function AdminCopilot() {
                 turn.role === 'user' ? (
                   <UserMessage key={i} content={turn.content} />
                 ) : (
-                  <AssistantMessage key={i} content={turn.content} />
+                  <AssistantMessage key={i} content={turn.content}>
+                    {turn.staged && (
+                      <ProposedActionCard
+                        action={turn.staged.action}
+                        status={turn.actionStatus ?? 'pending'}
+                        applying={applying === i}
+                        onApply={() => apply(i)}
+                        onDismiss={() => dismiss(i)}
+                        targetLabel={`For ${turn.staged.businessName}`}
+                      />
+                    )}
+                  </AssistantMessage>
                 ),
               )}
               {thinking && <ThinkingRow />}
@@ -135,7 +196,7 @@ export function AdminCopilot() {
           onSend={() => send(input)}
           disabled={thinking}
           placeholder="Ask about a client or customer…"
-          footer="Advisory only — I can't change settings, message customers, or take any action."
+          footer="I can propose an invite or stock change for a client — nothing happens until you tap Apply. I can't touch billing, plans, models, or message customers."
         />
       </div>
     </div>

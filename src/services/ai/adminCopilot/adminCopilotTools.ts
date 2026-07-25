@@ -2,15 +2,28 @@ import 'server-only';
 import { z } from 'zod';
 import type { LlmToolCall, LlmToolDef } from '@/services/ai/provider';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { MEMBER_ROLE_VALUES } from '@/lib/constants';
+import { type CopilotAction } from '@/services/ai/copilot/actions';
 import { log } from '@/lib/log';
 
 /**
- * Admin Copilot tools (docs/20 Part 2). Mirrors `copilot/copilotTools.ts` in shape
- * (`{ def, argsSchema, execute }`) but every tool here is READ-ONLY and platform-
- * wide — there is no draft, nothing is staged, nothing is ever written. This is
- * the on-demand half of the admin copilot: `buildAdminSnapshot.ts` still supplies
- * the always-loaded agency-wide overview; these tools let the operator drill into
- * ONE named client or customer without that detail sitting in every turn's prompt.
+ * Admin Copilot tools (docs/20 Part 2, extended per HANDOFF-followups-admin.md
+ * item 2). Mirrors `copilot/copilotTools.ts` in shape (`{ def, argsSchema,
+ * execute }`). Two tools remain READ-ONLY and platform-wide (`lookup_tenant`,
+ * `lookup_customer`) — this is the on-demand half of the admin copilot:
+ * `buildAdminSnapshot.ts` still supplies the always-loaded agency-wide overview;
+ * these tools let the operator drill into ONE named client or customer without
+ * that detail sitting in every turn's prompt.
+ *
+ * Three more tools (`invite_team_member`, `set_stock`, `restock`) mirror the
+ * Business Copilot's three actions (`copilot/copilotTools.ts`), but target a
+ * NAMED client rather than the caller's own tenant. Like every copilot tool in
+ * this codebase, they are side-effect-free at model time: they only resolve the
+ * business name to a tenant id and STAGE a `CopilotAction` (via `AdminToolResult`
+ * below) for the operator to review as a card — nothing writes here.
+ * `applyAdminCopilotActionAction` (admin/copilot-actions.ts) is the only writer,
+ * dispatching to the SAME already-auth-checked functions the owner-side apply
+ * action uses (`inviteMember`, `setItemStockAction`, `restockItemAction`).
  *
  * Uses `createSupabaseServerClient()` (RLS), never the service client — per
  * docs/20 §2.2's standing rule, a platform admin already sees every tenant's rows
@@ -22,13 +35,19 @@ import { log } from '@/lib/log';
  * message content" v1 exclusion. That widening was an explicit, confirmed user
  * decision (2026-07-24): platform admins already have this data through
  * `/admin/clients/<id>` and `/admin/chat`, so a lookup tool is a new interface to
- * existing access, not a new privilege. Still zero write tools of any kind.
+ * existing access, not a new privilege.
  */
+
+/** A tool's plain-text result for the model, plus an optional staged action + its resolved target (admin tools only — read-only tools never set this). */
+export interface AdminToolResult {
+  text: string;
+  staged?: { action: CopilotAction; tenantId: string; businessName: string };
+}
 
 export interface AdminCopilotTool {
   def: LlmToolDef;
   argsSchema: z.ZodTypeAny;
-  execute(args: unknown): Promise<string>;
+  execute(args: unknown): Promise<AdminToolResult>;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -146,7 +165,7 @@ const lookupTenantTool: AdminCopilotTool = {
   argsSchema: z.object({ business_name: z.string().min(1) }),
   async execute(args) {
     const a = args as { business_name: string };
-    return lookupTenant(a.business_name);
+    return { text: await lookupTenant(a.business_name) };
   },
 };
 
@@ -274,35 +293,194 @@ const lookupCustomerTool: AdminCopilotTool = {
   argsSchema: z.object({ query: z.string().min(1), business_name: z.string().optional() }),
   async execute(args) {
     const a = args as { query: string; business_name?: string };
-    return lookupCustomer(a.query, a.business_name);
+    return { text: await lookupCustomer(a.query, a.business_name) };
   },
 };
 
-const ADMIN_COPILOT_TOOLS: AdminCopilotTool[] = [lookupTenantTool, lookupCustomerTool];
+/* ------------------------------------------------------ tenant name resolver */
+
+interface ResolveTenantResult {
+  ok: true;
+  tenantId: string;
+  businessName: string;
+}
+interface ResolveTenantError {
+  ok: false;
+  message: string;
+}
+
+/**
+ * Resolve a business name to exactly one tenant, the "one genuinely new bit"
+ * for admin write-actions (HANDOFF-followups-admin.md item 2). Never guesses:
+ * zero matches or multiple matches both come back as an error string the model
+ * reads and relays, asking the operator to name the client more precisely —
+ * so a staged action always carries an unambiguous target.
+ */
+async function resolveTenantByName(businessName: string): Promise<ResolveTenantResult | ResolveTenantError> {
+  const q = businessName.trim();
+  if (!q) return { ok: false, message: 'Please provide a business name.' };
+
+  const supabase = await createSupabaseServerClient();
+  const { data: tenants, error } = await supabase
+    .from('tenants')
+    .select('id, business_name')
+    .ilike('business_name', ilikePattern(q))
+    .limit(TENANT_LIMIT);
+  if (error) throw error;
+
+  if (!tenants?.length) return { ok: false, message: `No client business matching "${q}" was found.` };
+  if (tenants.length > 1) {
+    const names = tenants.map((t) => t.business_name).join(', ');
+    return { ok: false, message: `Multiple clients match "${q}": ${names}. Please say which one you mean.` };
+  }
+
+  return { ok: true, tenantId: tenants[0].id, businessName: tenants[0].business_name };
+}
+
+/* -------------------------------------------------------- write-staging tools */
+
+const inviteTeamMemberTool: AdminCopilotTool = {
+  def: {
+    name: 'invite_team_member',
+    description:
+      'Propose inviting a new teammate to a NAMED client business by email. Role is "tenant_admin" (full access, ' +
+      'same as the owner) or "tenant_agent" (works the inbox/orders, no billing/team/settings access). This only ' +
+      'STAGES the invite — nothing is sent until the operator reviews and approves it as a card.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['business_name', 'email', 'role'],
+      properties: {
+        business_name: { type: 'string', description: 'The client business to invite this person to, as the operator said it.' },
+        email: { type: 'string', description: "The teammate's email address." },
+        role: {
+          type: 'string',
+          enum: [...MEMBER_ROLE_VALUES],
+          description: '"tenant_admin" for full access, "tenant_agent" for limited access.',
+        },
+      },
+    },
+  },
+  argsSchema: z.object({
+    business_name: z.string().min(1),
+    email: z.string().trim().email(),
+    role: z.enum(MEMBER_ROLE_VALUES),
+  }),
+  async execute(args) {
+    const a = args as { business_name: string; email: string; role: (typeof MEMBER_ROLE_VALUES)[number] };
+    const resolved = await resolveTenantByName(a.business_name);
+    if (!resolved.ok) return { text: resolved.message };
+    const action: CopilotAction = { type: 'invite_team_member', email: a.email.trim(), role: a.role };
+    return {
+      text: `Staged an invite for ${a.email} to ${resolved.businessName} as ${a.role === 'tenant_admin' ? 'an admin' : 'an agent'}.`,
+      staged: { action, tenantId: resolved.tenantId, businessName: resolved.businessName },
+    };
+  },
+};
+
+const setStockTool: AdminCopilotTool = {
+  def: {
+    name: 'set_stock',
+    description:
+      'Propose setting the exact stock count for one catalogue item, by name, for a NAMED client business, e.g. ' +
+      '"set Bridal Lehenga stock to 5 for Sabiha Jewellers". Use restock instead when the operator describes an ' +
+      'ADDITION rather than the exact new total. This only STAGES the change — nothing updates until the operator approves it.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['business_name', 'item_name', 'stock'],
+      properties: {
+        business_name: { type: 'string', description: 'The client business whose inventory this is, as the operator said it.' },
+        item_name: { type: 'string', description: 'The catalogue item name, as it appears in the catalogue.' },
+        stock: { type: 'integer', minimum: 0, description: 'The exact new stock count.' },
+      },
+    },
+  },
+  argsSchema: z.object({
+    business_name: z.string().min(1),
+    item_name: z.string().trim().min(1),
+    stock: z.number().int().min(0),
+  }),
+  async execute(args) {
+    const a = args as { business_name: string; item_name: string; stock: number };
+    const resolved = await resolveTenantByName(a.business_name);
+    if (!resolved.ok) return { text: resolved.message };
+    const action: CopilotAction = { type: 'set_stock', itemName: a.item_name.trim(), stock: a.stock };
+    return {
+      text: `Staged setting "${a.item_name.trim()}" stock to ${a.stock} for ${resolved.businessName}.`,
+      staged: { action, tenantId: resolved.tenantId, businessName: resolved.businessName },
+    };
+  },
+};
+
+const restockTool: AdminCopilotTool = {
+  def: {
+    name: 'restock',
+    description:
+      'Propose adding units to an item\'s current stock for a NAMED client business, e.g. "restock 10 more Bridal ' +
+      'Lehengas for Sabiha Jewellers". Use this instead of set_stock when the operator is describing an ADDITION ' +
+      'rather than stating the exact new total. This only STAGES the change — nothing updates until the operator approves it.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['business_name', 'item_name', 'add_units'],
+      properties: {
+        business_name: { type: 'string', description: 'The client business whose inventory this is, as the operator said it.' },
+        item_name: { type: 'string', description: 'The catalogue item name, as it appears in the catalogue.' },
+        add_units: { type: 'integer', minimum: 1, description: 'How many units to add to the current stock.' },
+      },
+    },
+  },
+  argsSchema: z.object({
+    business_name: z.string().min(1),
+    item_name: z.string().trim().min(1),
+    add_units: z.number().int().positive(),
+  }),
+  async execute(args) {
+    const a = args as { business_name: string; item_name: string; add_units: number };
+    const resolved = await resolveTenantByName(a.business_name);
+    if (!resolved.ok) return { text: resolved.message };
+    const action: CopilotAction = { type: 'restock', itemName: a.item_name.trim(), addUnits: a.add_units };
+    return {
+      text: `Staged adding ${a.add_units} units to "${a.item_name.trim()}" for ${resolved.businessName}.`,
+      staged: { action, tenantId: resolved.tenantId, businessName: resolved.businessName },
+    };
+  },
+};
+
+const ADMIN_COPILOT_TOOLS: AdminCopilotTool[] = [
+  lookupTenantTool,
+  lookupCustomerTool,
+  inviteTeamMemberTool,
+  setStockTool,
+  restockTool,
+];
 
 export function getAdminCopilotToolDefs(): LlmToolDef[] {
   return ADMIN_COPILOT_TOOLS.map((t) => t.def);
 }
 
 /**
- * Parse + validate the model's args, then run the (read-only) executor. Never
- * throws — a tool failure becomes an error string the model can recover from,
- * mirroring `copilot/copilotTools.ts`'s `executeCopilotTool`.
+ * Parse + validate the model's args, then run the executor. Never throws — a
+ * tool failure becomes an error string the model can recover from, mirroring
+ * `copilot/copilotTools.ts`'s `executeCopilotTool`. Returns the full
+ * `AdminToolResult` so a write tool's staged action reaches the turn action —
+ * the caller decides which staged action (if any) survives to the reply.
  */
-export async function executeAdminCopilotTool(call: LlmToolCall): Promise<string> {
+export async function executeAdminCopilotTool(call: LlmToolCall): Promise<AdminToolResult> {
   const tool = ADMIN_COPILOT_TOOLS.find((t) => t.def.name === call.name);
-  if (!tool) return `Unknown tool: ${call.name}`;
+  if (!tool) return { text: `Unknown tool: ${call.name}` };
 
   let rawArgs: unknown;
   try {
     rawArgs = JSON.parse(call.arguments);
   } catch {
-    return 'Invalid arguments: not valid JSON.';
+    return { text: 'Invalid arguments: not valid JSON.' };
   }
 
   const parsed = tool.argsSchema.safeParse(rawArgs);
   if (!parsed.success) {
-    return `Invalid arguments: ${parsed.error.issues[0]?.message ?? 'validation failed'}`;
+    return { text: `Invalid arguments: ${parsed.error.issues[0]?.message ?? 'validation failed'}` };
   }
 
   try {
@@ -312,8 +490,11 @@ export async function executeAdminCopilotTool(call: LlmToolCall): Promise<string
       tool: call.name,
       error: err instanceof Error ? err.message : String(err),
     });
-    return err instanceof Error && err.message.length <= 200
-      ? `That lookup failed: ${err.message}`
-      : 'That lookup failed. Try a different search.';
+    return {
+      text:
+        err instanceof Error && err.message.length <= 200
+          ? `That step failed: ${err.message}`
+          : 'That step failed. Try a different search.',
+    };
   }
 }
