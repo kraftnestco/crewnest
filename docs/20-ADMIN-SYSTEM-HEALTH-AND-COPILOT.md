@@ -94,20 +94,23 @@ Settings are the two desktop-only tails (both are review/setup surfaces, not liv
 
 ---
 
-## Part 2 — Admin Copilot (`/admin/copilot`) — ✅ SHIPPED 2026-07-24 (v2, tool-calling, read-only)
+## Part 2 — Admin Copilot (`/admin/copilot`) — ✅ SHIPPED 2026-07-24 (v2 read-only); **v3 write actions added 2026-07-26**
 
 An agency-operator chat: "what needs my attention", "which clients are failing to deliver", "who's at
-risk of cancelling", "who's near their cost cap", plus (v2) "look up client X" / "find customer Y's
-order status". **It answers and points to pages. It performs no actions and mutates nothing** — the
-write side (invite/inventory) exists only on the tenant-facing Business Copilot (docs/19 O5), never here.
+risk of cancelling", "who's near their cost cap", "look up client X" / "find customer Y's order status",
+plus (v3) proposing an invite/set-stock/restock action on a **named client**, subject to the operator's
+approval.
 
-> **v1 → v2 note:** the design below originally specified a **zero-tool** copilot (system-prompt
-> snapshot only, no DB access from the model at turn-time). It shipped that way first, then was
-> extended the same day to a **bounded tool-calling loop** (two read-only tools, `MAX_STEPS = 6`,
-> mirroring `runCopilotTurn.ts`'s loop shape) so the operator could ask about a **specific** tenant or
-> customer instead of only the pre-aggregated fleet snapshot. This was a scoped, user-requested
-> extension — not a Sonnet-freelanced widening — see the Rule 4 note directly below. Every other
-> constraint in §2.1 (auth gate, no writes, master key only, no secrets) is unchanged.
+> **v2 → v3 note (2026-07-26): "no write tools, ever" below is SUPERSEDED.** Per
+> `HANDOFF-followups-admin.md` item 2 (Opus-designed, user-approved), the admin copilot gained the same
+> three actions the Business Copilot already had — `invite_team_member`, `set_stock`, `restock` — aimed
+> at a client the operator names in chat rather than the caller's own tenant. This is **not** a
+> Sonnet-freelanced widening: it follows the exact propose/apply spine §2.1 Rule 2 below describes as the
+> thing v1/v2 deliberately omitted ("no apply half at all"), reusing the Business Copilot's own
+> `CopilotAction` schema/`.strict()` allowlist and its already-auth-checked apply functions
+> (`inviteMember`/`setItemStockAction`/`restockItemAction`) rather than inventing new write paths. See the
+> **v3 addendum** after §2.5 for the full contract — §2.1–§2.4 below are kept as-written for the v1/v2
+> historical record; do not edit them to match v3, read the addendum instead.
 
 ### 2.1 ⚠️ Security contract — THIS IS THE [OPUS]-FROZEN PART. Do not widen it.
 
@@ -274,17 +277,61 @@ v2 — tool calls happen server-side inside the turn and are never surfaced as a
   unrelated pre-existing server/client boundary bug surfaced by the build (see the constants-relocation
   note under "Standing rules" below).
 
+### 2.6 v3 addendum (2026-07-26) — write actions on a named client
+
+**What changed:** three write-staging tools were added to `adminCopilotTools.ts` — `invite_team_member`,
+`set_stock`, `restock` — plus a business-name-to-tenant resolver (`resolveTenantByName`, ilike on
+`business_name`, zero/multiple matches both refuse rather than guess). The turn action
+(`adminCopilotTurnAction` in `admin/copilot-actions.ts`) now also returns an optional `staged: { action:
+CopilotAction, tenantId, businessName }`, and a new `applyAdminCopilotActionAction(tenantId, rawAction)`
+is the **only** writer — it re-checks `ctx.isPlatformAdmin` (hard 403 otherwise), re-validates against
+the same `.strict()` `copilotActionSchema` the Business Copilot uses, then dispatches to
+`inviteMember`/`setItemStockAction`/`restockItemAction` with the **server-resolved** `tenantId` (never a
+client-supplied one). `admin-copilot.tsx` renders the same `ProposedActionCard` component
+`business-copilot.tsx` uses (now exported from there) with a "For {businessName}" label, and the
+Apply/Dismiss/superseded-on-new-proposal state machine mirrors the Business Copilot's exactly.
+
+**What did NOT change — §2.1's other rules still hold in full:**
+- Rule 1 (platform-admin-only auth gate) — unchanged; `applyAdminCopilotActionAction` re-checks it
+  independently of the turn action.
+- Rule 3/4 (snapshot allowlist, secrets/PII exclusions) — unchanged; the three new tools carry no
+  additional data exposure, only a name-to-id resolution and an action-shape return.
+- Rule 5 (master key only, no tenant key, no usage_logs write for the turn) — unchanged.
+- **No new action types beyond the three.** `is_active`, `plan`, `plan_status`, `llm_provider`,
+  `llm_model`, any `*_secret_id`, billing, or customer-messaging remain untouchable — no tool exists for
+  them here, same as the Business Copilot side. The model is told this explicitly in the system prompt
+  and, more importantly, has no tool it could even call for them — the allowlist is the enforcement
+  mechanism, not the prompt wording.
+- **The LLM still never writes.** Exactly like the Business Copilot's split, the tool calls only
+  *stage* a `CopilotAction` object during the turn; `applyAdminCopilotActionAction` is the sole path that
+  reaches the database, and only after the operator taps Apply.
+
+**Real bug found + fixed during testing:** the model initially refused to act on a client that existed
+in the database but wasn't in the "needs attention" snapshot — it conflated "not in the snapshot" with
+"doesn't exist," even when told explicitly which tool to call. Fixed by making the system prompt state
+plainly that the snapshot is a partial, attention-filtered view and that `lookup_tenant`/`lookup_customer`
+and the three write tools all search the **full** client list regardless of what the snapshot shows.
+
+**Verified 2026-07-26** via a real authenticated browser session (Playwright) against a live test
+tenant: set_stock staged → Apply → confirmed the actual `catalog_data` write landed in Supabase; restock
+staged correctly as an addition; an unknown business name was refused in plain text with no card ever
+staged; an off-limits request ("pause the account", "switch to GPT-4") was refused and pointed to the
+client page, no card staged. `tsc --noEmit` and `npm run build` both green.
+
 ---
 
 ## Critical files
 **System Health:** `src/services/systemHealth.ts` · `src/app/admin/health/page.tsx` ·
 `src/app/admin/admin-nav.tsx` (nav item + reorder).
-**Admin Copilot (v2, as shipped):** `src/services/ai/adminCopilot/buildAdminSnapshot.ts` (fleet-wide
-snapshot, unchanged since v1) · `src/services/ai/adminCopilot/adminCopilotTools.ts` (new in v2 —
-`lookup_tenant`/`lookup_customer` tool registry) · `src/app/admin/copilot-actions.ts` (rewritten in v2 —
-bounded tool-calling loop) · `src/components/copilot/admin-copilot.tsx` · `src/components/copilot/chat-shell.tsx`
-(factored from business-copilot, shared by both) · `src/app/admin/copilot/page.tsx` ·
-`src/app/admin/admin-nav.tsx` (nav item).
+**Admin Copilot (v3, as shipped):** `src/services/ai/adminCopilot/buildAdminSnapshot.ts` (fleet-wide
+snapshot, unchanged since v1) · `src/services/ai/adminCopilot/adminCopilotTools.ts` (v2's
+`lookup_tenant`/`lookup_customer` read tools + v3's `invite_team_member`/`set_stock`/`restock`
+write-staging tools and the tenant-name resolver) · `src/app/admin/copilot-actions.ts` (v2's bounded
+tool-calling loop + v3's staged-action passthrough and `applyAdminCopilotActionAction`, the sole writer)
+· `src/components/copilot/admin-copilot.tsx` (v3 adds the `ProposedActionCard` apply/dismiss flow) ·
+`src/components/copilot/business-copilot.tsx` (`ProposedActionCard` now exported for admin-copilot reuse)
+· `src/components/copilot/chat-shell.tsx` (factored from business-copilot, shared by both) ·
+`src/app/admin/copilot/page.tsx` · `src/app/admin/admin-nav.tsx` (nav item).
 **Reuses:** `services/overview.getAgencyNeedsAttention`, `services/notifications.mapNotification`,
 `services/ai/provider.getProvider` (+ `LlmToolDef`/`LlmToolCall`/`LlmMessage` types),
 `services/ai/copilot/tiers.CopilotMessage`, `lib/auth/context`, `lib/env.MASTER_*`,
@@ -330,10 +377,13 @@ Captured from the user 2026-07-24. Not scoped or security-reviewed yet; each nee
      scope. So "zero read-tools" is no longer accurate; the overview panel above is still static/
      non-LLM, but the copilot as a whole now has both read and write capability. Time-windowed
      (today/week/month) Q&A specifically is still unbuilt — see below.
-   - **Admin side: ✅ SHIPPED 2026-07-24 (the lookup half).** The Admin Copilot (Part 2 above) gained
-     `lookup_tenant`/`lookup_customer` read-only tools (§2.2), so "no tools at all" below is superseded.
-     Still queued/unbuilt: moving the copilot onto `/admin` itself (the agency home page) with the System
-     Health + needs-attention numbers as its opening overview turn, same pattern as the tenant side.
+   - **Admin side: ✅ SHIPPED 2026-07-24 (lookup half); ✅ SHIPPED 2026-07-26 (write half).** The Admin
+     Copilot (Part 2 above) gained `lookup_tenant`/`lookup_customer` read-only tools (§2.2), then
+     (§2.6 v3 addendum) the same three write actions the Business Copilot has — invite/set_stock/restock
+     — aimed at a named client. "No tools at all" and "no write tools, ever" below are both superseded;
+     see §2.6. Still queued/unbuilt: moving the copilot onto `/admin` itself (the agency home page) with
+     the System Health + needs-attention numbers as its opening overview turn, same pattern as the tenant
+     side.
    - **New capability both copilots still need:** the ability to answer **time-windowed** questions —
      "how were orders today / this week / this month". The lookup tools shipped 2026-07-24 answer
      "what's going on with a specific client/customer right now" but not "how did this week compare to

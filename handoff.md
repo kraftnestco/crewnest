@@ -80,16 +80,42 @@ Supabase SQL editor — see the drift warning in §5.
 Do these top-down. Each says **what**, **where the spec is**, **which model** (this repo follows an
 Opus-designs / Sonnet-builds split — `[OPUS]` work is high-stakes/novel design), and **status**.
 
-### 4a. Copilot follow-ups + Admin-Copilot actions + signup/caps audit — **IN PROGRESS**
+### 4a. Copilot follow-ups + Admin-Copilot actions + signup/caps audit — **2 of 3 DONE, item 1 on hold**
 - **Spec:** [`HANDOFF-followups-admin.md`](HANDOFF-followups-admin.md) (self-contained, Opus-authored).
 - **Model:** Sonnet (design already done).
 - Three items: (1) **scheduled customer follow-up messages** — AI proactively re-messages a customer, with
   a hybrid delivery (auto-send when inside Meta's 24h window, else owner-alert), triggered by **Supabase
   pg_cron + pg_net** (the project is on Vercel free/Hobby, so Vercel cron can't run sub-daily) — **not
-  started**; (2) **admin-copilot write actions** mirroring the owner's 3 — **not started**; (3) **audit**
-  the shipped signup + caps — **done**, see below.
+  started, on hold** (discussed with the user 2026-07-26: real value but non-urgent, and hard to validate
+  meaningfully until Meta channels are actually live — see §4b); (2) **admin-copilot write actions**
+  mirroring the owner's 3 — **done**, see below; (3) **audit** the shipped signup + caps — **done**, see
+  below.
 - Item 1 produces new migrations `0035` (table + notifications type) and `0036` (pg_cron SQL, run
   manually) — neither exists yet.
+- **Item 2 — complete.** Admin Copilot (`/admin/copilot`) can now propose `invite_team_member`/
+  `set_stock`/`restock` on a **named client** (previously read-only-only: two lookup tools, zero writes).
+  Added a business-name resolver (`resolveTenantByName` in `adminCopilotTools.ts` — zero/multiple matches
+  both refuse rather than guess) and three staging tools reusing the Business Copilot's exact
+  `CopilotAction` schema. `adminCopilotTurnAction` now returns an optional staged action;
+  `applyAdminCopilotActionAction` (new, in `admin/copilot-actions.ts`) is the sole writer — re-checks
+  `isPlatformAdmin`, re-validates against the `.strict()` allowlist, dispatches to the same
+  `inviteMember`/`setItemStockAction`/`restockItemAction` the owner side uses. UI reuses
+  `ProposedActionCard` (now exported from `business-copilot.tsx`) with a "For {business}" label. No new
+  action types; billing/plan/model/secrets/customer-messaging remain untouchable, same as the owner side.
+  Doc updated: `docs/20-ADMIN-SYSTEM-HEALTH-AND-COPILOT.md` §2.6 (v3 addendum) — its earlier
+  `[OPUS]-FROZEN` "no write tools, ever" language is explicitly superseded there, not silently
+  contradicted.
+  - **Real bug found + fixed during testing:** the model initially refused to act on a real client
+    because it wasn't listed in the "needs attention" snapshot (a partial, filtered view) — it read
+    "absent from snapshot" as "doesn't exist," even when told exactly which tool to call. Fixed by making
+    the system prompt state plainly that the snapshot is partial and the lookup/write tools search the
+    full client list regardless.
+  - **Verified live** via a real authenticated browser session (Playwright, installed locally via
+    `--no-save`, not a project dependency) against a test tenant: staged a `set_stock` action → Apply →
+    confirmed the `catalog_data` write actually landed in Supabase; staged a `restock` correctly as an
+    addition; an unknown business name was refused in plain text with no card; an off-limits ask ("pause
+    the account", "switch to GPT-4") was refused and pointed to the client page. `tsc --noEmit` and
+    `npm run build` both green.
 - **Item 3 audit — complete.** Traced signup (`provisionTenantAction`), the daily session cap, and the
   monthly cost cap end-to-end; no code changes needed for the trace itself, but it surfaced two real gaps,
   both now fixed and locally verified against a live tenant + real OpenRouter turns (not yet committed —
