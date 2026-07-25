@@ -85,9 +85,35 @@ Opus-designs / Sonnet-builds split — `[OPUS]` work is high-stakes/novel design
 - **Model:** Sonnet (design already done).
 - Three items: (1) **scheduled customer follow-up messages** — AI proactively re-messages a customer, with
   a hybrid delivery (auto-send when inside Meta's 24h window, else owner-alert), triggered by **Supabase
-  pg_cron + pg_net** (the project is on Vercel free/Hobby, so Vercel cron can't run sub-daily); (2)
-  **admin-copilot write actions** mirroring the owner's 3; (3) **audit** the shipped signup + caps.
-- Produces new migrations `0035` (table + notifications type) and `0036` (pg_cron SQL, run manually).
+  pg_cron + pg_net** (the project is on Vercel free/Hobby, so Vercel cron can't run sub-daily) — **not
+  started**; (2) **admin-copilot write actions** mirroring the owner's 3 — **not started**; (3) **audit**
+  the shipped signup + caps — **done**, see below.
+- Item 1 produces new migrations `0035` (table + notifications type) and `0036` (pg_cron SQL, run
+  manually) — neither exists yet.
+- **Item 3 audit — complete.** Traced signup (`provisionTenantAction`), the daily session cap, and the
+  monthly cost cap end-to-end; no code changes needed for the trace itself, but it surfaced two real gaps,
+  both now fixed and locally verified against a live tenant + real OpenRouter turns (not yet committed —
+  see below):
+  - **Rolling 30-day cap reset.** Previously a free tenant that hit `plan_status='cap_reached'` had no way
+    back except a manual DB edit — no admin UI control, no scheduled rollover job existed. Changed the
+    monthly-spend check from calendar-month-to-date to a rolling 30-day window
+    (`messages.getTrailing30DayMasterCostUsd`, renamed from `getMonthToDateMasterCostUsd`) and added an
+    auto-clear: once windowed spend drops back under cap, `aiOrchestrator.ts` flips `plan_status` back to
+    `null` on the next turn — no cron job or admin button needed. Verified live: tripped the cap on a real
+    tenant, confirmed `plan_status='cap_reached'` + exactly one owner+agency notification (no spam on
+    repeat blocked turns), then aged out `usage_logs` past 30 days and confirmed a fresh session got a
+    normal AI reply again with `plan_status` back to `null`.
+  - **Signup double-submit guard.** `complete-client.tsx`'s `useEffect` called `provisionTenantAction`
+    with no re-entrancy guard — React Strict Mode's double-invoke (or any remount) could fire it twice
+    before the first call's `ctx.memberships.length > 0` check would catch it, risking two tenants linked
+    to one user. Added a `useRef` guard so only the first effect run calls the action. Verified via a real
+    signup: exactly one `tenants` row + one `user_tenants` row for the new user.
+  - Docs note: `docs/18-HARDENING-AND-TEAM.md` §3 still describes the cap as "month-to-date" — left
+    as-is (frozen Opus design doc), but the shipped behavior is now the rolling-30-day version above.
+  - Not changed (flagged, not fixed): the double-submit race is still theoretically possible at the
+    database level if two calls land within the same read-check window — the `useRef` guard closes the
+    practical client-triggered case (Strict Mode, remounts) but isn't a DB-level constraint. Revisit if a
+    real double-tenant ever shows up in prod.
 
 ### 4b. Provision env + integrations so it actually runs in prod — **OPS, do early**
 Nothing below works in production until the environment is wired. See §5 for the full checklist. This is

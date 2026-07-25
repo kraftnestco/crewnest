@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { provisionTenantAction } from '../provision-actions';
@@ -17,9 +17,16 @@ type Status = 'provisioning' | 'done_pending_upgrade' | 'nothing_to_provision' |
 export function CompleteClient() {
   const [status, setStatus] = useState<Status>('provisioning');
   const [error, setError] = useState<string | null>(null);
+  // Guards against firing provisionTenantAction twice (React Strict Mode's
+  // double-invoke in dev, or any remount) — a ref survives across that second
+  // effect run, unlike the `cancelled` flag below which only suppresses state
+  // updates, not the in-flight server call itself.
+  const startedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    if (startedRef.current) return;
+    startedRef.current = true;
 
     async function run() {
       const raw = sessionStorage.getItem(DEMO_HANDOFF_KEY);

@@ -294,14 +294,16 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
   // 8. Resolve the LLM key (tenant BYOK from Vault, else master fallback).
   const { key, usedByok } = await getLlmKey(tenant);
 
-  // 8b. Free-plan monthly cost ceiling (docs/18 §3, Stage U-cap, finding #7) — the
-  // daily cap at step 2 only throttles NEW conversations; an existing free session
-  // could otherwise run up unbounded master-key spend. Scoped to plan='free' AND
-  // this turn using the master key (a BYOK free tenant spends their own key — not
-  // ours to cap). Checked here, now that `usedByok` is known, before any model call.
+  // 8b. Free-plan rolling 30-day cost ceiling (docs/18 §3, Stage U-cap, finding #7)
+  // — the daily cap at step 2 only throttles NEW conversations; an existing free
+  // session could otherwise run up unbounded master-key spend. Scoped to plan='free'
+  // AND this turn using the master key (a BYOK free tenant spends their own key —
+  // not ours to cap). Checked here, now that `usedByok` is known, before any model
+  // call. Rolling window (not calendar month) so a capped tenant un-sticks on its
+  // own as old spend ages out — see the else-branch below.
   if (tenant.plan === 'free' && !usedByok) {
     const cap = tenant.freeMonthlyCapUsd ?? DEFAULT_FREE_MONTHLY_CAP_USD;
-    const spentUsd = await messages.getMonthToDateMasterCostUsd(tenant.id);
+    const spentUsd = await messages.getTrailing30DayMasterCostUsd(tenant.id);
 
     if (spentUsd >= cap) {
       // Transition-only notify (mirrors sessions.setAlertSignal) so a chatty capped-out
@@ -345,6 +347,10 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
         replyText: session.platform === 'web' ? FREE_PLAN_MONTHLY_CAP_REACHED_TEXT : null,
         handoff: false,
       };
+    } else if (tenant.planStatus === 'cap_reached') {
+      // Rolling window has aged the old spend out and we're back under cap —
+      // clear the flag so the tenant resumes without any manual/admin reset.
+      await tenants.setPlanStatus(tenant.id, null);
     }
   }
 

@@ -181,24 +181,24 @@ export async function getRecentImageStoragePath(
 }
 
 /**
- * Month-to-date master-key spend for a tenant (docs/18 §3, Stage U-cap) — sums
- * `estimated_cost_usd` from `usage_logs` since UTC month start, master-key rows
- * only (`used_byok=false`; a BYOK tenant spends their own key, never counted
- * toward the platform's free-plan ceiling). Reads the existing
- * `usage_logs_period_idx (tenant_id, created_at)` index (migration 0004).
+ * Trailing-30-day master-key spend for a tenant (docs/18 §3, Stage U-cap) — sums
+ * `estimated_cost_usd` from `usage_logs` over the last 30 days (rolling, not
+ * calendar-month), master-key rows only (`used_byok=false`; a BYOK tenant spends
+ * their own key, never counted toward the platform's free-plan ceiling). Rolling
+ * so a capped tenant un-sticks automatically as old spend ages out, with no
+ * monthly-rollover job needed. Reads the existing `usage_logs_period_idx
+ * (tenant_id, created_at)` index (migration 0004).
  */
-export async function getMonthToDateMasterCostUsd(tenantId: string): Promise<number> {
+export async function getTrailing30DayMasterCostUsd(tenantId: string): Promise<number> {
   const client = createServiceClient();
-  const monthStart = new Date();
-  monthStart.setUTCDate(1);
-  monthStart.setUTCHours(0, 0, 0, 0);
+  const windowStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
   const { data, error } = await client
     .from('usage_logs')
     .select('estimated_cost_usd')
     .eq('tenant_id', tenantId)
     .eq('used_byok', false)
-    .gte('created_at', monthStart.toISOString());
+    .gte('created_at', windowStart.toISOString());
 
   if (error) throw error;
   return (data ?? []).reduce((sum, row) => sum + row.estimated_cost_usd, 0);
