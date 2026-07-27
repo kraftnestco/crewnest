@@ -120,7 +120,15 @@ values
   ('order-media', :'tenant_b'::text || '/' || :'session_b1'::text || '/rls-test.jpg');
 
 -- ── Persona: tenant A member ────────────────────────────────────────────────
+-- Sets BOTH conventions: the JSON blob (request.jwt.claims — what real
+-- PostgREST/GoTrue set, and what a real Supabase project's auth.uid() reads
+-- via a JSON-parsing wrapper) and the flat per-claim key (request.jwt.claim.sub
+-- — what THIS CI Postgres image's simpler auth.uid() reads directly, confirmed
+-- via introspecting its actual source: `nullif(current_setting
+-- ('request.jwt.claim.sub', true), '')::uuid`). Belt-and-suspenders so this
+-- fixture works regardless of which auth.uid() implementation is installed.
 select set_config('request.jwt.claims', json_build_object('sub', :'tenant_a_user', 'role', 'authenticated')::text, true);
+select set_config('request.jwt.claim.sub', :'tenant_a_user', true);
 set local role authenticated;
 
 select pg_temp.assert_eq('tenant A sees only its own chat_sessions', 2,
@@ -149,6 +157,7 @@ select pg_temp.assert_eq('tenant A sees no agency-scope notifications', 0,
 
 -- ── Persona: tenant B member (symmetric check) ──────────────────────────────
 select set_config('request.jwt.claims', json_build_object('sub', :'tenant_b_user', 'role', 'authenticated')::text, true);
+select set_config('request.jwt.claim.sub', :'tenant_b_user', true);
 
 select pg_temp.assert_eq('tenant B sees only its own chat_sessions', 2,
   (select count(*) from public.chat_sessions where tenant_id in (:'tenant_a'::uuid, :'tenant_b'::uuid)));
@@ -166,6 +175,7 @@ select pg_temp.assert_eq('tenant B sees only its own tenant-scope notification',
 
 -- ── Persona: platform admin (sees all fixture rows; audiences still split) ──
 select set_config('request.jwt.claims', json_build_object('sub', :'admin_user', 'role', 'authenticated')::text, true);
+select set_config('request.jwt.claim.sub', :'admin_user', true);
 
 select pg_temp.assert_eq('admin sees both tenants'' chat_sessions', 4,
   (select count(*) from public.chat_sessions where tenant_id in (:'tenant_a'::uuid, :'tenant_b'::uuid)));
