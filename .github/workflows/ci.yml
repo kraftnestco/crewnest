@@ -103,6 +103,13 @@ jobs:
             $$ select (string_to_array(name, '/'))[1 : array_length(string_to_array(name, '/'), 1) - 1] $$;
           SQL
 
+      - name: Diagnose auth.users columns
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c "select column_name from information_schema.columns where table_schema='auth' and table_name='users' order by ordinal_position;"
+
       - name: Apply migrations in order
         env:
           PGPASSWORD: postgres
