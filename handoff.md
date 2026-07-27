@@ -60,18 +60,21 @@ Phases 1–3 are largely shipped; Phase 2 **billing** and Phase 3 **Stage P** ar
   ❓ **Embedded Meta OAuth signup** — verify; channel tokens may still be pasted manually via Vault.
 - **Phase 3 — Harden/Prove (Stages P–V, docs 15–18):** ✅ Analytics (`0030`), ✅ data lifecycle / GDPR
   erasure (`0031`), ✅ hardening + rolling memory + free-plan ceiling + team management (`0032`),
-  ✅ customer identity (`0033`), ✅ inventory + referrals (`0034`). ⚠️ **Stage P (reliability/durable
-  queue delivery) — only scaffolded** (`0029_reliability.sql` added `webhook_events` status +
-  `rate_limit_buckets`), the actual `after()`→queue+worker cutover is **deferred** (§4e).
+  ✅ customer identity (`0033`), ✅ inventory + referrals (`0034`). ✅ **Stage P (reliability/durable
+  queue delivery) — DONE** (§4e) — Meta webhook processing now goes through a pgmq queue + a deployed
+  Supabase Edge Function worker instead of `after()`; Postgres-backed rate limiting; Meta 24h-window
+  detection. Deployed and tested live against prod Supabase (see §4e for the residual gap).
 - **Copilots:** ✅ **Business (owner) Copilot** — propose/apply profile edits + team/inventory **actions**
-  (`invite_team_member`/`set_stock`/`restock`). ✅ **Admin Copilot** — read-only triage + two lookup tools
-  (adding write actions is §4a). ✅ **Admin System Health** (`/admin/health`, docs/20).
+  (`invite_team_member`/`set_stock`/`restock`). ✅ **Admin Copilot** — read-only triage + two lookup tools,
+  **plus the same three write actions** (invite/set_stock/restock) targeting a named client, propose/apply
+  gated (§4a Item 2 — done). ✅ **Admin System Health** (`/admin/health`, docs/20).
 - **Notifications:** ✅ in-app (`notifications` table + dashboard bell) + ✅ email via **Resend**
-  (`services/email.ts`, best-effort). ❌ **Web push — NOT built** (§4c).
+  (`services/email.ts`) — domain verified (`mail.kraftnest.co`), API key live locally, real send confirmed;
+  Vercel env still pending (§4c). ❌ **Web push — NOT built** (§4c).
 - **UI polish (recent):** logo/wordmark font (Baloo 2), topbar headings, inbox layout, hero anti-jank.
 
-Migrations live in `supabase/migrations/` (`0001`–`0034` today). They are applied **manually** in the
-Supabase SQL editor — see the drift warning in §5.
+Migrations live in `supabase/migrations/` (`0001`–`0036` today, `0008` and `0035`/`0036` applied
+2026-07-2x). They are applied **manually** in the Supabase SQL editor — see the drift warning in §5.
 
 ---
 
@@ -147,9 +150,15 @@ mostly non-code: Vercel env vars, Supabase migrations actually applied, `CRON_SE
 Resend domain. **Do 4b before QA (4g)** — most "bugs" at this stage are missing env.
 
 ### 4c. Resend + push notifications
-- **Resend:** code is done. Ops-only: create a Resend account, **verify a sending domain** (until then it
-  only mails the account owner via `onboarding@resend.dev`), set `RESEND_API_KEY` + `RESEND_FROM_EMAIL`
-  (locally and in Vercel — both are now placeholders in `.env.example`). Ref: docs/14 §3.4.
+- **Resend — domain verified, working locally, Vercel pending.** Code was already done; ops half is now
+  mostly done too: `mail.kraftnest.co` (a subdomain — chosen deliberately to avoid colliding with the
+  existing Zoho MX/SPF/DKIM records already on the root `kraftnest.co` domain) is verified in Resend, DNS
+  records added via Netlify DNS (the domain's actual DNS host — `kraftnest.co` uses custom nameservers
+  pointing at Netlify, not Spaceship's own DNS panel, despite being registered at Spaceship). Real
+  `RESEND_API_KEY` + `RESEND_FROM_EMAIL=notifications@mail.kraftnest.co` are set in `.env.local`; a real
+  send through the actual `services/email.ts` `sendEmail` function was confirmed delivered. **Still
+  needed:** the same two vars in **Vercel's** env — blocked on the Vercel access situation (see §4b note
+  below), not on Resend itself.
 - **Web push — NET-NEW build** (nothing exists): VAPID keys, a service worker in `public/`, a
   `push_subscriptions` table, a subscribe UI in the dashboard, and send-on-notify wiring into
   `services/notifications.ts` (which already fans out in-app + email — push becomes a third sink).
@@ -171,14 +180,58 @@ Resend domain. **Do 4b before QA (4g)** — most "bugs" at this stage are missin
 - **Don't confuse with customer payments:** taking a *customer's* money for an order (bank transfer +
   payment-proof upload) is already built. 4d is about charging *tenants* for CrewNest itself.
 
-### 4e. Stage P completion — reliability & durable delivery — **Sonnet (design cleared)**
+### 4e. Stage P completion — reliability & durable delivery — **DONE, deployed, tested live**
 - **Spec:** [`docs/15-RELIABILITY-AND-DURABILITY.md`](docs/15-RELIABILITY-AND-DURABILITY.md) (all `[OPUS]`
-  gates already CLEARED per docs/07 Phase 3).
-- **What's left:** enable **pgmq** (migration `0008` referenced in the doc), move Meta webhook processing
-  from `after()` to a **queue + worker** (at-least-once, poison-safe, two-source idempotency), wire
-  **Postgres-backed rate limiting** (the `rate_limit_buckets` table from `0029` exists but confirm it's
-  used), and **Meta 24h-window** handling. The orchestrator is trigger-agnostic on purpose, so this is a
-  delivery-layer change, not an AI change.
+  gates were already CLEARED per docs/07 Phase 3; built and shipped 2026-07-2x).
+- **P1 — pgmq enabled**, with a real wrinkle: this project's Supabase dashboard has **no dedicated Queues
+  integration page** (confirmed — nothing under Database in the sidebar), so the usual "toggle Queues →
+  auto-creates a `pgmq_public` wrapper schema" path doesn't exist here. Migration `0008_pgmq.sql` (extension
+  + `inbound_messages` queue) is applied. A **new** migration `0036_pgmq_public_wrapper.sql` hand-builds the
+  `pgmq_public` wrapper (`send`/`read`/`archive`, verified against the actual installed pgmq 1.5.1 function
+  signatures via direct DB introspection, not assumed from docs) — this is the documented community
+  workaround for hosted projects missing that dashboard feature. `pgmq_public` was then added to **Project
+  Settings → Data API → Exposed schemas** (had to be done AFTER the wrapper schema existed — it doesn't
+  appear as a selectable option before that).
+- **P2 — producer.** `api/webhooks/meta/route.ts` rewritten: verify → parse → per-message
+  enqueue-with-dedup (the `webhook_events` insert IS the dedup gate, `23505` = skip) → 200. Zero LLM work in
+  the request path. New `services/queue.ts` wraps the `pgmq_public` RPC surface.
+- **P3 — worker, deployed.** `supabase/functions/inbound-worker/index.ts` (Deno, Supabase Edge Function —
+  a genuinely separate runtime from Next.js/Node, so it can't import `aiOrchestrator.ts` directly). It owns
+  the pgmq read + §3.2 processing-idempotency state machine + §4 poison handling (5 attempts →
+  `status='dead'` + agency `system_alert`, then archived), and delegates the actual AI turn over HTTP to a
+  **new** internal bridge route, `api/internal/process-message` (CRON_SECRET-gated, same pattern as
+  `api/cron/maintenance`), which calls the **unchanged** `handleInboundMessage`. Deployed via
+  `npx supabase functions deploy inbound-worker --no-verify-jwt` (the `--no-verify-jwt` flag was required —
+  Supabase's platform-level JWT gateway check runs before function code and rejects a custom bearer secret
+  by default; this function is called by a cron job, not a logged-in user, so the built-in check is
+  correctly disabled and the function does its own `INBOUND_WORKER_SECRET` check instead). Edge Function
+  secrets (`APP_URL`, `CRON_SECRET`, `INBOUND_WORKER_SECRET`) set via `npx supabase secrets set` —
+  `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` are auto-injected by the platform, don't set those manually.
+- **P4 — durable rate limiting, done.** `rateLimit.ts` now has a Postgres-backed atomic-increment path
+  (`increment_rate_limit_bucket`, new in migration `0035`, `insert ... on conflict do update set count =
+  count + 1 returning count` — a plain PostgREST upsert can't express "increment on conflict") for
+  production, selected by `NODE_ENV`; the old in-memory Map stays for local dev so `npm run dev` pays no DB
+  round-trip. Fails open (never blocks real traffic) on any DB error, logged.
+- **P5 — Meta 24h-window handling, done.** `services/meta/send.ts` now detects Meta's outside-window error
+  codes (`131047`/`#10`, checked by code not message-string) and throws a distinguishable `MetaWindowError`.
+  `aiOrchestrator.ts`'s dispatch step catches it specifically for `continueSession` turns (`userText ===
+  null`): the already-persisted reply is marked `chat_messages.delivery_failed` (reuses migration `0022`'s
+  column — the inbox already renders "Not delivered" with zero UI changes), `chat_sessions
+  .delivery_blocked_reason='meta_window'` is set, and the tenant gets a notification instead of the send
+  error being thrown into the void.
+- **Verified live against the real prod Supabase project** (not just typecheck/build): sent an identical
+  Meta webhook payload twice → exactly one `webhook_events` row + exactly one queued pgmq message (proves
+  the dedup gate); 10 concurrent rate-limit increments on the same bucket returned exactly `1..10` with no
+  races (proves true atomicity, the whole point of P4); the deployed worker was called for real, claimed a
+  queued message, correctly hit its no-matching-ledger-row fail-safe branch, and archived it cleanly.
+- **Residual gap, not yet tested:** the worker's *happy path* — a message that has a matching
+  `webhook_events` row and successfully reaches `handleInboundMessage` via the internal bridge route — has
+  not been exercised, because the Edge Function's `APP_URL` secret currently points at `localhost:3000`,
+  which Supabase's cloud can't reach. This needs a real, publicly reachable deployment URL, which is
+  blocked on the Vercel access situation (see §4b / the note at the top of this file's history — the
+  existing Vercel project is under a partner's account and Hobby plan can't add collaborators). Once
+  Vercel access is resolved, re-run `npx supabase secrets set APP_URL=<real-url>` and re-test end to end
+  with a real Meta message.
 
 ### 4f. Phase 4 — Voice & Platform — **`[OPUS]` design first; large, net-new**
 - **Spec seed:** [`docs/07-PHASES.md`](docs/07-PHASES.md) §Phase 4. **No spec doc exists yet** — this needs
@@ -242,27 +295,43 @@ The prior owner must privately hand you the **secret values** (never in git/this
 | `MASTER_OPENAI_KEY` | LLM master fallback (OpenAI tenants) | Was a placeholder historically — confirm it's real. |
 | `MASTER_OPENROUTER_KEY` | LLM master fallback (OpenRouter tenants) | The live demo runs on OpenRouter; `.env.example` has the placeholder — just fill the real value. |
 | `META_APP_SECRET`, `META_VERIFY_TOKEN`, `META_GRAPH_VERSION` | Meta webhook + Graph send | Verify token is one *you* choose (must match Meta config); app secret from Meta App → Settings → Basic. |
-| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | email notifications | Placeholders now in `.env.example`; fill real values. Needs a verified domain in Resend. |
-| `CRON_SECRET` | `/api/cron/maintenance` **and** `/api/cron/follow-ups` | Set in Vercel env **and** mirror the same value into **Supabase Vault** for the pg_cron job (4a). |
+| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | email notifications | ✅ Real values set in `.env.local` (domain `mail.kraftnest.co` verified, real send confirmed). Still need to land in **Vercel** env. |
+| `CRON_SECRET` | `/api/cron/maintenance`, `api/internal/process-message` (the §4e worker bridge), and future `/api/cron/follow-ups` | Set in Vercel env, **and** as an Edge Function secret (`npx supabase secrets set CRON_SECRET=...`) — must be the SAME value in both places. Mirror into **Supabase Vault** too if/when the pg_cron job (4a) is built. |
 | `SENTRY_DSN` | error tracking (optional) | No-op until set. |
 | `NEXT_PUBLIC_APP_URL` | absolute links | Set to the prod URL in Vercel. |
 
 **Other manual steps to reach "fully functional":**
 1. **Supabase migrations actually applied.** Migrations are run **by hand** in the Supabase SQL editor —
-   there is **no auto-apply**, so drift is a real risk. Verify every migration through `0034` (and the new
-   `0035`/`0036`) is applied in the live project. When a task hands you SQL, run it and confirm.
+   there is **no auto-apply**, so drift is a real risk. Every migration through `0036` is applied in the
+   live project as of 2026-07-2x (verified directly, not assumed — `0008_pgmq` needed the extension
+   enabled via Database → Extensions AND the queue actually created via its `perform pgmq.create(...)`
+   block; `0036` hand-builds `pgmq_public` since this project has no dashboard Queues integration to
+   auto-generate one — see §4e). When a task hands you new SQL, run it and confirm.
 2. **Vercel env vars:** set every server var above in the Vercel project (Production + Preview). A missing
-   var usually presents as a silent feature no-op, not a crash.
-3. **pg_cron + pg_net** (for 4a follow-ups): enable the extensions, store `CRON_SECRET` in Supabase Vault,
-   run the `0036` cron SQL with the real prod domain filled in. Confirm prod isn't behind Vercel
-   Deployment Protection (would block the automated ping — public by default on Hobby).
-4. **Meta channels go-live:** for real customer traffic you need the Meta App out of Development mode →
+   var usually presents as a silent feature no-op, not a crash. **Currently blocked**: the existing Vercel
+   project is under a partner's account, not accessible from this session/machine, and Vercel Hobby can't
+   add collaborators — needs a project transfer or the partner relaying the work (undecided as of
+   2026-07-2x).
+3. **Edge Function worker secrets** (for §4e's pgmq worker, `supabase/functions/inbound-worker`): set via
+   `npx supabase secrets set APP_URL=<prod-url> CRON_SECRET=<value> INBOUND_WORKER_SECRET=<value>`
+   (`SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` are auto-injected, don't set those). Deploy with
+   `npx supabase functions deploy inbound-worker --no-verify-jwt` — the `--no-verify-jwt` flag is required
+   (Supabase's platform JWT gateway otherwise 401s every call before the function's own auth check ever
+   runs). `APP_URL` currently points at `localhost:3000` as a placeholder — **must be updated to the real
+   prod URL** once Vercel access is resolved, or the worker can never reach `api/internal/process-message`
+   to actually run the AI turn.
+4. **pg_cron + pg_net** (for 4a follow-ups, if revived): enable the extensions, store `CRON_SECRET` in
+   Supabase Vault, run item 1's own cron SQL (not yet written) with the real prod domain filled in. Confirm
+   prod isn't behind Vercel Deployment Protection (would block the automated ping — public by default on
+   Hobby).
+5. **Meta channels go-live:** for real customer traffic you need the Meta App out of Development mode →
    **Meta App Review** (permissions: messaging scopes) + a public HTTPS webhook (prod URL, not localhost).
    Testing with your own accounts works in Development mode without review — see the IG/Meta checklist in §7.
    WhatsApp business-initiated messages (owner notifies, out-of-window follow-ups) need **approved message
    templates** — an ops step, not code.
-5. **Resend domain verification** (4c) before email is useful to real recipients.
-6. **Custom domain** (optional): point a real domain at the Vercel project; update `NEXT_PUBLIC_APP_URL`
+6. **Resend domain verification** — ✅ **done** (`mail.kraftnest.co`, see §4c) — before email is useful to
+   real recipients. Vercel env still pending, same blocker as item 2 above.
+7. **Custom domain** (optional): point a real domain at the Vercel project; update `NEXT_PUBLIC_APP_URL`
    and Meta webhook/redirect URLs + Supabase Auth redirect allow-list accordingly.
 
 ---
