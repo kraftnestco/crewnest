@@ -114,7 +114,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
           <CardTitle>2. Assistant persona</CardTitle>
           <CardDescription>
             The assistant&apos;s identity, voice, and scope. Generate it from a couple of answers, or edit it directly.
-            Catalogue, hours, and payment details are added automatically, so there's no need to repeat them here.
+            Catalogue, hours, and payment details are added automatically, so there&apos;s no need to repeat them here.
           </CardDescription>
         </CardHeader>
         <CardContent>

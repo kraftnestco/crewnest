@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
+
+const subscribeNever = () => () => {};
 
 /**
  * One-tap light/dark switch — deliberately a plain toggle, not a menu, so
@@ -10,11 +12,16 @@ import { Moon, Sun } from 'lucide-react';
  */
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
   // Theme is only known client-side; render a stable placeholder until mounted
-  // so the server and first client render never disagree.
-  useEffect(() => setMounted(true), []);
+  // so the server and first client render never disagree. useSyncExternalStore's
+  // getServerSnapshot always returns false, matching the SSR/first-paint render;
+  // the client snapshot is true from the very first client render onward — no
+  // setState-in-effect needed for what is fundamentally a static after-mount flag.
+  const mounted = useSyncExternalStore(
+    subscribeNever,
+    () => true,
+    () => false,
+  );
 
   const isDark = mounted && resolvedTheme === 'dark';
 
