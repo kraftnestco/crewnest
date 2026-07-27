@@ -62,6 +62,16 @@ jobs:
       - name: Install postgresql-client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
+      - name: Diagnose storage schema ownership
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          select current_user, session_user;
+          select rolname, rolsuper from pg_roles where rolname in ('postgres', 'supabase_admin', 'supabase_storage_admin');
+          select nspname, pg_catalog.pg_get_userbyid(nspowner) as owner from pg_namespace where nspname = 'storage';
+          SQL
+
       - name: Bootstrap minimal storage schema
         # The supabase/postgres image ships an EMPTY `storage` schema (owned by
         # a reserved role, not `postgres`) with no tables — the Storage
