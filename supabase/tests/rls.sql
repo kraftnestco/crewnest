@@ -48,9 +48,15 @@ $$;
 
 -- ── Fixtures (run as the migration/superuser role, which bypasses RLS) ─────
 
+-- CI's supabase/postgres image ships an older Auth schema where this column
+-- is `confirmed_at`, not the more common `email_confirmed_at` — confirmed via
+-- direct introspection (information_schema.columns) against the pinned image
+-- version, not assumed. Real Supabase Auth accepts inserts either way in
+-- practice, but the CI Postgres container has no Auth service running to
+-- reconcile the difference, so it must match this container's actual columns.
 insert into auth.users (
   instance_id, id, aud, role, email,
-  encrypted_password, email_confirmed_at, created_at, updated_at,
+  encrypted_password, confirmed_at, created_at, updated_at,
   raw_app_meta_data, raw_user_meta_data
 ) values
   ('00000000-0000-0000-0000-000000000000', :'admin_user'::uuid,   'authenticated', 'authenticated',
