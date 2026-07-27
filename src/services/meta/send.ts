@@ -5,6 +5,40 @@ import { getMetaToken } from '@/lib/secrets';
 import type { Platform, Tenant } from '@/types/domain';
 
 /**
+ * Meta's outside-24h-window error family (docs/15-RELIABILITY-AND-
+ * DURABILITY.md §6) — a business-initiated free-form message rejected because
+ * it's outside the customer's service window and would need a pre-approved
+ * template instead. WhatsApp Cloud API's code for this is 131047; Messenger's
+ * analogous "message outside allowed window" is its own error #10 family.
+ * Checked by CODE, not by string-matching `message` (Meta's wording can
+ * change; the numeric code is the stable contract).
+ */
+const META_WINDOW_ERROR_CODES = new Set([131047, 10]);
+
+/** Thrown by sendText specifically for the outside-window case, distinguishable via `instanceof` so callers (docs/15 §6) can surface-not-lose the reply instead of treating it like any other send failure. */
+export class MetaWindowError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MetaWindowError';
+  }
+}
+
+async function throwForFailedResponse(res: Response): Promise<never> {
+  const bodyText = await res.text();
+  let code: number | undefined;
+  try {
+    const parsed = JSON.parse(bodyText) as { error?: { code?: number; error_subcode?: number } };
+    code = parsed.error?.code ?? parsed.error?.error_subcode;
+  } catch {
+    // Non-JSON error body — fall through to the generic error below.
+  }
+  if (code !== undefined && META_WINDOW_ERROR_CODES.has(code)) {
+    throw new MetaWindowError(`Meta send rejected — outside 24h window (code ${code}): ${bodyText.slice(0, 300)}`);
+  }
+  throw new Error(`Meta send failed (${res.status}): ${bodyText.slice(0, 300)}`);
+}
+
+/**
  * Send an outbound text reply on the same Meta channel, using the tenant's
  * decrypted token (resolved from Vault in memory here). See docs/06-INTEGRATIONS.md §1.3.
  * Logs metadata only — never the token or full message body.
@@ -34,9 +68,7 @@ export async function sendText(args: {
         text: { body: text },
       }),
     });
-    if (!res.ok) {
-      throw new Error(`Meta send failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
-    }
+    if (!res.ok) await throwForFailedResponse(res);
     return { ok: res.ok, status: res.status };
   }
 
@@ -55,9 +87,7 @@ export async function sendText(args: {
       message: { text },
     }),
   });
-  if (!res.ok) {
-    throw new Error(`Meta send failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
-  }
+  if (!res.ok) await throwForFailedResponse(res);
   return { ok: res.ok, status: res.status };
 }
 

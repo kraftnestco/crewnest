@@ -21,9 +21,9 @@ import type { LlmMessage } from './ai/provider';
 import { estimateCostUsd } from './ai/pricing';
 import { getEnabledTools, executeTool } from './tools/registry';
 import { getLlmKey } from '@/lib/secrets';
-import { sendText } from './meta/send';
+import { sendText, MetaWindowError } from './meta/send';
 import * as metaProfile from './meta/profile';
-import { notifyBoth } from '@/services/notifications';
+import { notify, notifyBoth } from '@/services/notifications';
 import {
   sanitizeInbound,
   stripHandoffToken,
@@ -508,7 +508,7 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
   }
 
   // 11. Persist the assistant reply.
-  await messages.persist({
+  const assistantMessageId = await messages.persist({
     sessionId: session.id,
     tenantId: tenant.id,
     role: 'assistant',
@@ -520,12 +520,38 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
   // and for a continuation turn (`continueSession`) on a 'web' session there is no open
   // HTTP response to return it on either, a known/accepted gap (docs: media-handoff plan, B7).
   if (session.platform !== 'web') {
-    await sendText({
-      tenant,
-      platform: session.platform,
-      to: session.externalUserId,
-      text: replyText,
-    });
+    try {
+      await sendText({
+        tenant,
+        platform: session.platform,
+        to: session.externalUserId,
+        text: replyText,
+      });
+    } catch (err) {
+      // docs/15-RELIABILITY-AND-DURABILITY.md §6 — a continueSession dispatch
+      // (userText === null: a human resolved something hours after the
+      // customer's last message) can land outside Meta's 24h window and get
+      // rejected. The reply is NOT lost — it's already persisted above — but
+      // it must be surfaced, not thrown into the void: mark the message
+      // undelivered, flag the session, and tell the tenant so staff know it
+      // needs a template or a customer re-ping. Any OTHER send failure keeps
+      // its old behavior (throw — a fresh customer message's reply failing to
+      // send is a real, different problem, not this specific known gap).
+      if (err instanceof MetaWindowError && userText === null) {
+        await messages.markDeliveryFailed(assistantMessageId);
+        await sessions.setDeliveryBlockedReason(session.id, 'meta_window');
+        await notify({
+          scope: 'tenant',
+          tenantId: tenant.id,
+          type: 'handoff',
+          title: "Your reply couldn't be delivered",
+          body: "The 24h window closed before this reply could send — reopen it by having the customer message again, or send an approved template.",
+          link: `/dashboard/chat?session=${session.id}`,
+        });
+      } else {
+        throw err;
+      }
+    }
   }
 
   // 13. Rolling summary refresh (docs/18 §2, Stage U-mem) — best-effort, off-hot-path:

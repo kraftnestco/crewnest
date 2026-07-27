@@ -128,6 +128,18 @@ export async function setHandoff(sessionId: string, value: boolean, cause?: Hand
 }
 
 /**
+ * Record why an outbound reply couldn't be delivered (docs/15-RELIABILITY-AND-
+ * DURABILITY.md §6) — currently only 'meta_window' (a continueSession dispatch
+ * landed outside Meta's 24h business-initiated-message window). Null = no
+ * delivery-window problem, the safe default (migration 0029).
+ */
+export async function setDeliveryBlockedReason(sessionId: string, reason: string | null): Promise<void> {
+  const client = createServiceClient();
+  const { error } = await client.from('chat_sessions').update({ delivery_blocked_reason: reason }).eq('id', sessionId);
+  if (error) throw error;
+}
+
+/**
  * Persist the Live Inbox alert signal detected from the assistant's reply (or clear it
  * with null). Returns whether the value actually changed — `.neq()` can't express a
  * NULL→value transition correctly, so this reads-then-compares-then-writes, letting

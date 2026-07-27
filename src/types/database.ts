@@ -245,6 +245,7 @@ export type Database = {
           summary_through_message_at: string | null;
           customer_name: string | null;
           customer_avatar_url: string | null;
+          delivery_blocked_reason: string | null;
           created_at: string;
         };
         Insert: {
@@ -263,6 +264,7 @@ export type Database = {
           summary_through_message_at?: string | null;
           customer_name?: string | null;
           customer_avatar_url?: string | null;
+          delivery_blocked_reason?: string | null;
           created_at?: string;
         };
         Update: {
@@ -281,6 +283,7 @@ export type Database = {
           summary_through_message_at?: string | null;
           customer_name?: string | null;
           customer_avatar_url?: string | null;
+          delivery_blocked_reason?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -677,6 +680,10 @@ export type Database = {
           p_dedupe_window_minutes: number;
         };
         Returns: Json;
+      };
+      increment_rate_limit_bucket: {
+        Args: { p_bucket_key: string; p_window_start: number };
+        Returns: number;
       };
     };
     Enums: {

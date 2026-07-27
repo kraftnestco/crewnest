@@ -30,7 +30,7 @@ export default async function DashboardChatPage({
     supabase
       .from('chat_sessions')
       .select(
-        'id, tenant_id, platform, external_user_id, customer_name, customer_avatar_url, is_human_handoff, alert_signal, handoff_cause, last_message_at, unread_count, pending_review_order_id, pending_clarification, summary, summary_through_message_at, created_at',
+        'id, tenant_id, platform, external_user_id, customer_name, customer_avatar_url, is_human_handoff, alert_signal, handoff_cause, last_message_at, unread_count, pending_review_order_id, pending_clarification, summary, summary_through_message_at, delivery_blocked_reason, created_at',
       )
       .eq('tenant_id', activeTenantId) // explicit; RLS also enforces (docs/13 §5)
       .order('last_message_at', { ascending: false })

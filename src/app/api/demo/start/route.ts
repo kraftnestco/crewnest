@@ -17,7 +17,7 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  const rl = checkRateLimit(`demo:${ip}`, DEMO_SESSION_RATE_LIMIT);
+  const rl = await checkRateLimit(`demo:${ip}`, DEMO_SESSION_RATE_LIMIT);
   if (!rl.allowed) {
     return new Response(JSON.stringify({ allowed: false, remaining: rl.remaining }), {
       status: 429,

@@ -15,6 +15,7 @@ const CHARS_PER_TOKEN_ESTIMATE = 4;
 /** Hard cap on rows fetched before applying the token budget, to bound query size. */
 const WINDOW_FETCH_LIMIT = 50;
 
+/** Returns the inserted row's id — needed by callers that may have to mark this exact message `delivery_failed` after a later dispatch failure (docs/15-RELIABILITY-AND-DURABILITY.md §6). */
 export async function persist(args: {
   sessionId: string;
   tenantId: string;
@@ -25,19 +26,31 @@ export async function persist(args: {
   tokenCount?: number;
   /** Who produced this reply (docs/16 §2.1) — defaults to 'ai', the correct assumption for an LLM turn. */
   authoredBy?: AuthoredBy;
-}): Promise<void> {
+}): Promise<string> {
   const client = createServiceClient();
-  const { error } = await client.from('chat_messages').insert({
-    session_id: args.sessionId,
-    tenant_id: args.tenantId,
-    role: args.role,
-    content: args.content,
-    attachments: (args.attachments ?? null) as unknown as Json,
-    provider_msg_id: args.providerMsgId ?? null,
-    token_count: args.tokenCount ?? null,
-    authored_by: args.authoredBy ?? 'ai',
-  });
+  const { data, error } = await client
+    .from('chat_messages')
+    .insert({
+      session_id: args.sessionId,
+      tenant_id: args.tenantId,
+      role: args.role,
+      content: args.content,
+      attachments: (args.attachments ?? null) as unknown as Json,
+      provider_msg_id: args.providerMsgId ?? null,
+      token_count: args.tokenCount ?? null,
+      authored_by: args.authoredBy ?? 'ai',
+    })
+    .select('id')
+    .single();
 
+  if (error) throw error;
+  return data.id;
+}
+
+/** Mark a specific message as failed to deliver (docs/15 §6) — reuses migration 0022's delivery_failed column, so the inbox already renders the "not delivered" state with no UI change needed. */
+export async function markDeliveryFailed(messageId: string): Promise<void> {
+  const client = createServiceClient();
+  const { error } = await client.from('chat_messages').update({ delivery_failed: true }).eq('id', messageId);
   if (error) throw error;
 }
 

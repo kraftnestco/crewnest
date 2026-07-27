@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
   // Rate limit per (tenant, session), plus a tenant-wide fallback bucket —
   // sessionKey is client-supplied, so per-session alone can be dodged by
   // rotating it on every request.
-  const rl = checkRateLimit(`${tenant.id}:${sessionKey}`);
-  const tenantRl = checkRateLimit(`${tenant.id}`, WIDGET_TENANT_RATE_LIMIT);
+  const rl = await checkRateLimit(`${tenant.id}:${sessionKey}`);
+  const tenantRl = await checkRateLimit(`${tenant.id}`, WIDGET_TENANT_RATE_LIMIT);
   if (!rl.allowed || !tenantRl.allowed) return json({ error: 'rate limited' }, 429, origin);
 
   try {

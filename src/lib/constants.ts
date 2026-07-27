@@ -100,6 +100,22 @@ export const WIDGET_TENANT_RATE_LIMIT = { windowMs: 60_000, max: 120 } as const;
 /** Max characters accepted from a single inbound customer message (post-sanitise cap). */
 export const MAX_INBOUND_CHARS = 4000;
 
+/**
+ * Poison-message threshold (docs/15-RELIABILITY-AND-DURABILITY.md §4). When a
+ * pgmq message's read_ct reaches this, the worker parks it as
+ * webhook_events.status='dead' instead of retrying forever. Mirrored in the
+ * Edge Function worker (supabase/functions/inbound-worker) since that runs on
+ * Deno and can't import this file — keep both in sync if this changes.
+ */
+export const MAX_MESSAGE_ATTEMPTS = 5;
+
+/**
+ * pgmq visibility timeout in seconds (docs/15 §4) — how long a read message is
+ * hidden from other readers before it's eligible for redelivery if never
+ * archived. Same mirroring note as MAX_MESSAGE_ATTEMPTS above.
+ */
+export const QUEUE_VISIBILITY_TIMEOUT_SECONDS = 30;
+
 /** Bounds tool-calling rounds per inbound message — caps cost and prevents infinite loops. */
 export const MAX_TOOL_ROUNDS = 3;
 
