@@ -63,20 +63,21 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
       - name: Bootstrap minimal storage schema
-        # The supabase/postgres image ships the auth/vault schemas but NOT
-        # Storage (that's a separate service on real Supabase, backed by
-        # storage.buckets/storage.objects tables it creates itself). Migration
-        # 0016 inserts into storage.buckets and creates a policy on
-        # storage.objects, both of which are real and correct against a live
-        # Supabase project — this step exists ONLY to give this CI-only bare
-        # Postgres container the minimum shape those statements need, without
-        # weakening or changing the migration itself. Columns/RLS match what
-        # 0016 actually reads/writes; not a full Storage service reimplementation.
+        # The supabase/postgres image ships an EMPTY `storage` schema (owned by
+        # a reserved role, not `postgres`) with no tables — the Storage
+        # SERVICE that normally populates it (buckets/objects tables, RLS
+        # grants for the `postgres` role) doesn't run in this bare-Postgres CI
+        # container. Migration 0016's own comment documents that on a REAL
+        # Supabase project, `postgres` is explicitly granted rights into
+        # `storage` for exactly this reason — that grant just doesn't exist by
+        # default here, so this step adds it before creating the minimum
+        # table shape 0016 actually reads/writes. 0016 itself is unchanged;
+        # this is CI-only scaffolding, not a Storage service reimplementation.
         env:
           PGPASSWORD: postgres
         run: |
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
-          create schema if not exists storage;
+          grant create, usage on schema storage to postgres;
           create table if not exists storage.buckets (
             id text primary key,
             name text not null,
