@@ -62,32 +62,26 @@ jobs:
       - name: Install postgresql-client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
-      - name: Diagnose storage schema ownership
-        env:
-          PGPASSWORD: postgres
-        run: |
-          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
-          select current_user, session_user;
-          select rolname, rolsuper from pg_roles where rolname in ('postgres', 'supabase_admin', 'supabase_storage_admin');
-          select nspname, pg_catalog.pg_get_userbyid(nspowner) as owner from pg_namespace where nspname = 'storage';
-          SQL
-
       - name: Bootstrap minimal storage schema
-        # The supabase/postgres image ships an EMPTY `storage` schema (owned by
-        # a reserved role, not `postgres`) with no tables — the Storage
-        # SERVICE that normally populates it (buckets/objects tables, RLS
-        # grants for the `postgres` role) doesn't run in this bare-Postgres CI
-        # container. Migration 0016's own comment documents that on a REAL
-        # Supabase project, `postgres` is explicitly granted rights into
-        # `storage` for exactly this reason — that grant just doesn't exist by
-        # default here, so this step adds it before creating the minimum
-        # table shape 0016 actually reads/writes. 0016 itself is unchanged;
-        # this is CI-only scaffolding, not a Storage service reimplementation.
+        # The supabase/postgres image ships an EMPTY `storage` schema, owned by
+        # `supabase_admin` (the image's real superuser — confirmed via direct
+        # introspection: `postgres` itself has rolsuper=false here). The
+        # Storage SERVICE that normally populates this schema on a real
+        # Supabase project (buckets/objects tables, RLS grants letting
+        # `postgres` use them — see migration 0016's own comment) doesn't run
+        # in this bare-Postgres CI container, and `postgres` can't grant
+        # itself rights on a schema it doesn't own. So: grant as
+        # `supabase_admin` (same password as `postgres` in this dev image),
+        # then create the minimum table shape 0016 actually reads/writes as
+        # `postgres` (matching the real permission model — postgres uses the
+        # tables day to day, only the initial grant needs the superuser).
+        # 0016 itself is unchanged; this is CI-only scaffolding.
         env:
           PGPASSWORD: postgres
         run: |
+          psql -h localhost -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -c \
+            "grant create, usage on schema storage to postgres;"
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
-          grant create, usage on schema storage to postgres;
           create table if not exists storage.buckets (
             id text primary key,
             name text not null,
