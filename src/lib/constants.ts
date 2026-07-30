@@ -101,6 +101,20 @@ export const WIDGET_TENANT_RATE_LIMIT = { windowMs: 60_000, max: 120 } as const;
 export const MAX_INBOUND_CHARS = 4000;
 
 /**
+ * Which notification types are worth an interruptive browser push
+ * (docs/21-WEB-PUSH-NOTIFICATIONS.md §2.2) — DELIBERATELY just the two that
+ * need a human *now*: a customer asked for a person (`handoff`), or a customer
+ * is frustrated / at cancellation risk (`alert_signal`). Everything else
+ * (orders, reviews, media review, payment proofs, system alerts…) is real but
+ * not phone-buzz urgent, and stays on the in-app + email sinks.
+ *
+ * Widening this is a PRODUCT decision, not a cleanup: pushing everything trains
+ * operators to ignore push, which destroys its value for the two events above.
+ * It is a single named constant precisely so any change is explicit.
+ */
+export const PUSH_ELIGIBLE_TYPES = ['handoff', 'alert_signal'] as const;
+
+/**
  * Poison-message threshold (docs/15-RELIABILITY-AND-DURABILITY.md §4). When a
  * pgmq message's read_ct reaches this, the worker parks it as
  * webhook_events.status='dead' instead of retrying forever. Mirrored in the

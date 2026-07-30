@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { updateFullNameAction, updateNotificationPrefsAction } from '@/lib/account/actions';
+import { PushToggle } from '@/components/account/push-toggle';
 import type { NotificationPrefs, NotificationType } from '@/types/domain';
 
 const TYPE_LABELS: Record<NotificationType, string> = {
@@ -54,9 +55,12 @@ const DASHBOARD_TYPES: NotificationType[] = [
 export function AccountForm({
   profile,
   scope,
+  vapidPublicKey = null,
 }: {
   profile: { fullName: string | null; email: string | null; notificationPrefs: NotificationPrefs };
   scope: 'admin' | 'dashboard';
+  /** null when push isn't provisioned (docs/21 §2.5 — push is a bolt-on, absent env ⇒ the toggle self-hides). */
+  vapidPublicKey?: string | null;
 }) {
   const types = scope === 'admin' ? ADMIN_TYPES : DASHBOARD_TYPES;
 
@@ -213,6 +217,7 @@ export function AccountForm({
             </div>
             <Switch checked={emailEnabled} onCheckedChange={handleToggleEmail} disabled={isSavingPrefs} />
           </div>
+          <PushToggle vapidPublicKey={vapidPublicKey} />
           <div className="space-y-2.5 border-t pt-3">
             <p className="text-xs font-medium text-muted-foreground">Notification types</p>
             {types.map((type) => (

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getCallerContext } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { env } from '@/lib/env';
 import { PageHeader } from '@/components/page-header';
 import { AccountForm } from '@/components/account-form';
 import type { NotificationPrefs, NotificationType } from '@/types/domain';
@@ -25,7 +26,11 @@ export default async function AdminAccountPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <PageHeader title="Account" description="Manage your profile, password, and notification preferences." />
-      <AccountForm profile={{ fullName: ctx.fullName, email: ctx.email, notificationPrefs }} scope="admin" />
+      <AccountForm
+        profile={{ fullName: ctx.fullName, email: ctx.email, notificationPrefs }}
+        scope="admin"
+        vapidPublicKey={env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
+      />
     </div>
   );
 }

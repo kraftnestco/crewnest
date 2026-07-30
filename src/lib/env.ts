@@ -27,6 +27,13 @@ const schema = z.object({
   SENTRY_DSN: z.string().optional(),
   // Optional — Vercel Cron auth (docs/17 §3.1) rejects every request until set.
   CRON_SECRET: z.string().optional(),
+  // Optional — Web Push (docs/21). Push is a no-op until all three are set, the
+  // same bolt-on posture as Resend/Sentry. The PRIVATE key is server-only and
+  // must never be exposed; only NEXT_PUBLIC_VAPID_PUBLIC_KEY reaches the browser.
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().optional(),
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

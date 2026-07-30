@@ -2,6 +2,8 @@ import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
 import { env } from '@/lib/env';
 import { sendEmail } from '@/services/email';
+import { isPushConfigured, sendPushToUsers } from '@/services/push';
+import { PUSH_ELIGIBLE_TYPES } from '@/lib/constants';
 import type { Database } from '@/types/database';
 import type { Notification, NotificationEntityType, NotificationType } from '@/types/domain';
 import { log } from '@/lib/log';
@@ -70,34 +72,42 @@ export async function notify(input: NotifyInput): Promise<void> {
     return;
   }
 
-  await emitEmailFanOut(input);
+  await emitExternalFanOut(input);
 }
 
 interface RecipientRow {
+  id: string;
   email: string | null;
   notification_prefs: Database['public']['Tables']['profiles']['Row']['notification_prefs'];
 }
 
+/** A recipient has muted this type outright — applies to every sink, not just email. */
+function isMuted(row: RecipientRow, type: NotificationType): boolean {
+  const prefs = (row.notification_prefs ?? {}) as { muted_types?: string[] };
+  return (prefs.muted_types ?? []).includes(type);
+}
+
 function emailEligible(row: RecipientRow, type: NotificationType): boolean {
-  const prefs = (row.notification_prefs ?? {}) as { email_enabled?: boolean; muted_types?: string[] };
-  return prefs.email_enabled === true && !(prefs.muted_types ?? []).includes(type);
+  const prefs = (row.notification_prefs ?? {}) as { email_enabled?: boolean };
+  return prefs.email_enabled === true && !isMuted(row, type);
 }
 
 /**
  * docs/14 §3.4 — agency recipients are every platform admin; tenant recipients
- * are that tenant's user_tenants members. Both are filtered by the recipient's
- * own notification_prefs (email_enabled + muted_types) before we ever send.
+ * are that tenant's user_tenants members. Resolved ONCE per notify() and shared
+ * by the email and push fan-outs, so adding push didn't double the queries.
+ * Per-sink eligibility (email_enabled, muted_types) is applied by each fan-out.
  */
-async function resolveEmailRecipients(client: ReturnType<typeof createServiceClient>, input: NotifyInput): Promise<string[]> {
+async function resolveRecipients(
+  client: ReturnType<typeof createServiceClient>,
+  input: NotifyInput,
+): Promise<RecipientRow[]> {
   if (input.scope === 'agency') {
     const { data } = await client
       .from('profiles')
-      .select('email, notification_prefs')
+      .select('id, email, notification_prefs')
       .eq('is_platform_admin', true);
-    return (data ?? [])
-      .filter((row) => emailEligible(row, input.type))
-      .map((row) => row.email)
-      .filter((email): email is string => email !== null);
+    return data ?? [];
   }
 
   const { data: members } = await client
@@ -109,25 +119,50 @@ async function resolveEmailRecipients(client: ReturnType<typeof createServiceCli
 
   const { data: profiles } = await client
     .from('profiles')
-    .select('email, notification_prefs')
+    .select('id, email, notification_prefs')
     .in('id', userIds);
-  return (profiles ?? [])
-    .filter((row) => emailEligible(row, input.type))
-    .map((row) => row.email)
-    .filter((email): email is string => email !== null);
+  return profiles ?? [];
 }
 
 /**
- * Email is a bolt-on, not a dependency (docs/14 §3.4/§9, Stage O7): a no-op
- * whenever RESEND_API_KEY is unset, and best-effort (never throws) once it is.
+ * Email and push are bolt-ons, not dependencies (docs/14 §3.4/§9; docs/21 §2.5):
+ * each is a no-op whenever its own env vars are unset, and both are best-effort
+ * (never throw into the caller's hot path) once configured.
+ *
+ * Recipients are resolved once and shared by both sinks.
  */
-async function emitEmailFanOut(input: NotifyInput): Promise<void> {
-  if (!env.RESEND_API_KEY) return;
+async function emitExternalFanOut(input: NotifyInput): Promise<void> {
+  const emailOn = Boolean(env.RESEND_API_KEY);
+  const pushOn = isPushConfigured() && (PUSH_ELIGIBLE_TYPES as readonly string[]).includes(input.type);
+  if (!emailOn && !pushOn) return;
+
+  let recipients: RecipientRow[];
   try {
-    const client = createServiceClient();
-    const recipients = await resolveEmailRecipients(client, input);
-    if (recipients.length === 0) return;
-    await sendEmail({ to: recipients, subject: input.title, text: input.body ?? input.title });
+    recipients = await resolveRecipients(createServiceClient(), input);
+  } catch (err) {
+    log.error('[notifications] recipient lookup failed', {
+      type: input.type,
+      tenantId: input.tenantId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
+  if (recipients.length === 0) return;
+
+  await Promise.all([
+    emailOn ? emitEmailFanOut(input, recipients) : Promise.resolve(),
+    pushOn ? emitPushFanOut(input, recipients) : Promise.resolve(),
+  ]);
+}
+
+async function emitEmailFanOut(input: NotifyInput, recipients: RecipientRow[]): Promise<void> {
+  try {
+    const to = recipients
+      .filter((row) => emailEligible(row, input.type))
+      .map((row) => row.email)
+      .filter((email): email is string => email !== null);
+    if (to.length === 0) return;
+    await sendEmail({ to, subject: input.title, text: input.body ?? input.title });
   } catch (err) {
     log.error('[notifications] email fan-out failed', {
       type: input.type,
@@ -135,6 +170,27 @@ async function emitEmailFanOut(input: NotifyInput): Promise<void> {
       error: err instanceof Error ? err.message : String(err),
     });
   }
+}
+
+/**
+ * docs/21 §2.2 — only PUSH_ELIGIBLE_TYPES reach here (checked by the caller),
+ * and a recipient who muted the type gets no push, exactly as they get no email.
+ *
+ * §2.5: the payload carries NO customer PII and NO message content — just the
+ * title, the short body the in-app row already shows, and the link. A push
+ * lands on a lock screen, the least controlled surface in the product.
+ */
+async function emitPushFanOut(input: NotifyInput, recipients: RecipientRow[]): Promise<void> {
+  const userIds = recipients.filter((row) => !isMuted(row, input.type)).map((row) => row.id);
+  if (userIds.length === 0) return;
+
+  await sendPushToUsers(userIds, {
+    title: input.title,
+    body: input.body ?? '',
+    link: input.link,
+    // Collapse repeats of the same event on the same entity into one buzz.
+    tag: input.entityId ? `${input.type}:${input.entityId}` : input.type,
+  });
 }
 
 /** Emit the agency + tenant rows for an event both audiences care about, each with its own copy + link. */
