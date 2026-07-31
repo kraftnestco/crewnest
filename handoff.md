@@ -356,6 +356,59 @@ The prior owner must privately hand you the **secret values** (never in git/this
 
 ---
 
+## 5.1 The Vercel/Meta-access checklist — do these IN ORDER once you have access
+
+Everything below is genuinely blocked on Vercel access (§4b) and/or a Meta Developer account, tracked
+here so nothing gets lost across sessions. **Do them in this order** — several later steps depend on
+an earlier one.
+
+**A. Once Vercel access is resolved (transfer / partner relay / fresh deploy — your call, §4b):**
+1. Set every secret in §5's table on the **Vercel project** (Production + Preview) — not just
+   `.env.local`. This alone unblocks nothing by itself but is a prerequisite for everything after.
+2. Confirm the real deployed URL (e.g. `crewnest-rouge.vercel.app` or a custom domain, §5 item 7).
+3. **Re-point the Stage P worker at it**: `npx supabase secrets set APP_URL=<real-deployed-url>` (currently
+   `localhost:3000`, which Supabase's cloud cannot reach — this is the ONLY reason the worker's happy
+   path is unverified, §4e). No redeploy needed — Edge Function secrets take effect immediately.
+4. **Test the Stage P happy path** (docs/15 §8, still unchecked): send a real inbound message through
+   whatever channel is live, confirm it reaches `handleInboundMessage` via the worker → internal bridge
+   route, and the customer gets exactly one reply. This is the one Stage P acceptance criterion that
+   couldn't be verified locally.
+5. **Web push** (docs/21): this session's push code is committed locally but never pushed to `main` —
+   confirm it's actually pushed, then land the four `VAPID_*` vars in Vercel too. Re-verify a real
+   push fires end-to-end (this session's local test was inconclusive — see step B4's related note on
+   why testing through a real Meta channel is ambiguous until a real deployment exists).
+6. **Billing** (docs/22): once you also have a real Stripe account (independent of Vercel, see below),
+   land `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_STARTER`/`STRIPE_PRICE_PRO` in Vercel,
+   and register the webhook endpoint (`https://<your-domain>/api/webhooks/stripe`) in the Stripe
+   dashboard using the real deployed URL.
+
+**B. Once you have Meta Developer access (independent of Vercel, but most useful paired with it):**
+1. Follow §7's live-connection checklist (IG/Messenger, Development mode, no App Review needed for your
+   own test accounts) to connect a real test channel.
+2. **Register the webhook URL** — this must point at a server Meta can actually reach: either the real
+   deployed Vercel URL (once step A is done), or a tunnel (ngrok/cloudflared) to a local dev server if
+   you want to test before deploying. **Meta can never reach `localhost` directly** — this is exactly
+   the ambiguity that made this session's push test inconclusive (a real Instagram message was sent,
+   but it was unclear whether production, a stale local path, or nothing actually processed it).
+3. Send a real customer-side message and confirm the full round trip: webhook → pgmq → worker →
+   `handleInboundMessage` → reply delivered back on the same channel. This double-checks step A4 above
+   under real conditions, not a synthetic test.
+4. **Re-test push notifications for real** (deferred from this session by your own choice): with a real
+   channel connected and the app actually deployed, trigger a `handoff` (message "I want to talk to a
+   real person") or `alert_signal` from a genuine customer message, with the CrewNest tab **not**
+   focused on the receiving device, and confirm a real OS notification appears. Do this from the SAME
+   deployment that has the VAPID env vars set (step A5) — testing against a deployment without them
+   will silently no-op (push is a no-op-by-design bolt-on when unconfigured, docs/21 §2.5/§4).
+5. **WhatsApp business-initiated messages** (owner notifications, future out-of-window follow-ups) need
+   Meta-approved message templates — a separate ops step inside the Meta dashboard, not code (§5 item 4).
+
+**C. Independent of both (can happen anytime, own timeline):**
+- Create a Stripe account (test mode is enough to start) + create the Starter ($29/mo) / Pro ($79/mo)
+  Products/Prices to match `PAYWALL_PLANS` (docs/22 §4).
+- Meta App Review (only needed for real, non-test customer traffic beyond your own test accounts, §7).
+
+---
+
 ## 6. Working rules (read `CLAUDE.md` + `AGENTS.md` for the full set)
 
 - **Opus designs, Sonnet builds.** Anything touching locked interfaces or novel/high-stakes reasoning is
