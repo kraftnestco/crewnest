@@ -64,6 +64,35 @@ export async function savePushSubscriptionAction(
   }
 }
 
+/**
+ * Does a push subscription for THIS endpoint exist under the CALLING user?
+ *
+ * The browser's own `pushManager.getSubscription()` only proves a subscription
+ * exists somewhere for this browser — one browser holds exactly one push
+ * subscription regardless of which app account is currently logged in, so
+ * switching accounts in the same browser (log out of Tenant A, log into
+ * Tenant B) leaves the OS-level subscription in place while it's still bound
+ * to Tenant A's user_id in the database. Without this check the toggle would
+ * show "on" for Tenant B while nothing is actually wired to notify them.
+ */
+export async function isEndpointSubscribedToMeAction(endpoint: string): Promise<boolean> {
+  const ctx = await getCallerContext();
+  if (!ctx) return false;
+
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from('push_subscriptions')
+    .select('id')
+    .eq('endpoint', endpoint)
+    .eq('user_id', ctx.userId)
+    .maybeSingle();
+  if (error) {
+    log.error('[push] endpoint ownership check failed', { error: error.message });
+    return false;
+  }
+  return data !== null;
+}
+
 export async function deletePushSubscriptionAction(endpoint: string): Promise<PushActionResult> {
   const ctx = await getCallerContext();
   if (!ctx) return { success: false, error: 'Not signed in.' };

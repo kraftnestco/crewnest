@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
-import { savePushSubscriptionAction, deletePushSubscriptionAction } from '@/lib/push/actions';
+import {
+  savePushSubscriptionAction,
+  deletePushSubscriptionAction,
+  isEndpointSubscribedToMeAction,
+} from '@/lib/push/actions';
 
 /**
  * Push opt-in (docs/21-WEB-PUSH-NOTIFICATIONS.md §2.3).
@@ -65,14 +69,23 @@ export function PushToggle({ vapidPublicKey }: { vapidPublicKey: string | null }
 
   useEffect(() => {
     if (support !== 'supported') return;
-    // Reflect whatever this browser is actually subscribed to, so the toggle
-    // isn't lying after a reload or on a second device. Async by nature — this
-    // is a real external-system read, not state-syncing.
+    // Reflect reality for the CURRENTLY LOGGED-IN user, not just "does this
+    // browser hold any push subscription" — a browser holds exactly one
+    // subscription regardless of which account is logged in, so after
+    // switching accounts the browser-level subscription still exists but may
+    // belong to a DIFFERENT user server-side. Both checks are required: the
+    // browser subscription must exist AND the server must confirm it's ours.
     let cancelled = false;
     navigator.serviceWorker.ready
       .then((reg) => reg.pushManager.getSubscription())
-      .then((sub) => {
-        if (!cancelled) setEnabled(sub !== null);
+      .then(async (sub) => {
+        if (cancelled) return;
+        if (!sub) {
+          setEnabled(false);
+          return;
+        }
+        const mine = await isEndpointSubscribedToMeAction(sub.endpoint);
+        if (!cancelled) setEnabled(mine);
       })
       .catch(() => {
         if (!cancelled) setEnabled(false);
