@@ -18,7 +18,7 @@ import * as knowledge from './knowledge';
 import { computeOpenNow } from './hours';
 import { getProvider } from './ai/provider';
 import type { LlmMessage } from './ai/provider';
-import { estimateCostUsd } from './ai/pricing';
+import { estimateCostUsd, estimatePromptTokens } from './ai/pricing';
 import { getEnabledTools, executeTool } from './tools/registry';
 import { getLlmKey } from '@/lib/secrets';
 import { sendText, MetaWindowError } from './meta/send';
@@ -38,6 +38,11 @@ import {
   FREE_PLAN_DAILY_SESSION_CAP,
   DEFAULT_FREE_MONTHLY_CAP_USD,
   RECENT_IMAGE_REATTACH_WINDOW_MINUTES,
+  BATCH_GRACE_MS,
+  SUPERSEDE_POLL_MS,
+  MAX_TURN_SUPERSESSIONS,
+  MAX_SWEEP_ROUNDS,
+  TURN_LEASE_TTL_SECONDS,
 } from '@/lib/constants';
 import type { AuthoredBy, ChatSession, InboundMessage, OrderAttachment, Tenant } from '@/types/domain';
 import { log } from '@/lib/log';
@@ -180,7 +185,9 @@ export async function handleInboundMessage(
     return { sessionId: session.id, replyText: null, handoff: true };
   }
 
-  // 5. Persist the inbound user message.
+  // 5. Persist the inbound user message + bump the supersession epoch (docs/23
+  // §4 phase 1). This is unconditional: whatever happens to the turn below, the
+  // customer's words are already in chat_messages and visible in the inbox.
   await messages.persist({
     sessionId: session.id,
     tenantId: tenant.id,
@@ -188,9 +195,211 @@ export async function handleInboundMessage(
     content: userText,
     providerMsgId: input.providerMsgId,
     attachments: media.attachments,
+    bumpEpoch: true,
   });
 
-  return runTurn(tenant, session, { userText, imageUrls: media.imageUrls, attachments: media.attachments });
+  // 5b. The website widget answers synchronously on its own HTTP response and is
+  // explicitly out of scope for batching (docs/23 §1) — run the turn directly,
+  // exactly as before.
+  if (input.platform === 'web') {
+    return runTurn(tenant, session, {
+      userText,
+      imageUrls: media.imageUrls,
+      attachments: media.attachments,
+    });
+  }
+
+  return runBatchedTurn(tenant, session, {
+    imageUrls: media.imageUrls,
+    attachments: media.attachments,
+  });
+}
+
+/**
+ * Phase 2 of docs/23-MESSAGE-BATCHING.md §4 — the lease-guarded, batched turn.
+ *
+ * Only ever reached for queue-driven channels (WhatsApp/Messenger/Instagram);
+ * the caller has already persisted the message and bumped the epoch.
+ */
+async function runBatchedTurn(
+  tenant: Tenant,
+  session: ChatSession,
+  /**
+   * Media from the message that triggered THIS call. Captions/transcripts are
+   * already folded into the persisted text (so they survive the batched rebuild),
+   * but image URLs and attachment refs ride the turn in memory only — they must
+   * be carried across explicitly or a photo sent mid-burst is silently dropped.
+   */
+  media: { imageUrls?: string[]; attachments?: OrderAttachment[] },
+): Promise<OrchestratorResult> {
+  const leaseId = crypto.randomUUID();
+
+  // If another worker owns this session's turn, we're done: our message is
+  // already persisted and the epoch is bumped, so the in-flight turn is
+  // obligated to pick it up (§5.2) — either by supersession or by its own sweep.
+  // Reporting success here is correct, and lets the queue archive the row.
+  const claimed = await sessions.claimTurn(session.id, leaseId, TURN_LEASE_TTL_SECONDS);
+  if (!claimed) {
+    return { sessionId: session.id, replyText: null, handoff: false };
+  }
+
+  try {
+    // Grace window (§2a) — the one delay this feature adds. Everything the
+    // customer sends during it is folded into the same turn.
+    await sleep(BATCH_GRACE_MS);
+
+    let outcome = await runTurnWithSupersession(tenant, session, leaseId, media);
+
+    // Trailing-message sweep (§5.5): messages can land after the supersession cap
+    // is hit, or between the final epoch snapshot and here. Without this they'd
+    // sit persisted but unanswered — the one gap this feature must not have.
+    for (let round = 0; round < MAX_SWEEP_ROUNDS; round++) {
+      const latestEpoch = await sessions.readEpoch(session.id);
+      if (latestEpoch <= outcome.coveredEpoch) break;
+      // A handoff raised by the turn we just ran means no further AI replies.
+      if (outcome.result.handoff) break;
+      // No media carried into a sweep round: this turn's images were already
+      // consumed by the turn above. A photo arriving DURING the sweep window is
+      // handled by its own call's media, and the cross-turn re-attach window
+      // (RECENT_IMAGE_REATTACH_WINDOW_MINUTES) still covers a later reference.
+      outcome = await runTurnWithSupersession(tenant, session, leaseId, {});
+    }
+
+    return outcome.result;
+  } finally {
+    // Best-effort: a failed release just means the lease expires on its TTL,
+    // which is exactly what the TTL is for. Never fail an already-sent reply
+    // over it.
+    try {
+      await sessions.releaseTurn(session.id, leaseId);
+    } catch (err) {
+      log.warn('[orchestrator] lease release failed — will expire on TTL', {
+        sessionId: session.id,
+        error: err instanceof Error ? err.message : 'unknown',
+      });
+    }
+  }
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Thrown by the supersession watcher's abort — caught by the batching loop, never escapes it. */
+class SupersededError extends Error {
+  constructor() {
+    super('turn superseded by a newer inbound message');
+    this.name = 'SupersededError';
+  }
+}
+
+/**
+ * Watches `inbound_epoch` while an LLM call is in flight and aborts it when a
+ * newer customer message lands (docs/23-MESSAGE-BATCHING.md §5.1).
+ *
+ * Polling rather than LISTEN/NOTIFY on purpose: this is one indexed primary-key
+ * read every SUPERSEDE_POLL_MS against a row already in cache, only for the
+ * duration of a call. A long-lived listening connection from a serverless route
+ * would be the worse trade.
+ */
+function watchForSupersession(sessionId: string, baselineEpoch: number) {
+  const controller = new AbortController();
+  let superseded = false;
+
+  const timer = setInterval(() => {
+    void sessions
+      .readEpoch(sessionId)
+      .then((epoch) => {
+        if (epoch > baselineEpoch && !controller.signal.aborted) {
+          superseded = true;
+          controller.abort();
+        }
+      })
+      // A failed poll must never abort a healthy turn — worst case we miss a
+      // supersession and the §5.5 sweep answers the new message next.
+      .catch(() => {});
+  }, SUPERSEDE_POLL_MS);
+
+  return {
+    signal: controller.signal,
+    stop: () => clearInterval(timer),
+    /** True only if WE aborted for supersession — distinguishes it from a genuine provider error. */
+    wasSuperseded: () => superseded,
+  };
+}
+
+/**
+ * Run one turn, restarting it whenever a newer customer message arrives
+ * (docs/23 §5.2). Returns the completed turn's result plus the epoch it actually
+ * covered, so the caller's sweep (§5.5) can tell whether anything landed after.
+ */
+async function runTurnWithSupersession(
+  tenant: Tenant,
+  session: ChatSession,
+  leaseId: string,
+  media: { imageUrls?: string[]; attachments?: OrderAttachment[] },
+): Promise<{ result: OrchestratorResult; coveredEpoch: number }> {
+  for (let attempt = 0; ; attempt++) {
+    // Renew before each attempt so a long burst can't let the lease expire under
+    // us. Losing it means another worker legitimately took over — stop here
+    // rather than racing them.
+    if (attempt > 0) {
+      const stillOurs = await sessions.renewTurn(session.id, leaseId, TURN_LEASE_TTL_SECONDS);
+      if (!stillOurs) {
+        log.warn('[orchestrator] lease lost mid-burst — another worker took over', {
+          sessionId: session.id,
+        });
+        return {
+          result: { sessionId: session.id, replyText: null, handoff: false },
+          coveredEpoch: await sessions.readEpoch(session.id),
+        };
+      }
+    }
+
+    // Snapshot AFTER any wait, so it covers everything already persisted.
+    const coveredEpoch = await sessions.readEpoch(session.id);
+
+    // Past the cap we stop watching entirely and let the call finish (§5.3):
+    // a customer machine-gunning messages must not starve the turn forever.
+    const watch =
+      attempt < MAX_TURN_SUPERSESSIONS ? watchForSupersession(session.id, coveredEpoch) : null;
+
+    // Re-read the session each attempt: `summary`, `pendingClarification` etc.
+    // may have moved, and the batched user text certainly has.
+    const fresh = (await sessions.getById(session.id)) ?? session;
+
+    // Handoff can be raised BETWEEN attempts — by the superseded turn itself, or
+    // by a human hitting Take Over in the inbox mid-burst. The step-4 gate only
+    // ran on entry, so without re-checking here a retry would run a full AI turn
+    // on a conversation a human has just taken over. Hard stop, same as step 4.
+    if (fresh.isHumanHandoff) {
+      return {
+        result: { sessionId: session.id, replyText: null, handoff: true },
+        coveredEpoch: await sessions.readEpoch(session.id),
+      };
+    }
+
+    const batched = await messages.loadPendingUserMessages(session.id);
+
+    try {
+      const result = await runTurn(
+        tenant,
+        fresh,
+        {
+          // Newest last, one coherent user turn (§6). Empty ⇒ null, which runTurn
+          // already understands as "continuation, no new customer input".
+          userText: batched.length ? batched.join('\n') : null,
+          imageUrls: media.imageUrls,
+          attachments: media.attachments,
+        },
+        watch?.signal,
+      );
+      return { result, coveredEpoch };
+    } catch (err) {
+      if (watch?.wasSuperseded()) continue; // newer message arrived — rebuild and retry
+      throw err;
+    } finally {
+      watch?.stop();
+    }
+  }
 }
 
 interface RunTurnInput {
@@ -207,7 +416,13 @@ interface RunTurnInput {
  * human-handoff resolution with no new customer input) — see docs: media-handoff
  * plan, B7. Pure extraction from the original inline steps; behavior-preserving.
  */
-async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUrls, attachments }: RunTurnInput): Promise<OrchestratorResult> {
+async function runTurn(
+  tenant: Tenant,
+  session: ChatSession,
+  { userText, imageUrls, attachments }: RunTurnInput,
+  /** Supersession abort (docs/23 §5.1). Undefined for continueSession and the widget — unchanged behaviour. */
+  supersedeSignal?: AbortSignal,
+): Promise<OrchestratorResult> {
   // 6. Short-term memory (chronological, token-budgeted). `truncated`/`oldestKeptAt`
   // feed the rolling-summary refresh at step 13 (docs/18 §2, Stage U-mem).
   const {
@@ -363,12 +578,18 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
   let finalText = '';
   let finalCompletionTokens = 0;
   let strippedImages = false;
+  // §5.6 — once ANY tool has executed, this turn stops being interruptible.
+  // Tools have side effects (an order placed, stock decremented); aborting after
+  // one ran and restarting the whole turn would re-run it. Ordering safety beats
+  // latency, and the §5.5 sweep answers whatever arrived in the meantime.
+  let toolExecuted = false;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const chatArgs = {
       model: tenant.llmModel,
       cachePrefixLength: built.cachePrefixLength,
       tools: tools.length ? tools.map((t) => t.def) : undefined,
+      signal: toolExecuted ? undefined : supersedeSignal,
     };
     // Vision resilience: a model that can't accept images (e.g. a text-only OpenRouter
     // model) throws on a request carrying image parts. Rather than dropping the whole
@@ -379,6 +600,26 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
     try {
       result = await provider.chat({ ...chatArgs, messages: conversation }, key);
     } catch (err) {
+      // Supersession (docs/23 §5.1/§5.4). Checked FIRST so an abort can't be
+      // mistaken for a vision failure and retried text-only below.
+      if (chatArgs.signal?.aborted) {
+        // Meter what the abort still cost us: prompt tokens are exact enough to
+        // matter (the provider bills input on accepting the request), completion
+        // tokens are genuinely unknown and stored NULL, not 0.
+        const promptTokens = estimatePromptTokens(conversation);
+        const partialUsage = { promptTokens, completionTokens: 0, totalTokens: promptTokens };
+        await messages.logUsage({
+          tenantId: tenant.id,
+          sessionId: session.id,
+          provider: provider.id,
+          model: tenant.llmModel,
+          usage: partialUsage,
+          usedByok,
+          costUsd: estimateCostUsd(partialUsage, tenant.llmModel),
+          superseded: true,
+        });
+        throw new SupersededError();
+      }
       if (!strippedImages && conversationHasImages(conversation)) {
         log.warn('[orchestrator] chat failed with images — retrying text-only', {
           tenantId: tenant.id,
@@ -418,6 +659,10 @@ async function runTurn(tenant: Tenant, session: ChatSession, { userText, imageUr
       for (const call of result.toolCalls) {
         // Identity (tenant/session) and this turn's media come from the server-side
         // ToolContext, never from the model's arguments — see services/tools/registry.ts.
+        // Set BEFORE executing, not after: a tool that throws midway may still
+        // have had side effects, so the turn must stop being interruptible from
+        // the moment execution begins (§5.6).
+        toolExecuted = true;
         const toolResult = await executeTool(call, { tenant, session, attachments });
         conversation.push({ role: 'tool', toolCallId: call.id, content: JSON.stringify(toolResult) });
       }

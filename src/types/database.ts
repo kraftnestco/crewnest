@@ -282,6 +282,9 @@ export type Database = {
           customer_name: string | null;
           customer_avatar_url: string | null;
           delivery_blocked_reason: string | null;
+          turn_lease_until: string | null;
+          turn_lease_id: string | null;
+          inbound_epoch: number;
           created_at: string;
         };
         Insert: {
@@ -301,6 +304,9 @@ export type Database = {
           customer_name?: string | null;
           customer_avatar_url?: string | null;
           delivery_blocked_reason?: string | null;
+          turn_lease_until?: string | null;
+          turn_lease_id?: string | null;
+          inbound_epoch?: number;
           created_at?: string;
         };
         Update: {
@@ -320,6 +326,9 @@ export type Database = {
           customer_name?: string | null;
           customer_avatar_url?: string | null;
           delivery_blocked_reason?: string | null;
+          turn_lease_until?: string | null;
+          turn_lease_id?: string | null;
+          inbound_epoch?: number;
           created_at?: string;
         };
         Relationships: [];
@@ -374,10 +383,12 @@ export type Database = {
           provider: string;
           model: string;
           prompt_tokens: number;
-          completion_tokens: number;
+          /** Null on a superseded (aborted mid-flight) call — genuinely unknown, not zero. docs/23 §5.4. */
+          completion_tokens: number | null;
           total_tokens: number;
           estimated_cost_usd: number;
           used_byok: boolean;
+          superseded: boolean;
           created_at: string;
         };
         Insert: {
@@ -387,10 +398,11 @@ export type Database = {
           provider: string;
           model: string;
           prompt_tokens?: number;
-          completion_tokens?: number;
+          completion_tokens?: number | null;
           total_tokens?: number;
           estimated_cost_usd?: number;
           used_byok?: boolean;
+          superseded?: boolean;
           created_at?: string;
         };
         Update: {
@@ -400,10 +412,11 @@ export type Database = {
           provider?: string;
           model?: string;
           prompt_tokens?: number;
-          completion_tokens?: number;
+          completion_tokens?: number | null;
           total_tokens?: number;
           estimated_cost_usd?: number;
           used_byok?: boolean;
+          superseded?: boolean;
           created_at?: string;
         };
         Relationships: [];
@@ -737,6 +750,25 @@ export type Database = {
       };
       increment_rate_limit_bucket: {
         Args: { p_bucket_key: string; p_window_start: number };
+        Returns: number;
+      };
+      // docs/23-MESSAGE-BATCHING.md §3.2 — the per-session turn lease. `claim`
+      // returns null (not false) when the lease is already held: the UPDATE
+      // matches no row, so there is nothing to return.
+      claim_session_turn: {
+        Args: { p_session_id: string; p_lease_id: string; p_ttl_seconds: number };
+        Returns: boolean | null;
+      };
+      renew_session_turn: {
+        Args: { p_session_id: string; p_lease_id: string; p_ttl_seconds: number };
+        Returns: boolean | null;
+      };
+      release_session_turn: {
+        Args: { p_session_id: string; p_lease_id: string };
+        Returns: boolean | null;
+      };
+      bump_inbound_epoch: {
+        Args: { p_session_id: string };
         Returns: number;
       };
     };

@@ -28,7 +28,17 @@ function parsePendingClarification(raw: unknown): PendingClarification | null {
   return raw as unknown as PendingClarification;
 }
 
-export type SessionRow = Database['public']['Tables']['chat_sessions']['Row'];
+/**
+ * The inbox's view of a session. Deliberately OMITS the turn-batching internals
+ * (`turn_lease_until`, `turn_lease_id`, `inbound_epoch` — docs/23 §3.1): they are
+ * server-side turn machinery, never rendered, and the chat pages don't select
+ * them. Omitting them here keeps those explicit column lists honest instead of
+ * forcing the UI to fetch state it has no use for.
+ */
+export type SessionRow = Omit<
+  Database['public']['Tables']['chat_sessions']['Row'],
+  'turn_lease_until' | 'turn_lease_id' | 'inbound_epoch'
+>;
 export type MessageRow = Database['public']['Tables']['chat_messages']['Row'];
 export type TenantRow = Pick<
   Database['public']['Tables']['tenants']['Row'],

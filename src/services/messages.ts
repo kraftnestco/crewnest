@@ -26,6 +26,13 @@ export async function persist(args: {
   tokenCount?: number;
   /** Who produced this reply (docs/16 §2.1) — defaults to 'ai', the correct assumption for an LLM turn. */
   authoredBy?: AuthoredBy;
+  /**
+   * Bump the session's supersession epoch as part of this write
+   * (docs/23-MESSAGE-BATCHING.md §4 phase 1). Set for INBOUND CUSTOMER messages
+   * only: the epoch means "new customer input has arrived", so bumping it for
+   * our own assistant/system rows would spuriously supersede a live turn.
+   */
+  bumpEpoch?: boolean;
 }): Promise<string> {
   const client = createServiceClient();
   const { data, error } = await client
@@ -44,7 +51,56 @@ export async function persist(args: {
     .single();
 
   if (error) throw error;
+
+  if (args.bumpEpoch) {
+    // Deliberately AFTER the insert and not swallowed: a message that is
+    // persisted but whose epoch never moved is invisible to the supersession
+    // check — i.e. silently unanswered, the one failure this feature must not
+    // have. Failing loudly means the queue retries the whole message instead.
+    const { error: epochError } = await client.rpc('bump_inbound_epoch', {
+      p_session_id: args.sessionId,
+    });
+    if (epochError) throw epochError;
+  }
+
   return data.id;
+}
+
+/**
+ * Every user message newer than the most recent assistant reply, chronological
+ * (docs/23-MESSAGE-BATCHING.md §6) — the burst a single turn should answer.
+ *
+ * Returns them as separate strings; the caller joins them into ONE user turn
+ * rather than N consecutive user turns (some providers reject consecutive
+ * same-role messages, and one coherent turn is closer to how a person reads a
+ * burst anyway).
+ */
+export async function loadPendingUserMessages(sessionId: string): Promise<string[]> {
+  const client = createServiceClient();
+
+  const { data: lastAssistant, error: assistantError } = await client
+    .from('chat_messages')
+    .select('created_at')
+    .eq('session_id', sessionId)
+    .eq('role', 'assistant')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (assistantError) throw assistantError;
+
+  let query = client
+    .from('chat_messages')
+    .select('content, created_at')
+    .eq('session_id', sessionId)
+    .eq('role', 'user')
+    .order('created_at', { ascending: true })
+    .limit(WINDOW_FETCH_LIMIT);
+
+  if (lastAssistant) query = query.gt('created_at', lastAssistant.created_at);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []).map((r) => r.content);
 }
 
 /** Mark a specific message as failed to deliver (docs/15 §6) — reuses migration 0022's delivery_failed column, so the inbox already renders the "not delivered" state with no UI change needed. */
@@ -217,7 +273,19 @@ export async function getTrailing30DayMasterCostUsd(tenantId: string): Promise<n
   return (data ?? []).reduce((sum, row) => sum + row.estimated_cost_usd, 0);
 }
 
-/** Write a per-turn usage row for billing/cost/abuse. */
+/**
+ * Write a per-turn usage row for billing/cost/abuse.
+ *
+ * Calls that RETURN carry the provider's own `usage` object and are logged
+ * exactly as they always have been — that is the overwhelming majority of rows.
+ *
+ * `superseded` rows (docs/23-MESSAGE-BATCHING.md §5.4) are the exception: a call
+ * we aborted mid-flight has no provider usage, so its prompt tokens are computed
+ * from the prompt we built (exact — the provider bills input on accepting the
+ * request regardless of us hanging up) while its completion tokens are genuinely
+ * unknown and stored as NULL, never 0. Recording the unknown as zero would be a
+ * quiet lie in a billing-adjacent table; NULL + the marker keeps it measurable.
+ */
 export async function logUsage(args: {
   tenantId: string;
   sessionId: string | null;
@@ -226,6 +294,8 @@ export async function logUsage(args: {
   usage: LlmUsage;
   usedByok: boolean;
   costUsd: number;
+  /** True only for a call aborted by supersession — see above. */
+  superseded?: boolean;
 }): Promise<void> {
   const client = createServiceClient();
   const { error } = await client.from('usage_logs').insert({
@@ -234,10 +304,11 @@ export async function logUsage(args: {
     provider: args.provider,
     model: args.model,
     prompt_tokens: args.usage.promptTokens,
-    completion_tokens: args.usage.completionTokens,
+    completion_tokens: args.superseded ? null : args.usage.completionTokens,
     total_tokens: args.usage.totalTokens,
     estimated_cost_usd: args.costUsd,
     used_byok: args.usedByok,
+    superseded: args.superseded ?? false,
   });
 
   if (error) throw error;

@@ -253,6 +253,86 @@ export async function setCustomerIdentity(
   if (error) throw error;
 }
 
+/**
+ * Per-session turn lease + supersession epoch (docs/23-MESSAGE-BATCHING.md §3).
+ *
+ * The lease is what stops two workers running a turn for the same customer at
+ * once; the epoch is what lets a worker mid-LLM-call notice that a newer message
+ * arrived. Both live behind SQL functions (migration 0039) rather than plain
+ * updates because the claim MUST be a single atomic statement — a
+ * read-then-write races two workers into the same session.
+ */
+
+/**
+ * Try to take the turn lease. Returns true only if it was actually claimed;
+ * false means another worker owns it and the caller must NOT run a turn.
+ * `claim_session_turn` returns null (no row matched) rather than false when the
+ * lease is held, hence the `=== true` check.
+ */
+export async function claimTurn(
+  sessionId: string,
+  leaseId: string,
+  ttlSeconds: number,
+): Promise<boolean> {
+  const client = createServiceClient();
+  const { data, error } = await client.rpc('claim_session_turn', {
+    p_session_id: sessionId,
+    p_lease_id: leaseId,
+    p_ttl_seconds: ttlSeconds,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
+/**
+ * Extend a lease we still hold — called on each supersession restart so a long
+ * burst can't let the lease expire underneath its owner. A false return means we
+ * no longer own it (it expired and someone else claimed it), which the caller
+ * should treat as "stop, another worker has taken over".
+ */
+export async function renewTurn(
+  sessionId: string,
+  leaseId: string,
+  ttlSeconds: number,
+): Promise<boolean> {
+  const client = createServiceClient();
+  const { data, error } = await client.rpc('renew_session_turn', {
+    p_session_id: sessionId,
+    p_lease_id: leaseId,
+    p_ttl_seconds: ttlSeconds,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
+/**
+ * Release a lease we hold. Gated on ownership server-side, so a worker that
+ * overran its TTL can never release the lease a DIFFERENT worker now holds.
+ * Best-effort by design: a failure here just means the lease expires on its TTL
+ * instead of immediately, which is exactly what the TTL is for — so callers log
+ * rather than fail the turn (the reply has usually already been sent).
+ */
+export async function releaseTurn(sessionId: string, leaseId: string): Promise<void> {
+  const client = createServiceClient();
+  const { error } = await client.rpc('release_session_turn', {
+    p_session_id: sessionId,
+    p_lease_id: leaseId,
+  });
+  if (error) throw error;
+}
+
+/** Current supersession epoch for a session — the value a turn snapshots before calling the LLM. */
+export async function readEpoch(sessionId: string): Promise<number> {
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from('chat_sessions')
+    .select('inbound_epoch')
+    .eq('id', sessionId)
+    .single();
+  if (error) throw error;
+  return data.inbound_epoch;
+}
+
 /** Load a session by id, regardless of tenant — used by `continueSession` to resume a turn. */
 export async function getById(sessionId: string): Promise<ChatSession | null> {
   const client = createServiceClient();

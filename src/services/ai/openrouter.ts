@@ -16,16 +16,20 @@ export const openRouterProvider: LlmProvider = {
   async chat(req: LlmRequest, apiKey: string): Promise<LlmResult> {
     const client = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' });
 
-    const completion = await client.chat.completions.create({
-      model: req.model,
-      messages: req.messages.map(toOpenAiMessage),
-      temperature: req.temperature ?? 0.4,
-      max_tokens: req.maxTokens ?? 800,
-      tools: req.tools?.map((t) => ({
-        type: 'function' as const,
-        function: { name: t.name, description: t.description, parameters: t.parameters },
-      })),
-    });
+    const completion = await client.chat.completions.create(
+      {
+        model: req.model,
+        messages: req.messages.map(toOpenAiMessage),
+        temperature: req.temperature ?? 0.4,
+        max_tokens: req.maxTokens ?? 800,
+        tools: req.tools?.map((t) => ({
+          type: 'function' as const,
+          function: { name: t.name, description: t.description, parameters: t.parameters },
+        })),
+      },
+      // Supersession (docs/23 §5.1). Undefined ⇒ unchanged behaviour.
+      { signal: req.signal },
+    );
 
     const choice = completion.choices[0];
     const usage = completion.usage;

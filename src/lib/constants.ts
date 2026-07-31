@@ -127,8 +127,36 @@ export const MAX_MESSAGE_ATTEMPTS = 5;
  * pgmq visibility timeout in seconds (docs/15 §4) — how long a read message is
  * hidden from other readers before it's eligible for redelivery if never
  * archived. Same mirroring note as MAX_MESSAGE_ATTEMPTS above.
+ *
+ * Raised 30 → 120 for message batching (docs/23 §7): a batched turn can now run
+ * for the grace window + several provider calls + tool execution, which the old
+ * 30s comfortably undershot. A turn outliving this value leaves its pgmq row
+ * eligible for redelivery WHILE it is still processing — previously rare, and
+ * routine once turns got longer. Must exceed TURN_LEASE_TTL_SECONDS.
  */
-export const QUEUE_VISIBILITY_TIMEOUT_SECONDS = 30;
+export const QUEUE_VISIBILITY_TIMEOUT_SECONDS = 120;
+
+/**
+ * Message batching (docs/23-MESSAGE-BATCHING.md §7) — one AI turn answers a whole
+ * burst instead of firing a separate turn per message.
+ *
+ * BATCH_GRACE_MS is the one number worth tuning from real traffic: long enough to
+ * catch a two-thumb burst, short enough that a lone "hi" doesn't feel dead. It is
+ * the ONLY latency this feature adds to a single-message conversation.
+ *
+ * MAX_TURN_SUPERSESSIONS bounds abort-and-restart so a customer machine-gunning
+ * messages can't starve the turn forever; MAX_SWEEP_ROUNDS bounds the
+ * trailing-message sweep (§5.5) that catches anything landing after the cap.
+ *
+ * TURN_LEASE_TTL_SECONDS bounds CRASH recovery, not normal duration — it is
+ * renewed on every supersession restart. Keep it below
+ * QUEUE_VISIBILITY_TIMEOUT_SECONDS above.
+ */
+export const BATCH_GRACE_MS = 4000;
+export const SUPERSEDE_POLL_MS = 1500;
+export const MAX_TURN_SUPERSESSIONS = 3;
+export const MAX_SWEEP_ROUNDS = 2;
+export const TURN_LEASE_TTL_SECONDS = 90;
 
 /** Bounds tool-calling rounds per inbound message — caps cost and prevents infinite loops. */
 export const MAX_TOOL_ROUNDS = 3;

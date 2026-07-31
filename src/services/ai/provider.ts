@@ -52,6 +52,13 @@ export interface LlmRequest {
   temperature?: number;
   maxTokens?: number;
   tools?: LlmToolDef[]; // omit ⇒ no tool-calling (today's path)
+  /**
+   * Aborts the in-flight request (docs/23-MESSAGE-BATCHING.md §5.1). Set when a
+   * newer customer message has arrived and this turn is about to be superseded —
+   * the partial response is discarded and the turn restarts with everything
+   * combined. Omitting it behaves exactly as before.
+   */
+  signal?: AbortSignal;
 }
 
 export interface LlmUsage {

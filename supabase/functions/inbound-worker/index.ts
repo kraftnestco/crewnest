@@ -14,7 +14,11 @@
 // Mirrors these constants from src/lib/constants.ts (Deno can't import that
 // Node file — keep both in sync if either changes):
 const MAX_MESSAGE_ATTEMPTS = 5; // docs/15 §4
-const VISIBILITY_TIMEOUT_SECONDS = 30; // docs/15 §4
+// Raised 30 → 120 for message batching (docs/23 §7): a batched turn runs for the
+// grace window + several provider calls + tool execution, and a turn outliving
+// this leaves its pgmq row eligible for redelivery while STILL processing.
+// Must stay above TURN_LEASE_TTL_SECONDS (90) in src/lib/constants.ts.
+const VISIBILITY_TIMEOUT_SECONDS = 120; // docs/15 §4, docs/23 §7
 const BATCH_SIZE = 10; // docs/15 §7 P3 ("n=10")
 const QUEUE_NAME = 'inbound_messages';
 
