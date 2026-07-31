@@ -4,9 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { provisionTenantAction } from '../provision-actions';
+import { createCheckoutSessionAction } from '@/app/dashboard/billing/actions';
 import { DEMO_HANDOFF_KEY, type DemoHandoff } from '@/services/demo/handoff';
 
 type Status = 'provisioning' | 'done_pending_upgrade' | 'nothing_to_provision' | 'error';
+
+function isPaidPlanId(id: string): id is 'starter' | 'pro' {
+  return id === 'starter' || id === 'pro';
+}
 
 /**
  * Lands here after either typed-code verify or the Google OAuth round trip
@@ -53,14 +58,30 @@ export function CompleteClient() {
       }
 
       sessionStorage.removeItem(DEMO_HANDOFF_KEY);
-      if (result.planStatus === 'pending_upgrade') {
+
+      // docs/22-BILLING-STRIPE.md §4: a paid-plan selection now goes straight
+      // to real Stripe Checkout instead of landing on a "we'll email you"
+      // holding page (provisionTenantAction still stamps plan_status=
+      // 'pending_upgrade' first — the webhook clears it once payment actually
+      // completes, so an abandoned checkout correctly stays pending, not silently free).
+      if (result.planStatus === 'pending_upgrade' && result.tenantId && isPaidPlanId(handoff.planId)) {
+        const checkout = await createCheckoutSessionAction(result.tenantId, handoff.planId);
+        if (cancelled) return;
+        if (checkout.url) {
+          window.location.assign(checkout.url);
+          return;
+        }
+        // Checkout couldn't be created (e.g. Stripe not configured yet) — the
+        // tenant already exists on the free plan with pending_upgrade set, so
+        // fall back to the same holding message rather than losing the account.
         setStatus('done_pending_upgrade');
-      } else {
-        // Hard navigation, not router.push(): /dashboard's server-side auth
-        // check needs to see the session that was just established, the same
-        // reasoning as verify-code-form.tsx's redirect.
-        window.location.assign('/dashboard');
+        return;
       }
+
+      // Hard navigation, not router.push(): /dashboard's server-side auth
+      // check needs to see the session that was just established, the same
+      // reasoning as verify-code-form.tsx's redirect.
+      window.location.assign('/dashboard');
     }
 
     run();

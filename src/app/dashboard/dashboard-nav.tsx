@@ -1,6 +1,6 @@
 'use client';
 
-import { House, MessagesSquare, Package, ChartNoAxesColumn, Store, Boxes, Users } from 'lucide-react';
+import { House, MessagesSquare, Package, ChartNoAxesColumn, Store, Boxes, Users, CreditCard } from 'lucide-react';
 import { SidebarNav, MobileTabBar, type NavItem } from '@/components/app-nav';
 
 /**
@@ -20,6 +20,7 @@ function buildItems(showBusiness: boolean): NavItem[] {
     // notification deep-links straight into Inventory on phones (docs/19 I1).
     ...(showBusiness ? [{ href: '/dashboard/inventory', label: 'Inventory', shortLabel: 'Stock', icon: Boxes }] : []),
     ...(showBusiness ? [{ href: '/dashboard/team', label: 'My Team', shortLabel: 'Team', icon: Users }] : []),
+    ...(showBusiness ? [{ href: '/dashboard/billing', label: 'Billing', icon: CreditCard }] : []),
   ];
 }
 

@@ -55,6 +55,8 @@ function mapTenant(row: TenantRow): Tenant {
     dailyCostAlertUsd: row.daily_cost_alert_usd,
     freeMonthlyCapUsd: row.free_monthly_cap_usd,
     messageRetentionDays: row.message_retention_days,
+    stripeCustomerId: row.stripe_customer_id,
+    stripeSubscriptionId: row.stripe_subscription_id,
   };
 }
 

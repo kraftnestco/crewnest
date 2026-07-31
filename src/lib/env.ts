@@ -34,6 +34,14 @@ const schema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
+  // Optional — Stripe billing (docs/22). Unlike Resend/push, billing has no
+  // meaningful partial state: unset ⇒ the checkout/portal actions refuse with
+  // a clear error rather than silently no-op-ing (a paywall that pretends to
+  // work but never charges anyone would be a much worse failure mode).
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_PRICE_STARTER: z.string().optional(),
+  STRIPE_PRICE_PRO: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

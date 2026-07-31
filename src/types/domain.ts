@@ -74,6 +74,10 @@ export interface Tenant {
   freeMonthlyCapUsd: number | null;
   /** Days of chat_messages history to keep for this tenant (docs/17 §4.3, Stage T). Null = keep forever. */
   messageRetentionDays: number | null;
+  /** Stripe Customer id (docs/22 §2.2) — null until the tenant's first checkout/portal visit creates one. */
+  stripeCustomerId: string | null;
+  /** Stripe Subscription id (docs/22 §2.3) — set by the webhook on checkout.session.completed, cleared on cancellation. */
+  stripeSubscriptionId: string | null;
 }
 
 /**

@@ -127,6 +127,8 @@ export type Database = {
           created_at: string;
           updated_at: string;
           referred_by: string | null;
+          stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
         };
         Insert: {
           id?: string;
@@ -181,6 +183,8 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           referred_by?: string | null;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
         };
         Update: {
           id?: string;
@@ -234,6 +238,8 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           referred_by?: string | null;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
         };
         Relationships: [];
       };
@@ -555,6 +561,24 @@ export type Database = {
           provider_msg_id?: string;
           tenant_id?: string | null;
           received_at?: string;
+        };
+        Relationships: [];
+      };
+      stripe_events: {
+        Row: {
+          id: string;
+          type: string;
+          processed_at: string;
+        };
+        Insert: {
+          id: string;
+          type: string;
+          processed_at?: string;
+        };
+        Update: {
+          id?: string;
+          type?: string;
+          processed_at?: string;
         };
         Relationships: [];
       };
