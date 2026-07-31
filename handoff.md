@@ -72,11 +72,18 @@ Stripe account (§4d); Phase 3 **Stage P** is done and deployed (§4e).
   gated (§4a Item 2 — done). ✅ **Admin System Health** (`/admin/health`, docs/20).
 - **Notifications:** ✅ in-app (`notifications` table + dashboard bell) + ✅ email via **Resend**
   (`services/email.ts`) — domain verified (`mail.kraftnest.co`), API key live locally, real send confirmed;
-  Vercel env still pending (§4c). ❌ **Web push — NOT built** (§4c).
+  Vercel env still pending (§4c). ✅ **Web push (docs/21)** — built, `0037` applied, urgent-only fan-out
+  (`handoff` + `alert_signal`); a real end-to-end push through a live channel is still unverified (§5.1 A5).
+- **Message batching (docs/23) — ✅ built, `0039` applied and verified, ⚠️ never tested on live traffic.**
+  The AI now reads a whole burst and replies once instead of firing a turn per message: a 4s grace
+  window plus abort-and-restart supersession, guarded by an atomic per-session lease. Scoped to the
+  queue-driven channels — the website widget is deliberately unchanged. Two follow-ups before it can be
+  trusted in prod: the Edge Function worker must be redeployed (§5.1 A7) and the acceptance criteria in
+  docs/23 §10 must actually be exercised (§5.1 B6).
 - **UI polish (recent):** logo/wordmark font (Baloo 2), topbar headings, inbox layout, hero anti-jank.
 
-Migrations live in `supabase/migrations/` (`0001`–`0038` today). **All applied** to the live project
-as of 2026-07-2x (`0008`, `0035`–`0038` confirmed via direct verification, not assumed). They are
+Migrations live in `supabase/migrations/` (`0001`–`0039` today). **All applied** to the live project
+as of 2026-07-3x (`0008`, `0035`–`0039` confirmed via direct verification, not assumed). They are
 applied **manually** in the Supabase SQL editor — see the drift warning in §5.
 
 ---
@@ -266,6 +273,9 @@ Resend domain. **Do 4b before QA (4g)** — most "bugs" at this stage are missin
   and each doc's §Acceptance — e.g. real Meta message e2e, two-tenant RLS isolation, widget origin
   allow/deny, take-over mutes AI, signup→free-tenant→hit caps→notify. **Run these against a real
   configured environment (4b), ideally on a preview deploy, not by creating junk in prod.**
+- **Unverified-on-live-traffic features** (built + DB applied, acceptance criteria written but never
+  exercised against real users): **message batching** (docs/23 §10 → run via §5.1 B6) and **web push**
+  (docs/21 → §5.1 B4). Both are blocked on the same thing: a real deployment plus a live Meta channel.
 
 ---
 
@@ -381,6 +391,12 @@ an earlier one.
    land `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_STARTER`/`STRIPE_PRICE_PRO` in Vercel,
    and register the webhook endpoint (`https://<your-domain>/api/webhooks/stripe`) in the Stripe
    dashboard using the real deployed URL.
+7. **Redeploy the Edge Function worker** — `npx supabase functions deploy inbound-worker`. Message
+   batching (docs/23) raised `VISIBILITY_TIMEOUT_SECONDS` 30 → 120 **inside the Deno worker**, which
+   does NOT ship with the Vercel deploy. Until this is redeployed, a batched turn running past 30s has
+   its pgmq row redelivered *while still processing*; the `webhook_events` status gate absorbs the
+   duplicate, so it degrades rather than breaks — but that's defence-in-depth doing load-bearing work,
+   which is not where you want it.
 
 **B. Once you have Meta Developer access (independent of Vercel, but most useful paired with it):**
 1. Follow §7's live-connection checklist (IG/Messenger, Development mode, no App Review needed for your
@@ -401,6 +417,22 @@ an earlier one.
    will silently no-op (push is a no-op-by-design bolt-on when unconfigured, docs/21 §2.5/§4).
 5. **WhatsApp business-initiated messages** (owner notifications, future out-of-window follow-ups) need
    Meta-approved message templates — a separate ops step inside the Meta dashboard, not code (§5 item 4).
+6. **Test message batching for real** (docs/23 §10 — the acceptance criteria are written but NONE are
+   verified against live traffic; migration 0039 and the unit tests verify the *parts*, not the
+   behaviour). Requires step A7 (worker redeployed) first. Send, from a real customer device:
+   - **Two messages ~1s apart** ⇒ expect exactly ONE reply addressing both. This is the whole feature.
+   - **One message, then nothing** ⇒ expect a normal reply, delayed by no more than `BATCH_GRACE_MS`
+     (4s). Confirms batching didn't make the common case feel dead.
+   - **A message sent while the AI is visibly typing/generating** ⇒ expect one combined reply, not two.
+     This is the supersession path (docs/23 §5) and the hardest to trigger deliberately — send the
+     follow-up ~5-8s after the first, i.e. after the grace window closed but mid-LLM-call.
+   - **Then check `usage_logs`**: `select count(*), superseded from usage_logs group by superseded`.
+     Rows with `superseded = true` are aborted calls (docs/23 §5.4) — they carry exact prompt tokens
+     and NULL completion tokens. If that count is a meaningful fraction of all rows, `BATCH_GRACE_MS`
+     is too short and bursts are escaping the grace window; tune it up.
+7. **Tune `BATCH_GRACE_MS`** (`src/lib/constants.ts`, currently 4000). It is a starting guess, never
+   measured against real users. The `superseded` count from step B6 is the signal: lots of superseded
+   rows ⇒ raise it; near-zero superseded rows AND complaints about sluggishness ⇒ lower it.
 
 **C. Independent of both (can happen anytime, own timeline):**
 - Create a Stripe account (test mode is enough to start) + create the Starter ($29/mo) / Pro ($79/mo)
