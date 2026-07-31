@@ -57,8 +57,8 @@ Stripe account (§4d); Phase 3 **Stage P** is done and deployed (§4e).
   queue), ✅ **client logins** (tenant_admin past the admin gate; `/dashboard`), ✅ **RAG** (pgvector
   knowledge base), ✅ **conversation summarisation**, ✅ **public self-serve signup** (`(auth)/signup/` →
   `provision-actions.ts`) + **free-plan caps** (daily session cap + monthly cost ceiling in
-  `aiOrchestrator.ts`). ⚠️ **Billing (Stripe) — code-complete, untested** (§4d): needs a real Stripe
-  account + migration `0038` applied before it can replace today's manual plan provisioning.
+  `aiOrchestrator.ts`). ⚠️ **Billing (Stripe) — code-complete, DB applied, still untested** (§4d): schema
+  is live; only a real Stripe account is needed before it can replace today's manual plan provisioning.
   ❓ **Embedded Meta OAuth signup** — verify; channel tokens may still be pasted manually via Vault.
 - **Phase 3 — Harden/Prove (Stages P–V, docs 15–18):** ✅ Analytics (`0030`), ✅ data lifecycle / GDPR
   erasure (`0031`), ✅ hardening + rolling memory + free-plan ceiling + team management (`0032`),
@@ -75,10 +75,9 @@ Stripe account (§4d); Phase 3 **Stage P** is done and deployed (§4e).
   Vercel env still pending (§4c). ❌ **Web push — NOT built** (§4c).
 - **UI polish (recent):** logo/wordmark font (Baloo 2), topbar headings, inbox layout, hero anti-jank.
 
-Migrations live in `supabase/migrations/` (`0001`–`0038` today). `0001`–`0036` are applied to the live
-project (`0008` and `0035`/`0036` applied 2026-07-2x); **`0037` (push_subscriptions) and `0038`
-(billing) are written but NOT yet applied** — waiting on the user. They are applied **manually** in
-the Supabase SQL editor — see the drift warning in §5.
+Migrations live in `supabase/migrations/` (`0001`–`0038` today). **All applied** to the live project
+as of 2026-07-2x (`0008`, `0035`–`0038` confirmed via direct verification, not assumed). They are
+applied **manually** in the Supabase SQL editor — see the drift warning in §5.
 
 ---
 
@@ -182,8 +181,8 @@ Resend domain. **Do 4b before QA (4g)** — most "bugs" at this stage are missin
   paid-tier "soft overage" signal this doc originally called for turned out to already exist
   (`services/maintenance.ts`'s `daily_cost_alert_usd` cron, docs/17 §3) — reused, not rebuilt.
 - **Migration `0038_billing.sql`** — `tenants.stripe_customer_id`/`stripe_subscription_id`, the FIRST
-  real DB check constraint on `plan_status` (adds `'payment_failed'`), `stripe_events` ledger. **Not
-  yet applied to the live database.**
+  real DB check constraint on `plan_status` (adds `'payment_failed'`), `stripe_events` ledger. **Applied
+  and verified** (columns/table existence + a constraint-rejection test, 2026-07-2x).
 - **Verified:** `tsc`/`eslint`/`vitest`/`npm run build` all green; grepped both Copilot tool registries
   to confirm `plan`/`plan_status`/the two new Stripe columns remain unreachable by any Copilot — still
   true, unchanged.
@@ -314,8 +313,8 @@ The prior owner must privately hand you the **secret values** (never in git/this
 | `META_APP_SECRET`, `META_VERIFY_TOKEN`, `META_GRAPH_VERSION` | Meta webhook + Graph send | Verify token is one *you* choose (must match Meta config); app secret from Meta App → Settings → Basic. |
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | email notifications | ✅ Real values set in `.env.local` (domain `mail.kraftnest.co` verified, real send confirmed). Still need to land in **Vercel** env. |
 | `CRON_SECRET` | `/api/cron/maintenance`, `api/internal/process-message` (the §4e worker bridge), and future `/api/cron/follow-ups` | Set in Vercel env, **and** as an Edge Function secret (`npx supabase secrets set CRON_SECRET=...`) — must be the SAME value in both places. Mirror into **Supabase Vault** too if/when the pg_cron job (4a) is built. |
-| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | web push (docs/21) | ✅ Real keypair generated + set in `.env.local`, verified against a real push service (410 pruning confirmed). Still needs migration `0037` applied + landing in **Vercel** env. |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO` | billing (docs/22) | ⚠️ **No Stripe account exists yet** — none of these have real values. Unlike Resend/push, billing has no safe "unconfigured" no-op mode; the checkout/portal actions will refuse with a clear error until these are real. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | web push (docs/21) | ✅ Real keypair generated + set in `.env.local`, migration `0037` applied, verified against a real push service (410 pruning confirmed). Ready for manual browser testing. Still needs to land in **Vercel** env for prod. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO` | billing (docs/22) | ⚠️ **No Stripe account exists yet** — none of these have real values. DB schema (`0038`) is applied and ready. Unlike Resend/push, billing has no safe "unconfigured" no-op mode; the checkout/portal actions will refuse with a clear error until these are real. |
 | `SENTRY_DSN` | error tracking (optional) | No-op until set. |
 | `NEXT_PUBLIC_APP_URL` | absolute links | Set to the prod URL in Vercel. |
 
@@ -325,8 +324,9 @@ The prior owner must privately hand you the **secret values** (never in git/this
    live project as of 2026-07-2x (verified directly, not assumed — `0008_pgmq` needed the extension
    enabled via Database → Extensions AND the queue actually created via its `perform pgmq.create(...)`
    block; `0036` hand-builds `pgmq_public` since this project has no dashboard Queues integration to
-   auto-generate one — see §4e). **`0037` (push_subscriptions) and `0038` (billing) are written but NOT
-   yet applied** — hand the user the exact SQL to paste. When a task hands you new SQL, run it and confirm.
+   auto-generate one — see §4e). **`0037` (push_subscriptions) and `0038` (billing) are also applied**
+   (verified 2026-07-2x: table/column existence checks + a constraint-rejection test all passed). When
+   a task hands you new SQL, run it and confirm.
 2. **Vercel env vars:** set every server var above in the Vercel project (Production + Preview). A missing
    var usually presents as a silent feature no-op, not a crash. **Currently blocked**: the existing Vercel
    project is under a partner's account, not accessible from this session/machine, and Vercel Hobby can't
