@@ -6,7 +6,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -38,10 +37,14 @@ export function AccountMenu({
         {initials(fullName, email)}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="flex flex-col gap-0.5 px-1.5 py-1.5">
+        {/* A plain div, NOT DropdownMenuLabel: that renders Base UI's
+            Menu.GroupLabel, which throws unless it's inside a Menu.Group /
+            Menu.RadioGroup. This block is an identity header, not a label for a
+            group of items, so there's no group to put it in. */}
+        <div className="flex flex-col gap-0.5 px-1.5 py-1.5">
           <span className="truncate text-sm font-medium text-foreground">{fullName || 'Account'}</span>
           {email && <span className="truncate text-xs text-muted-foreground">{email}</span>}
-        </DropdownMenuLabel>
+        </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link href={accountHref} />}>
           <User />
