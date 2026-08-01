@@ -58,6 +58,7 @@ export default async function DashboardOrdersPage({
       showBusinessColumn={ctx.memberships.length > 1}
       chatBasePath="/dashboard/chat"
       initialStatus={initialStatus}
+      initialTenantId={null}
     />
   );
 }

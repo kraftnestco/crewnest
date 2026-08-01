@@ -155,6 +155,8 @@ export interface Order {
   tenantId: string;
   sessionId: string | null;
   status: OrderStatus;
+  /** Per-tenant sequential (#1, #2, ...), customer-facing. Null on the very rare crash race the atomic claim otherwise prevents — callers building a customer message must fall back to something other than the raw uuid. */
+  orderNumber: number | null;
   customerName: string | null;
   customerPhone: string | null;
   customerAddress: string | null;

@@ -23,6 +23,26 @@ function orderNoun(tenant: Tenant | null): string {
 }
 
 /**
+ * "order #47" / "request #47" — never the raw uuid `order.id`: a customer
+ * reading a message on their phone has no use for
+ * "order #f2c7191d-394d-44d3-9f23-dded4b99f6e9" (migration 0040 adds the
+ * per-tenant sequential order_number this reads). Composes the FULL noun
+ * phrase (not just the "#N" fragment) so call sites never have to reason
+ * about grammar around the null fallback: order_number is only ever null on
+ * the rare crash between claim and insert that create_order_atomic's own
+ * transaction otherwise prevents, and "your order" still reads correctly
+ * wherever "order #47" would have gone.
+ */
+function orderLabel(noun: string, order: Pick<OrderRow, 'order_number'>): string {
+  return order.order_number != null ? `${noun} #${order.order_number}` : `your ${noun}`;
+}
+
+/** Sentence-initial capitalisation for `orderLabel`'s output ("order #47" → "Order #47"). */
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
  * Shared customer-facing side effect for every order status/payment transition
  * (docs: order-event-messaging plan, Phase A) — generalises the insert+sendText
  * pattern `approveOrderAction` originated. The `chat_messages` insert throws (it's
@@ -83,6 +103,14 @@ export interface GetOrdersPageInput {
   /** created_at cursor — fetch orders strictly older than this. Omit for the newest page. */
   before?: string | null;
   status?: OrderStatus | 'all';
+  /**
+   * Agency-only client filter (docs: admin orders client filter, mirrors the
+   * notification bell's dropdown). Narrows an already-visible RLS result set —
+   * never widens it, so passing a tenantId the caller can't actually see just
+   * returns zero rows, not a leak. A tenant-scoped caller's own RLS policy
+   * already restricts every query to their tenant, so this is a no-op for them.
+   */
+  tenantId?: string | null;
 }
 
 export interface GetOrdersPageResult {
@@ -105,6 +133,9 @@ export async function getOrdersPageAction(input: GetOrdersPageInput): Promise<Ge
 
   if (input.status && input.status !== 'all') {
     query = query.eq('status', input.status);
+  }
+  if (input.tenantId) {
+    query = query.eq('tenant_id', input.tenantId);
   }
   if (input.before) {
     query = query.lt('created_at', input.before);
@@ -152,7 +183,9 @@ export async function approveOrderAction(orderId: string): Promise<void> {
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, tenant_id, session_id, platform, external_user_id, customer_name, customer_address, items, status')
+    .select(
+      'id, tenant_id, session_id, platform, external_user_id, customer_name, customer_address, items, status, order_number',
+    )
     .eq('id', orderId)
     .single();
 
@@ -210,7 +243,7 @@ export async function approveOrderAction(orderId: string): Promise<void> {
     supabase,
     order,
     tenant,
-    `Your ${noun} is confirmed — ${noun} #${order.id}.`,
+    `${capitalize(orderLabel(noun, order))} is confirmed.`,
     'confirmed',
   );
 
@@ -223,7 +256,7 @@ export async function rejectOrderAction(orderId: string, reason?: string): Promi
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, tenant_id, session_id, platform, external_user_id, status, notes')
+    .select('id, tenant_id, session_id, platform, external_user_id, status, notes, order_number')
     .eq('id', orderId)
     .single();
 
@@ -246,7 +279,7 @@ export async function rejectOrderAction(orderId: string, reason?: string): Promi
     supabase,
     order,
     tenant,
-    `We're sorry, but we can't accept this ${noun} (#${order.id})${suffix}. Feel free to reach out if you have questions.`,
+    `We're sorry, but we can't accept this ${noun}${order.order_number != null ? ` (#${order.order_number})` : ''}${suffix}. Feel free to reach out if you have questions.`,
     'cancelled',
   );
 
@@ -264,7 +297,7 @@ export async function fulfillOrderAction(orderId: string): Promise<void> {
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, tenant_id, session_id, platform, external_user_id, status')
+    .select('id, tenant_id, session_id, platform, external_user_id, status, order_number')
     .eq('id', orderId)
     .single();
 
@@ -294,7 +327,7 @@ export async function fulfillOrderAction(orderId: string): Promise<void> {
     supabase,
     order,
     tenant,
-    `Your ${noun} #${order.id} is complete — thank you! We'd love your feedback: reply with a rating from 1 to 5 (and any comments) whenever you get a chance.`,
+    `${capitalize(orderLabel(noun, order))} is complete — thank you! We'd love your feedback: reply with a rating from 1 to 5 (and any comments) whenever you get a chance.`,
     'fulfilled',
   );
 
@@ -312,7 +345,7 @@ export async function markPaidAction(orderId: string, reference?: string): Promi
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, tenant_id, session_id, platform, external_user_id, payment_status')
+    .select('id, tenant_id, session_id, platform, external_user_id, payment_status, order_number')
     .eq('id', orderId)
     .single();
 
@@ -331,7 +364,7 @@ export async function markPaidAction(orderId: string, reference?: string): Promi
     supabase,
     order,
     tenant,
-    `We've received your payment for ${noun} #${order.id} — thank you!`,
+    `We've received your payment for ${orderLabel(noun, order)} — thank you!`,
     'payment:paid',
   );
 
@@ -343,7 +376,7 @@ export async function markRefundedAction(orderId: string): Promise<void> {
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, tenant_id, session_id, platform, external_user_id, payment_status')
+    .select('id, tenant_id, session_id, platform, external_user_id, payment_status, order_number')
     .eq('id', orderId)
     .single();
 
@@ -362,7 +395,7 @@ export async function markRefundedAction(orderId: string): Promise<void> {
     supabase,
     order,
     tenant,
-    `Your payment for ${noun} #${order.id} has been refunded.`,
+    `Your payment for ${orderLabel(noun, order)} has been refunded.`,
     'payment:refunded',
   );
 
@@ -381,7 +414,7 @@ export async function rejectPaymentProofAction(orderId: string): Promise<void> {
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, tenant_id, session_id, platform, external_user_id, payment_status')
+    .select('id, tenant_id, session_id, platform, external_user_id, payment_status, order_number')
     .eq('id', orderId)
     .single();
 
@@ -400,7 +433,7 @@ export async function rejectPaymentProofAction(orderId: string): Promise<void> {
     supabase,
     order,
     tenant,
-    `We couldn't verify the payment proof you sent for ${noun} #${order.id} — could you send a clearer screenshot or receipt of the completed payment?`,
+    `We couldn't verify the payment proof you sent for ${orderLabel(noun, order)} — could you send a clearer screenshot or receipt of the completed payment?`,
     'payment:proof_rejected',
   );
 

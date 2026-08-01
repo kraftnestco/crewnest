@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
+import { ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Badge } from '@/components/ui/badge';
@@ -10,8 +11,17 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PageHeader } from '@/components/page-header';
 import { StatusLegend, ORDER_STATUS_LEGEND } from '@/components/status-legend';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { Database } from '@/types/database';
 import type { OrderAttachment } from '@/types/domain';
+
+const ALL_CLIENTS = '__all__';
 import {
   approveOrderAction,
   fulfillOrderAction,
@@ -378,6 +388,7 @@ export function OrdersView({
   showBusinessColumn = true,
   chatBasePath = '/admin/chat',
   initialStatus = 'all',
+  initialTenantId = null,
 }: {
   initialOrders: OrderRow[];
   tenants: TenantRow[];
@@ -388,15 +399,24 @@ export function OrdersView({
   chatBasePath?: string;
   /** Pre-filter from a `?status=` deep link (docs/14 §5.1 "Needs attention" cards); the server already fetched a matching first page. */
   initialStatus?: OrderStatus | 'all';
+  /**
+   * Pre-filter from a `?tenant=` deep link (docs: admin orders client filter).
+   * Agency-only — a single-tenant dashboard caller always passes null, and the
+   * dropdown that would set it is gated on `showBusinessColumn` below, same as
+   * the notification bell's client filter is gated on being an agency caller.
+   */
+  initialTenantId?: string | null;
 }) {
   const columnCount = showBusinessColumn ? 10 : 9;
   const [orders, setOrders] = useState(initialOrders);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>(initialStatus);
+  const [tenantFilter, setTenantFilter] = useState<string>(initialTenantId ?? ALL_CLIENTS);
   const [hasMore, setHasMore] = useState(initialOrders.length === 25);
   const [isPending, startTransition] = useTransition();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const statusFilterRef = useRef(statusFilter);
+  const tenantFilterRef = useRef(tenantFilter);
 
   const tenantMap = useMemo(() => new Map(tenants.map((t) => [t.id, t.business_name])), [tenants]);
 
@@ -405,19 +425,25 @@ export function OrdersView({
   }, [statusFilter]);
 
   useEffect(() => {
+    tenantFilterRef.current = tenantFilter;
+  }, [tenantFilter]);
+
+  useEffect(() => {
     if (realtimeAccessToken) void supabase.realtime.setAuth(realtimeAccessToken);
   }, [realtimeAccessToken, supabase]);
 
   // Single long-lived subscription (doesn't rebind on filter change) — matches
-  // an in-flight status filter via the ref so it always reads the current value.
+  // in-flight status AND tenant filters via refs so it always reads the current
+  // values without re-subscribing.
   useEffect(() => {
     const channel = supabase
       .channel('admin-orders')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
         const row = payload.new as OrderRow;
+        const statusMatch = statusFilterRef.current === 'all' || row.status === statusFilterRef.current;
+        const tenantMatch = tenantFilterRef.current === ALL_CLIENTS || row.tenant_id === tenantFilterRef.current;
+        if (!statusMatch || !tenantMatch) return; // Filtered out of the current view — no toast, no row.
         toast.success(`New order from ${row.customer_name || 'a customer'}`);
-        const filter = statusFilterRef.current;
-        if (filter !== 'all' && row.status !== filter) return;
         setOrders((prev) => (prev.some((o) => o.id === row.id) ? prev : [row, ...prev]));
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
@@ -431,11 +457,26 @@ export function OrdersView({
     };
   }, [supabase]);
 
-  function handleFilterChange(next: OrderStatus | 'all') {
+  function handleStatusFilterChange(next: OrderStatus | 'all') {
     setStatusFilter(next);
+    const tenantId = tenantFilter === ALL_CLIENTS ? null : tenantFilter;
     startTransition(async () => {
       try {
-        const page = await getOrdersPageAction({ status: next });
+        const page = await getOrdersPageAction({ status: next, tenantId });
+        setOrders(page.orders);
+        setHasMore(page.hasMore);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to load orders.');
+      }
+    });
+  }
+
+  function handleTenantFilterChange(next: string) {
+    setTenantFilter(next);
+    const tenantId = next === ALL_CLIENTS ? null : next;
+    startTransition(async () => {
+      try {
+        const page = await getOrdersPageAction({ status: statusFilter, tenantId });
         setOrders(page.orders);
         setHasMore(page.hasMore);
       } catch (err) {
@@ -447,9 +488,10 @@ export function OrdersView({
   function handleLoadMore() {
     const oldest = orders[orders.length - 1];
     if (!oldest) return;
+    const tenantId = tenantFilter === ALL_CLIENTS ? null : tenantFilter;
     startTransition(async () => {
       try {
-        const page = await getOrdersPageAction({ status: statusFilter, before: oldest.created_at });
+        const page = await getOrdersPageAction({ status: statusFilter, tenantId, before: oldest.created_at });
         setOrders((prev) => [...prev, ...page.orders]);
         setHasMore(page.hasMore);
       } catch (err) {
@@ -472,18 +514,47 @@ export function OrdersView({
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1">
-          {STATUS_FILTERS.map((f) => (
-            <Button
-              key={f.value}
-              size="sm"
-              variant={statusFilter === f.value ? 'default' : 'outline'}
-              onClick={() => handleFilterChange(f.value)}
-              disabled={isPending}
-            >
-              {f.label}
-            </Button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-1">
+            {STATUS_FILTERS.map((f) => (
+              <Button
+                key={f.value}
+                size="sm"
+                variant={statusFilter === f.value ? 'default' : 'outline'}
+                onClick={() => handleStatusFilterChange(f.value)}
+                disabled={isPending}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+          {/* Agency-only client filter (docs: admin orders client filter) —
+              hidden on a single-tenant dashboard view, same gate as the
+              Business column right below. Combines WITH the status filter
+              (both apply as AND), not instead of it. */}
+          {showBusinessColumn && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                disabled={isPending}
+                className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 disabled:pointer-events-none disabled:opacity-50"
+              >
+                <span className="max-w-40 truncate">
+                  {tenantFilter === ALL_CLIENTS ? 'All clients' : (tenantMap.get(tenantFilter) ?? 'All clients')}
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="max-h-72 min-w-56">
+                <DropdownMenuRadioGroup value={tenantFilter} onValueChange={handleTenantFilterChange}>
+                  <DropdownMenuRadioItem value={ALL_CLIENTS}>All clients</DropdownMenuRadioItem>
+                  {tenants.map((t) => (
+                    <DropdownMenuRadioItem key={t.id} value={t.id}>
+                      {t.business_name}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
         <StatusLegend items={ORDER_STATUS_LEGEND} />
       </div>
@@ -509,6 +580,12 @@ export function OrdersView({
               <Fragment key={o.id}>
                 <TableRow>
                   <TableCell className="font-medium">
+                    {/* Same #N shown to the customer in their own confirmation/status
+                        messages (admin/orders/actions.ts's orderLabel) — lets staff
+                        reference an order by the number the customer actually has. */}
+                    {o.order_number != null && (
+                      <span className="mr-1.5 text-xs font-normal text-muted-foreground">#{o.order_number}</span>
+                    )}
                     {o.customer_name || '—'}
                     {o.customer_phone && (
                       <div className="text-xs font-normal text-muted-foreground">{o.customer_phone}</div>

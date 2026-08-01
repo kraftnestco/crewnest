@@ -7,9 +7,9 @@ const VALID_STATUSES: OrderStatus[] = ['pending', 'confirmed', 'fulfilled', 'can
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; tenant?: string }>;
 }) {
-  const { status: statusParam } = await searchParams;
+  const { status: statusParam, tenant: tenantParam } = await searchParams;
   const initialStatus: OrderStatus | 'all' = VALID_STATUSES.includes(statusParam as OrderStatus)
     ? (statusParam as OrderStatus)
     : 'all';
@@ -22,15 +22,23 @@ export default async function OrdersPage({
     data: { session },
   } = await supabase.auth.getSession();
 
+  const [{ data: tenants }] = await Promise.all([supabase.from('tenants').select('id, business_name')]);
+
+  // `?tenant=` is only honoured if it's a real tenant id — an unrecognised
+  // value (stale link, typo) falls back to "all clients" rather than silently
+  // returning zero rows with no explanation.
+  const initialTenantId =
+    tenantParam && tenants?.some((t) => t.id === tenantParam) ? tenantParam : null;
+
   let ordersQuery = supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(25);
   if (initialStatus !== 'all') {
     ordersQuery = ordersQuery.eq('status', initialStatus);
   }
+  if (initialTenantId) {
+    ordersQuery = ordersQuery.eq('tenant_id', initialTenantId);
+  }
 
-  const [{ data: orders }, { data: tenants }] = await Promise.all([
-    ordersQuery,
-    supabase.from('tenants').select('id, business_name'),
-  ]);
+  const { data: orders } = await ordersQuery;
 
   return (
     <OrdersView
@@ -38,6 +46,7 @@ export default async function OrdersPage({
       tenants={tenants ?? []}
       realtimeAccessToken={session?.access_token ?? null}
       initialStatus={initialStatus}
+      initialTenantId={initialTenantId}
     />
   );
 }

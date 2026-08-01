@@ -427,6 +427,8 @@ export type Database = {
           tenant_id: string;
           session_id: string | null;
           status: Database['public']['Enums']['order_status'];
+          /** Per-tenant sequential (#1, #2, ...) — customer-facing; `id` (uuid) never is. Null on the very rare crash-between-claim-and-insert race the atomic function's transaction otherwise prevents. */
+          order_number: number | null;
           customer_name: string | null;
           customer_phone: string | null;
           customer_address: string | null;
@@ -459,6 +461,7 @@ export type Database = {
           tenant_id: string;
           session_id?: string | null;
           status?: Database['public']['Enums']['order_status'];
+          order_number?: number | null;
           customer_name?: string | null;
           customer_phone?: string | null;
           customer_address?: string | null;
@@ -491,6 +494,7 @@ export type Database = {
           tenant_id?: string;
           session_id?: string | null;
           status?: Database['public']['Enums']['order_status'];
+          order_number?: number | null;
           customer_name?: string | null;
           customer_phone?: string | null;
           customer_address?: string | null;

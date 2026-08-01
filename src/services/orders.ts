@@ -27,6 +27,7 @@ function mapOrder(row: OrderRow): Order {
     tenantId: row.tenant_id,
     sessionId: row.session_id,
     status: row.status,
+    orderNumber: row.order_number,
     customerName: row.customer_name,
     customerPhone: row.customer_phone,
     customerAddress: row.customer_address,
