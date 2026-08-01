@@ -49,6 +49,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <p className="mt-1 truncate text-[0.7rem] text-muted-foreground">By KraftNest Automations</p>
             </div>
           </div>
+          {/* Account-type indicator — the admin (/admin) and client (/dashboard)
+              shells otherwise look identical (same logo, same topbar component),
+              so this is the only always-visible cue for which one you're in. */}
+          <div className="px-4 pb-3">
+            <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] font-medium text-primary">
+              Agency
+            </span>
+          </div>
           <AdminNav />
           <div className="border-t border-sidebar-border p-3">
             <p className="truncate px-1 text-xs text-muted-foreground">{ctx.fullName || ctx.email}</p>
@@ -60,7 +68,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
         </aside>
         <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
-          <AppTopbar accountHref="/admin/account" />
+          <AppTopbar accountHref="/admin/account" accountTypeLabel="Agency" />
           {/* pb-16 keeps content clear of the fixed mobile tab bar. */}
           <main className="min-h-0 flex-1 overflow-y-auto pb-16 lg:pb-0">{children}</main>
           <AdminTabBar />

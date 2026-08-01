@@ -56,6 +56,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     log.error('[dashboard/layout] member tenants lookup failed', { userId: ctx.userId, error: tenantsError.message });
   }
   const tenantNameMap = new Map((memberTenants ?? []).map((t) => [t.id, t.business_name]));
+  // Single source of truth for the sidebar badge AND the mobile topbar badge below
+  // — computed once so the two can't drift apart.
+  const activeTenantName = tenantNameMap.get(activeTenantId ?? '') ?? 'Client';
 
   const showBusiness = activeMembership?.role === 'tenant_admin';
 
@@ -70,6 +73,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <p className="font-logo text-2xl leading-none">CrewNest</p>
               <p className="mt-1 truncate text-[0.7rem] text-muted-foreground">By KraftNest Automations</p>
             </div>
+          </div>
+          {/* Account-type indicator — the admin (/admin) and client (/dashboard)
+              shells otherwise look identical (same logo, same topbar component),
+              so this is the only always-visible cue for which one you're in and,
+              for a multi-tenant member, which business is currently active. */}
+          <div className="px-4 pb-3">
+            <span className="inline-flex max-w-full items-center truncate rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-medium text-foreground">
+              {activeTenantName}
+            </span>
           </div>
           {ctx.memberships.length > 1 && (
             <TenantSwitcher
@@ -91,7 +103,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </aside>
         <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
-          <AppTopbar accountHref="/dashboard/account" />
+          <AppTopbar accountHref="/dashboard/account" accountTypeLabel={activeTenantName} />
           {/* pb-16 keeps content clear of the fixed mobile tab bar. */}
           <main className="min-h-0 flex-1 overflow-y-auto pb-16 lg:pb-0">{children}</main>
           <DashboardTabBar showBusiness={showBusiness} />
