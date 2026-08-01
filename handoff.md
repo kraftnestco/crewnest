@@ -338,10 +338,20 @@ The prior owner must privately hand you the **secret values** (never in git/this
    (verified 2026-07-2x: table/column existence checks + a constraint-rejection test all passed). When
    a task hands you new SQL, run it and confirm.
 2. **Vercel env vars:** set every server var above in the Vercel project (Production + Preview). A missing
-   var usually presents as a silent feature no-op, not a crash. **Currently blocked**: the existing Vercel
-   project is under a partner's account, not accessible from this session/machine, and Vercel Hobby can't
-   add collaborators — needs a project transfer or the partner relaying the work (undecided as of
-   2026-07-2x).
+   var usually presents as a silent feature no-op, not a crash.
+   **Status as of 2026-08-01:** the owner now has a Vercel login and can SEE the `crewnest-rouge` project,
+   but its Settings → Git shows **no GitHub repo connected**. Connecting `khubaibagha/crewnest` from the
+   owner's Vercel account didn't work — the repo doesn't appear in the "Import/Connect Git Repository"
+   picker, even though `gh api repos/khubaibagha/crewnest/collaborators/<user>/permission` confirms
+   `write` access on GitHub. This is a GitHub App **installation** gap, not a Vercel permissions gap:
+   Vercel's repo picker only lists repos its GitHub App is actually installed on, and that installation is
+   controlled by the repo OWNER (`khubaibagha`) at `github.com/settings/installations`, not by a
+   collaborator's own access level. **Next step, decided with the owner:** ask `khubaibagha` to install/
+   authorize the "Vercel" GitHub App on their account and grant it access to the `crewnest` repo (either
+   that repo specifically, or all repos) — no transfer needed, ownership stays with them. Once installed,
+   the repo should appear in Vercel's connect-repo picker within a minute or two. (A full repo transfer to
+   the owner's own GitHub account was considered and explicitly deferred — bigger, more permanent change,
+   not needed just to unblock deploys.)
 3. **Edge Function worker secrets** (for §4e's pgmq worker, `supabase/functions/inbound-worker`): set via
    `npx supabase secrets set APP_URL=<prod-url> CRON_SECRET=<value> INBOUND_WORKER_SECRET=<value>`
    (`SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` are auto-injected, don't set those). Deploy with
@@ -368,11 +378,21 @@ The prior owner must privately hand you the **secret values** (never in git/this
 
 ## 5.1 The Vercel/Meta-access checklist — do these IN ORDER once you have access
 
-Everything below is genuinely blocked on Vercel access (§4b) and/or a Meta Developer account, tracked
-here so nothing gets lost across sessions. **Do them in this order** — several later steps depend on
-an earlier one.
+Everything below is genuinely blocked on Vercel **deploys actually working** (§4b) and/or a Meta Developer
+account, tracked here so nothing gets lost across sessions. **Do them in this order** — several later
+steps depend on an earlier one.
 
-**A. Once Vercel access is resolved (transfer / partner relay / fresh deploy — your call, §4b):**
+**Correction (2026-08-01):** having a Vercel *login* that can see the project is NOT the same as deploys
+working — §4b item 2 has the current specific blocker (no GitHub repo connected in Vercel's Git settings,
+needs the repo owner to install Vercel's GitHub App). Step A0 below covers it.
+
+**A0. Before anything else — confirm a push actually deploys:**
+- Push notifications, billing, and message batching (8 commits) plus this session's uncommitted work have
+  never reached `origin/main` at all — Vercel has literally never seen any of it, access or not.
+- Once §4b item 2's GitHub App installation is sorted, push to `main` and confirm in the Vercel dashboard
+  that a NEW deployment actually starts (not just that the project page loads). Only then move to A1.
+
+**A. Once Vercel deploys are confirmed working:**
 1. Set every secret in §5's table on the **Vercel project** (Production + Preview) — not just
    `.env.local`. This alone unblocks nothing by itself but is a prerequisite for everything after.
 2. Confirm the real deployed URL (e.g. `crewnest-rouge.vercel.app` or a custom domain, §5 item 7).
