@@ -22,17 +22,55 @@ async function resolveAudience(): Promise<{ scope: 'agency' | 'tenant'; tenantId
 /**
  * RLS server client — scoped automatically to the caller's audience (agency rows
  * for a platform admin, this tenant's rows for a client). See migration 0023.
+ *
+ * `tenantId` narrows an agency caller's view to one client (docs: admin
+ * notification grouping). It is never trusted as the whole scoping mechanism —
+ * RLS already restricts the base rows to the caller's audience, so this can only
+ * ever narrow WITHIN what the caller could already see, never widen it. Ignored
+ * for a tenant-scoped caller (their feed is already one tenant).
  */
-export async function listNotificationsAction(limit = 20): Promise<Notification[]> {
+export async function listNotificationsAction(limit = 20, tenantId?: string | null): Promise<Notification[]> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+  let query = supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(limit);
+  if (tenantId) query = query.eq('tenant_id', tenantId);
 
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapNotification);
+}
+
+/**
+ * Distinct clients that have at least one AGENCY-scope notification, for the
+ * admin bell's filter dropdown — deliberately not the full tenant roster, so a
+ * client with zero notifications doesn't clutter the list. RLS limits this to
+ * agency rows the caller can see; a tenant-scoped caller (single-tenant feed
+ * already) gets an empty list back rather than erroring, since the dropdown is
+ * agency-only UI.
+ */
+export async function listNotificationClientsAction(): Promise<{ tenantId: string; businessName: string }[]> {
+  const ctx = await getCallerContext();
+  if (!ctx?.isPlatformAdmin) return [];
+
+  const supabase = await createSupabaseServerClient();
+  const { data: rows, error } = await supabase
+    .from('notifications')
+    .select('tenant_id')
+    .eq('scope', 'agency')
+    .not('tenant_id', 'is', null);
+  if (error) throw new Error(error.message);
+
+  const tenantIds = [...new Set((rows ?? []).map((r) => r.tenant_id!))];
+  if (tenantIds.length === 0) return [];
+
+  const { data: tenants, error: tenantsError } = await supabase
+    .from('tenants')
+    .select('id, business_name')
+    .in('id', tenantIds);
+  if (tenantsError) throw new Error(tenantsError.message);
+
+  return (tenants ?? [])
+    .map((t) => ({ tenantId: t.id, businessName: t.business_name }))
+    .sort((a, b) => a.businessName.localeCompare(b.businessName));
 }
 
 export async function getUnreadCountAction(): Promise<number> {
@@ -64,7 +102,15 @@ export async function markNotificationReadAction(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-export async function markAllNotificationsReadAction(): Promise<void> {
+/**
+ * `filterTenantId` scopes "mark all read" to one client when the admin bell's
+ * dropdown is filtered (docs: admin notification grouping) — without it, an
+ * admin viewing ONE client's feed but clicking "mark all read" would silently
+ * mark every other client's unread notifications read too, a mismatch between
+ * what's shown and what's affected. Ignored for a tenant-scoped caller (already
+ * scoped to their own tenant_id via `audience` below).
+ */
+export async function markAllNotificationsReadAction(filterTenantId?: string | null): Promise<void> {
   const audience = await resolveAudience();
   if (!audience) return;
 
@@ -75,6 +121,7 @@ export async function markAllNotificationsReadAction(): Promise<void> {
     .eq('scope', audience.scope)
     .eq('is_read', false);
   if (audience.scope === 'tenant') query = query.eq('tenant_id', audience.tenantId!);
+  else if (filterTenantId) query = query.eq('tenant_id', filterTenantId);
 
   const { error } = await query;
   if (error) throw new Error(error.message);
