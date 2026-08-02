@@ -21,7 +21,8 @@ many clients) and **client** (`/dashboard`, a single business owner). Both have 
 (a Claude-style chat that edits the business by proposing changes the owner one-tap applies).
 
 - **Live:** `crewnest-rouge.vercel.app` (Vercel, GitHub continuous deploy — **pushing `main` = a
-  production deploy**). Repo: `khubaibagha/crewnest`.
+  production deploy**). Repo: **`kraftnestco/crewnest`** (moved from `khubaibagha/crewnest` around
+  2026-07-27; that move silently broke Vercel's webhook — see §5 item 2).
 - **Stack:** Next.js 16 (App Router, Turbopack, RSC) · Supabase (Postgres + Auth + RLS + Vault + Storage)
   · Tailwind v4 · LLM via OpenAI **or** OpenRouter (per-tenant, BYOK or master key).
 - **Backing services:** Supabase project (ref in `.env.local`/Vercel env) · Meta Graph API (channels) ·
@@ -338,20 +339,37 @@ The prior owner must privately hand you the **secret values** (never in git/this
    (verified 2026-07-2x: table/column existence checks + a constraint-rejection test all passed). When
    a task hands you new SQL, run it and confirm.
 2. **Vercel env vars:** set every server var above in the Vercel project (Production + Preview). A missing
-   var usually presents as a silent feature no-op, not a crash.
-   **Status as of 2026-08-01:** the owner now has a Vercel login and can SEE the `crewnest-rouge` project,
-   but its Settings → Git shows **no GitHub repo connected**. Connecting `khubaibagha/crewnest` from the
-   owner's Vercel account didn't work — the repo doesn't appear in the "Import/Connect Git Repository"
-   picker, even though `gh api repos/khubaibagha/crewnest/collaborators/<user>/permission` confirms
-   `write` access on GitHub. This is a GitHub App **installation** gap, not a Vercel permissions gap:
-   Vercel's repo picker only lists repos its GitHub App is actually installed on, and that installation is
-   controlled by the repo OWNER (`khubaibagha`) at `github.com/settings/installations`, not by a
-   collaborator's own access level. **Next step, decided with the owner:** ask `khubaibagha` to install/
-   authorize the "Vercel" GitHub App on their account and grant it access to the `crewnest` repo (either
-   that repo specifically, or all repos) — no transfer needed, ownership stays with them. Once installed,
-   the repo should appear in Vercel's connect-repo picker within a minute or two. (A full repo transfer to
-   the owner's own GitHub account was considered and explicitly deferred — bigger, more permanent change,
-   not needed just to unblock deploys.)
+   var usually presents as a silent feature no-op, not a crash. **None of them are set yet** — this is the
+   single biggest outstanding ops task, and several finished features are inert without it (see §5.1).
+
+   **⚠️ ROOT CAUSE FOUND 2026-08-02 — THE REPO MOVED.** `khubaibagha/crewnest` →
+   **`kraftnestco/crewnest`**. GitHub redirects *git operations* after a transfer, so `git push` kept
+   working and gave no hint anything had changed. But **webhooks and app integrations do NOT follow the
+   redirect** — Vercel was still watching the old address, so it silently stopped receiving push events.
+   Everything observed follows from that one fact:
+   - pushes succeeded (redirect) and CI ran (Actions moved with the repo), so GitHub looked healthy;
+   - Vercel created **no** deployment after 2026-07-27 — verified via
+     `gh api repos/<owner>/crewnest/deployments`, which is a good way to check this independently of the
+     dashboard;
+   - manual **Redeploy** still worked (Vercel rebuilds from its own stored connection), which made it look
+     like a permissions problem rather than a plumbing one;
+   - the repo never appeared in the Vercel connect-repo picker, because the picker lists repos for the
+     signed-in GitHub identity and the repo now lives under a different owner entirely;
+   - the July "`talha62ismail-9787` did not have contributing access" banner was the transfer in progress —
+     that GitHub account being relinked to `kraftnestco-6204`, exactly as the banner said.
+
+   **Earlier diagnoses in this doc were WRONG** (a missing Vercel GitHub App installation, needing
+   `khubaibagha` to grant repo access, needing Vercel Pro for team members). None of those were the cause;
+   ignore them. The local git remote has been repointed to `kraftnestco/crewnest`.
+
+   **Remaining fix (dashboard-only, cannot be done from the CLI):** Vercel → project → Settings → Git →
+   **disconnect**, then **reconnect** choosing `kraftnestco/crewnest`. That re-registers the webhook against
+   the new address. `kraftnestco-6204` owns the Vercel team, so the repo should be selectable directly — no
+   involvement from `khubaibagha` needed. Then push (or Redeploy) and confirm a NEW row appears.
+
+   **Lesson worth keeping:** when pushes succeed and CI is green but no deployment appears, check whether
+   the repo moved (`git push` prints a "This repository moved" notice) before theorising about
+   permissions. The push output said so plainly and it was overlooked for most of a session.
 3. **Edge Function worker secrets** (for §4e's pgmq worker, `supabase/functions/inbound-worker`): set via
    `npx supabase secrets set APP_URL=<prod-url> CRON_SECRET=<value> INBOUND_WORKER_SECRET=<value>`
    (`SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` are auto-injected, don't set those). Deploy with
@@ -376,21 +394,74 @@ The prior owner must privately hand you the **secret values** (never in git/this
 
 ---
 
-## 5.1 The Vercel/Meta-access checklist — do these IN ORDER once you have access
+## 5.1 Vercel env vars — exact list, and what breaks without each
+
+Derived from `src/lib/env.ts` (the zod schema is the authority — check it, not this table, if they ever
+disagree). **Set these in the Vercel project for BOTH Production and Preview.**
+
+**REQUIRED — the app throws at startup if any is missing.** `env.ts` fails fast by design, so a deploy
+without these doesn't degrade gracefully, it crashes on boot:
+
+| Var | Note |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Public (anon-safe). |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public (anon-safe). |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Server-only, bypasses RLS.** Never expose to the browser. |
+| `MASTER_OPENAI_KEY` | Required even for OpenRouter tenants — the schema demands it. |
+| `META_VERIFY_TOKEN` | Must match what's configured in the Meta app. |
+| `META_APP_SECRET` | Meta App → Settings → Basic. |
+
+**Has a default, but set it explicitly in prod:**
+
+| Var | Note |
+|---|---|
+| `NEXT_PUBLIC_APP_URL` | Defaults to `http://localhost:3000` — **wrong in prod**. Absolute links and redirects use it. |
+| `META_GRAPH_VERSION` | Defaults to `v21.0`. |
+
+**Optional — the feature silently no-ops until set (this is why a missing var looks like "the feature
+just doesn't work" rather than an error):**
+
+| Var(s) | Feature that stays dead without it |
+|---|---|
+| `MASTER_OPENROUTER_KEY` | OpenRouter tenants + the public demo (which runs on OpenRouter, not OpenAI). |
+| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | All email notification fan-out. Domain already verified. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | **Web push (docs/21).** Built and DB-applied, completely inert until all four land. |
+| `CRON_SECRET` | `/api/cron/maintenance` AND `api/internal/process-message` (the Stage P worker bridge) reject every request. **Must be the same value in Vercel and as a Supabase Edge Function secret.** |
+| `SENTRY_DSN` | Error tracking. |
+
+**Optional but fails LOUDLY rather than silently — deliberate:**
+
+| Var(s) | Behaviour |
+|---|---|
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO` | Checkout/portal refuse with a clear error instead of no-op-ing — a paywall that appears to work but never charges would be a worse failure. **No Stripe account exists yet**, so these have no real values. |
+
+**Gaps to be aware of (as of 2026-08-02):**
+- `.env.local` currently has **no `CRON_SECRET`** and **no `INBOUND_WORKER_SECRET`**. Both are needed for
+  the Stage P worker path to function; `INBOUND_WORKER_SECRET` isn't in `env.ts` at all (it's read only by
+  the Deno Edge Function), so nothing validates it — it will just 403 silently if missing/mismatched.
+- No `STRIPE_*` values anywhere, local or prod.
+- `VERCEL_OIDC_TOKEN` in `.env.local` is injected tooling state, **not** something to copy into Vercel.
+
+---
+
+## 5.2 The Vercel/Meta-access checklist — do these IN ORDER once you have access
 
 Everything below is genuinely blocked on Vercel **deploys actually working** (§4b) and/or a Meta Developer
 account, tracked here so nothing gets lost across sessions. **Do them in this order** — several later
 steps depend on an earlier one.
 
-**Correction (2026-08-01):** having a Vercel *login* that can see the project is NOT the same as deploys
-working — §4b item 2 has the current specific blocker (no GitHub repo connected in Vercel's Git settings,
-needs the repo owner to install Vercel's GitHub App). Step A0 below covers it.
+**Correction (2026-08-02):** an earlier note here blamed a missing Vercel GitHub App installation. That
+was **wrong**. The real cause was the repo moving to `kraftnestco/crewnest`, which broke Vercel's webhook
+while leaving `git push` and CI working — full write-up in §5 item 2. Disregard the App-installation theory.
 
-**A0. Before anything else — confirm a push actually deploys:**
-- Push notifications, billing, and message batching (8 commits) plus this session's uncommitted work have
-  never reached `origin/main` at all — Vercel has literally never seen any of it, access or not.
-- Once §4b item 2's GitHub App installation is sorted, push to `main` and confirm in the Vercel dashboard
-  that a NEW deployment actually starts (not just that the project page loads). Only then move to A1.
+**A0. Before anything else — reconnect Vercel to the MOVED repo:**
+- All code is committed and pushed; `origin/main` is current. Nothing is waiting on a push.
+- Vercel → Settings → Git → disconnect, reconnect to **`kraftnestco/crewnest`** (§5 item 2).
+- Then push (or Redeploy) and confirm a NEW deployment row appears — not just that the project page loads.
+- **Verify by looking at the site, not the dashboard.** Production currently serves 2026-07-27 code. Quick
+  tells that the new build is live: an **"Agency" badge** under the sidebar logo; the **profile avatar menu
+  opens instead of crashing**; a **client-filter dropdown** in the notification bell. If those are absent,
+  the deploy did not take, whatever the dashboard says.
 
 **A. Once Vercel deploys are confirmed working:**
 1. Set every secret in §5's table on the **Vercel project** (Production + Preview) — not just
