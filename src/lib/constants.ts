@@ -1,6 +1,10 @@
 /**
  * Single source of truth for tunable constants. No magic numbers in services.
  * See docs/06-INTEGRATIONS.md §5.
+ *
+ * Changing a value here affects every call site at once — check the doc comment
+ * on the constant before editing, several encode a constraint (e.g. the queue
+ * visibility timeout must stay above the turn lease TTL).
  */
 
 /** Meta Graph API base (version comes from env.META_GRAPH_VERSION at call sites). */
