@@ -130,6 +130,32 @@ working; the model simply never called a tool. Switching to `nvidia/nemotron-3-s
 `services/ai/openrouter.ts` carried this warning in a comment from the start; it deserves more weight
 than a comment. Probe a candidate model against a real tool schema before putting a client on it.
 
+**OpenRouter's free tier is 50 requests PER DAY, PER ACCOUNT — and exhausting it looks like a broken
+feature, not an error.** Hit live 2026-08-03 after an evening of testing. The server log said it
+plainly:
+
+    429 Rate limit exceeded: free-models-per-day.
+    Add 10 credits to unlock 1000 free model requests per day
+
+Two things make this expensive to diagnose:
+- **It is per-ACCOUNT, not per-model.** Earlier the same evening `openai/gpt-oss-20b:free` returned 429
+  on every tool probe and I concluded that model was throttled, switching the tenant to
+  `nvidia/nemotron-3-super-120b-a12b:free`. That was the wrong lesson: swapping models never addressed
+  it, we simply still had budget at the time. A new API key does not help either — the quota is on the
+  account, and keys are just credentials pointing at it.
+- **The symptom is a plausible-sounding reply, not a failure.** When the LLM call is refused the
+  orchestrator falls back to whatever text it can produce, so the AI confidently tells customers things
+  like "we don't have an online booking system". Nothing in the product surfaces "we ran out of quota".
+
+`GET https://openrouter.ai/api/v1/key` reports `usage`/`usage_daily` and `is_free_tier`, but
+`limit_reset` is **null** for the free-model quota, so there is no reliable way to read the reset time
+from the API. It is a daily quota; midnight UTC is the likely reset but is not confirmed by them.
+Total spend at the point of exhaustion was **$0.025** — the cap is on request COUNT, not money.
+
+**Practical consequence:** 50 requests/day is not enough to develop against, let alone run a client on.
+Adding 10 credits (a one-off, not a subscription) raises it to 1000/day. Until then, expect testing
+sessions to die partway through in a way that mimics feature bugs.
+
 **Vercel Hobby's 60s function limit is a real ceiling on the AI turn.** A live turn hit
 `process-message bridge failed (504)`; pgmq then correctly retried, which re-ran the turn and persisted
 the customer's message twice. `0043` makes that retry idempotent, and `BATCH_GRACE_MS` came down 8s→5s
