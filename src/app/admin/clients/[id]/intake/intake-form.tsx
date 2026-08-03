@@ -104,13 +104,22 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
               </button>
             ))}
           </div>
+          {/* Booking flags submit via hidden inputs, matching payments_enabled
+              below — the visible controls are React-controlled and a checkbox
+              inside a conditional block does not reliably reach FormData. */}
+          <input
+            type="hidden"
+            name="booking_enabled"
+            value={businessType === 'service' && bookingEnabled ? 'on' : ''}
+          />
+          <input type="hidden" name="booking_mode" value={bookingMode} />
+
           {/* Appointment booking (docs/24) — service businesses only. */}
           {businessType === 'service' && (
             <div className="flex flex-col gap-3 rounded-lg border p-3">
               <label className="flex items-start gap-2.5">
                 <input
                   type="checkbox"
-                  name="booking_enabled"
                   checked={bookingEnabled}
                   onChange={(e) => setBookingEnabled(e.target.checked)}
                   className="mt-0.5"
@@ -129,7 +138,6 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
                     <Label htmlFor="booking_mode">Where do meetings happen?</Label>
                     <select
                       id="booking_mode"
-                      name="booking_mode"
                       value={bookingMode}
                       onChange={(e) => setBookingMode(e.target.value)}
                       className="h-9 max-w-sm rounded-md border border-input bg-transparent px-3 text-sm"
