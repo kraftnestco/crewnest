@@ -50,7 +50,22 @@ export async function persist(args: {
     .select('id')
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // 23505 = the partial unique index on provider_msg_id (migration 0043).
+    // Two retries raced and both passed the check above; the index is what
+    // actually prevents the duplicate. Re-read rather than throwing — the
+    // message IS stored, which is all the caller needs to be true. Returns
+    // early so the epoch is not bumped twice for one customer message.
+    if (error.code === '23505' && args.providerMsgId) {
+      const { data: raced } = await client
+        .from('chat_messages')
+        .select('id')
+        .eq('provider_msg_id', args.providerMsgId)
+        .maybeSingle();
+      if (raced) return raced.id;
+    }
+    throw error;
+  }
 
   if (args.bumpEpoch) {
     // Deliberately AFTER the insert and not swallowed: a message that is

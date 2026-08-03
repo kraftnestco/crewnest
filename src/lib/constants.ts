@@ -162,7 +162,13 @@ export const QUEUE_VISIBILITY_TIMEOUT_SECONDS = 120;
 // webhook nudges the worker on arrival (api/webhooks/meta/route.ts), the window
 // lands where it was designed to — and 8s matches a real "type, send, type
 // again" rhythm better than 4s, at the cost of 8s on a lone message.
-export const BATCH_GRACE_MS = 8000;
+// 8000 → 5000 (2026-08-03). The grace window is spent INSIDE the Vercel
+// function that runs the turn, so it eats the same 60s budget the LLM calls
+// need. A real turn hit `process-message bridge failed (504)` — the timeout
+// then triggered a pgmq retry, which is correct but re-ran the whole turn. 5s
+// still catches a two-thumb burst while leaving more headroom for a slow model
+// doing several tool rounds. If turns get faster, this can go back up.
+export const BATCH_GRACE_MS = 5000;
 export const SUPERSEDE_POLL_MS = 1500;
 export const MAX_TURN_SUPERSESSIONS = 3;
 export const MAX_SWEEP_ROUNDS = 2;
