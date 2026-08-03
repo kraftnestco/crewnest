@@ -2,6 +2,7 @@ import 'server-only';
 import { z } from 'zod';
 import * as orders from '@/services/orders';
 import { notifyBoth } from '@/services/notifications';
+import { orderRef } from '@/lib/orderRef';
 import type { ToolContext, ToolExecutor } from './registry';
 
 /**
@@ -113,6 +114,14 @@ export const editOrderTool: ToolExecutor = {
       },
     });
 
-    return { orderNumber: updated.orderNumber, status: updated.status };
+    return {
+      orderRef: orderRef({
+        businessName: ctx.tenant.businessName,
+        number: updated.orderNumber,
+        createdAt: updated.createdAt,
+        timezone: ctx.tenant.timezone,
+      }),
+      status: updated.status,
+    };
   },
 };

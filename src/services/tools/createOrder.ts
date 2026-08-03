@@ -7,6 +7,7 @@ import { notifyBoth } from '@/services/notifications';
 import { applyOrderStockEffects } from '@/services/inventoryStore';
 import { MAX_ORDERS_PER_SESSION_WINDOW, PAYMENT_METHOD_PRIORITY } from '@/lib/constants';
 import type { PaymentMethod, Tenant } from '@/types/domain';
+import { orderRef } from '@/lib/orderRef';
 import type { ToolContext, ToolExecutor } from './registry';
 import { log } from '@/lib/log';
 
@@ -242,7 +243,14 @@ export const createOrderTool: ToolExecutor = {
       // here can be read aloud to the customer, and the model did exactly that
       // with the raw uuid — "Order ID: 4f5e0565-0fb5-..." (2026-08-03). The
       // uuid stays internal; migration 0040 exists precisely for this.
-      orderNumber: order.orderNumber,
+      // The customer-facing reference (KN-0803-5), not a bare number and never
+      // the uuid. Anything returned here can be read aloud verbatim.
+      orderRef: orderRef({
+        businessName: ctx.tenant.businessName,
+        number: order.orderNumber,
+        createdAt: order.createdAt,
+        timezone: ctx.tenant.timezone,
+      }),
       status: order.status,
       paymentStatus: order.paymentStatus,
       ...(payment ? { payment } : {}),

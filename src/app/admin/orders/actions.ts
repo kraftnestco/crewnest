@@ -10,6 +10,7 @@ import * as media from '@/services/meta/media';
 import { applyOrderStockEffects } from '@/services/inventoryStore';
 import type { Database } from '@/types/database';
 import type { OrderAttachment, OrderItem, Tenant } from '@/types/domain';
+import { orderRef } from '@/lib/orderRef';
 import { log } from '@/lib/log';
 
 export type OrderRow = Database['public']['Tables']['orders']['Row'];
@@ -23,21 +24,30 @@ function orderNoun(tenant: Tenant | null): string {
 }
 
 /**
- * "order #47" / "request #47" — never the raw uuid `order.id`: a customer
- * reading a message on their phone has no use for
- * "order #f2c7191d-394d-44d3-9f23-dded4b99f6e9" (migration 0040 adds the
- * per-tenant sequential order_number this reads). Composes the FULL noun
- * phrase (not just the "#N" fragment) so call sites never have to reason
- * about grammar around the null fallback: order_number is only ever null on
- * the rare crash between claim and insert that create_order_atomic's own
- * transaction otherwise prevents, and "your order" still reads correctly
- * wherever "order #47" would have gone.
+ * "order KN-0803-5" / "request KN-0803-5" — the customer-facing reference from
+ * lib/orderRef, never the raw uuid and no longer a bare "#5" (which read like a
+ * test and advertised how few orders a business had taken).
+ *
+ * Composes the FULL noun phrase, not just the reference, so call sites never
+ * have to reason about grammar around the null fallback: order_number is only
+ * null in the narrow crash window create_order_atomic otherwise prevents, and
+ * "your order" still reads correctly wherever the reference would have gone.
  */
-function orderLabel(noun: string, order: Pick<OrderRow, 'order_number'>): string {
-  return order.order_number != null ? `${noun} #${order.order_number}` : `your ${noun}`;
+function orderLabel(
+  noun: string,
+  order: Pick<OrderRow, 'order_number' | 'created_at'>,
+  tenant: Tenant | null,
+): string {
+  const ref = orderRef({
+    businessName: tenant?.businessName,
+    number: order.order_number,
+    createdAt: order.created_at,
+    timezone: tenant?.timezone,
+  });
+  return ref ? `${noun} ${ref}` : `your ${noun}`;
 }
 
-/** Sentence-initial capitalisation for `orderLabel`'s output ("order #47" → "Order #47"). */
+/** Sentence-initial capitalisation for `orderLabel`'s output ("order KN-0803-5" → "Order KN-0803-5"). */
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -184,7 +194,7 @@ export async function approveOrderAction(orderId: string): Promise<void> {
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .select(
-      'id, tenant_id, session_id, platform, external_user_id, customer_name, customer_address, items, status, order_number',
+      'id, tenant_id, session_id, platform, external_user_id, customer_name, customer_address, items, status, order_number, created_at',
     )
     .eq('id', orderId)
     .single();
@@ -243,7 +253,7 @@ export async function approveOrderAction(orderId: string): Promise<void> {
     supabase,
     order,
     tenant,
-    `${capitalize(orderLabel(noun, order))} is confirmed.`,
+    `${capitalize(orderLabel(noun, order, tenant))} is confirmed.`,
     'confirmed',
   );
 
@@ -256,7 +266,7 @@ export async function rejectOrderAction(orderId: string, reason?: string): Promi
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, tenant_id, session_id, platform, external_user_id, status, notes, order_number')
+    .select('id, tenant_id, session_id, platform, external_user_id, status, notes, order_number, created_at')
     .eq('id', orderId)
     .single();
 
@@ -279,7 +289,7 @@ export async function rejectOrderAction(orderId: string, reason?: string): Promi
     supabase,
     order,
     tenant,
-    `We're sorry, but we can't accept this ${noun}${order.order_number != null ? ` (#${order.order_number})` : ''}${suffix}. Feel free to reach out if you have questions.`,
+    `We're sorry, but we can't accept this ${orderLabel(noun, order, tenant)}${suffix}. Feel free to reach out if you have questions.`,
     'cancelled',
   );
 
@@ -297,7 +307,7 @@ export async function fulfillOrderAction(orderId: string): Promise<void> {
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, tenant_id, session_id, platform, external_user_id, status, order_number')
+    .select('id, tenant_id, session_id, platform, external_user_id, status, order_number, created_at')
     .eq('id', orderId)
     .single();
 
@@ -327,7 +337,7 @@ export async function fulfillOrderAction(orderId: string): Promise<void> {
     supabase,
     order,
     tenant,
-    `${capitalize(orderLabel(noun, order))} is complete — thank you! We'd love your feedback: reply with a rating from 1 to 5 (and any comments) whenever you get a chance.`,
+    `${capitalize(orderLabel(noun, order, tenant))} is complete — thank you! We'd love your feedback: reply with a rating from 1 to 5 (and any comments) whenever you get a chance.`,
     'fulfilled',
   );
 
@@ -345,7 +355,7 @@ export async function markPaidAction(orderId: string, reference?: string): Promi
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, tenant_id, session_id, platform, external_user_id, payment_status, order_number')
+    .select('id, tenant_id, session_id, platform, external_user_id, payment_status, order_number, created_at')
     .eq('id', orderId)
     .single();
 
@@ -364,7 +374,7 @@ export async function markPaidAction(orderId: string, reference?: string): Promi
     supabase,
     order,
     tenant,
-    `We've received your payment for ${orderLabel(noun, order)} — thank you!`,
+    `We've received your payment for ${orderLabel(noun, order, tenant)} — thank you!`,
     'payment:paid',
   );
 
@@ -376,7 +386,7 @@ export async function markRefundedAction(orderId: string): Promise<void> {
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, tenant_id, session_id, platform, external_user_id, payment_status, order_number')
+    .select('id, tenant_id, session_id, platform, external_user_id, payment_status, order_number, created_at')
     .eq('id', orderId)
     .single();
 
@@ -395,7 +405,7 @@ export async function markRefundedAction(orderId: string): Promise<void> {
     supabase,
     order,
     tenant,
-    `Your payment for ${orderLabel(noun, order)} has been refunded.`,
+    `Your payment for ${orderLabel(noun, order, tenant)} has been refunded.`,
     'payment:refunded',
   );
 
@@ -414,7 +424,7 @@ export async function rejectPaymentProofAction(orderId: string): Promise<void> {
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, tenant_id, session_id, platform, external_user_id, payment_status, order_number')
+    .select('id, tenant_id, session_id, platform, external_user_id, payment_status, order_number, created_at')
     .eq('id', orderId)
     .single();
 
@@ -433,7 +443,7 @@ export async function rejectPaymentProofAction(orderId: string): Promise<void> {
     supabase,
     order,
     tenant,
-    `We couldn't verify the payment proof you sent for ${orderLabel(noun, order)} — could you send a clearer screenshot or receipt of the completed payment?`,
+    `We couldn't verify the payment proof you sent for ${orderLabel(noun, order, tenant)} — could you send a clearer screenshot or receipt of the completed payment?`,
     'payment:proof_rejected',
   );
 

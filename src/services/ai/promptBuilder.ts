@@ -85,7 +85,7 @@ export const ORDER_FLOW_BLOCK = [
   '2. Collect: delivery name, full address, and contact phone — one or two at a time, conversationally.',
   '3. Read the COMPLETE order back (items + qty + name + address + phone) and ask them to confirm.',
   '4. ONLY after they explicitly confirm, call the create_order tool with the collected details.',
-  '5. After the tool returns, confirm to the customer using the order NUMBER the tool gave you (e.g. "order #7") and a friendly closing. Never show internal ids.',
+  '5. After the tool returns, confirm to the customer quoting the orderRef the tool gave you EXACTLY as written (e.g. "KN-0803-5"), plus a friendly closing. Never invent or reformat a reference, and never show internal ids.',
   'Never call create_order before the customer has confirmed. If unsure or the request is out of scope, use [HUMAN_HANDOFF].',
   'If a customer asks about an order they already placed (status, "where is my order"), call check_order_status instead of guessing.',
   'If a customer wants to change an order they placed, call edit_order with the new details. If they want to cancel, call cancel_order. If the order is already paid or fulfilled, do not edit/cancel it — use [HUMAN_HANDOFF] so a person can help with a refund.',
@@ -195,7 +195,7 @@ const APPROVAL_MODE_DIRECTIVES: Record<'required' | 'bypass', string> = {
   required:
     'After the customer confirms a custom order, call create_order, then tell them you will check with the team and confirm shortly — do NOT tell them the order is confirmed yet.',
   bypass:
-    'After the customer confirms a custom order, call create_order, then tell them their order is confirmed, quoting the order NUMBER the tool returned (e.g. "order #7"). Never show internal ids.',
+    'After the customer confirms a custom order, call create_order, then tell them their order is confirmed, quoting the orderRef the tool returned EXACTLY as written (e.g. "KN-0803-5"). Never invent or reformat a reference, and never show internal ids.',
 };
 
 /**
@@ -316,7 +316,7 @@ export function buildPaymentBlock(tenant: Pick<Tenant, 'paymentMethods' | 'payme
  * "transcribe concisely" work itself, as the `feedback` arg on the submit_review call.
  */
 export function buildReviewBlock(
-  pendingReview: { orderNumber: number | null; itemsSummary: string },
+  pendingReview: { orderRef: string | null; itemsSummary: string },
   isService: boolean,
 ): string {
   const noun = isService ? 'request' : 'order';
@@ -324,7 +324,7 @@ export function buildReviewBlock(
     '## PENDING REVIEW',
     // The customer-facing number, never the uuid — this string goes straight
     // into the prompt and the model reads it out verbatim.
-    `The customer's ${noun}${pendingReview.orderNumber != null ? ` #${pendingReview.orderNumber}` : ''} (${pendingReview.itemsSummary}) was just completed and is awaiting their feedback.`,
+    `The customer's ${noun}${pendingReview.orderRef ? ` ${pendingReview.orderRef}` : ''} (${pendingReview.itemsSummary}) was just completed and is awaiting their feedback.`,
     'If their next message gives or clearly implies a rating out of 5 (a number, stars, or an unambiguous sentiment you can map to 1-5), call submit_review with that rating and, as the feedback argument, a concise 1-2 sentence transcription of any comments they gave.',
     'Only call submit_review once you have an explicit or clearly-implied 1-5 rating — if their message is about something else, help with that first and return to asking for the rating naturally rather than ignoring what they said.',
     "Don't ask more than once — if they decline, ignore the ask, or seem uninterested, drop it and move on normally.",
@@ -545,7 +545,7 @@ export interface BuildArgs {
    */
   imageUrls?: string[];
   /** Set when this session has a fulfilled order awaiting a rating (docs: order-event-messaging plan, Phase B). */
-  pendingReview?: { orderNumber: number | null; itemsSummary: string };
+  pendingReview?: { orderRef: string | null; itemsSummary: string };
 }
 
 export interface BuiltPrompt {

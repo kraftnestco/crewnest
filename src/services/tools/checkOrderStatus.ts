@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import * as orders from '@/services/orders';
+import { orderRef } from '@/lib/orderRef';
 import type { ToolContext, ToolExecutor } from './registry';
 
 /**
@@ -45,7 +46,12 @@ export const checkOrderStatusTool: ToolExecutor = {
     return {
       found: true,
       orders: matches.map((o) => ({
-        orderNumber: o.orderNumber,
+        orderRef: orderRef({
+          businessName: ctx.tenant.businessName,
+          number: o.orderNumber,
+          createdAt: o.createdAt,
+          timezone: ctx.tenant.timezone,
+        }),
         status: o.status,
         items: o.items.map((i) => ({ name: i.name, qty: i.qty })),
         placedAt: o.createdAt,
