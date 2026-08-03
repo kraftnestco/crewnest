@@ -1,6 +1,16 @@
 'use client';
 
-import { LayoutDashboard, Activity, Building2, MessagesSquare, Package, ChartNoAxesColumn, Settings, Sparkles } from 'lucide-react';
+import {
+  Activity,
+  Building2,
+  CalendarDays,
+  ChartNoAxesColumn,
+  LayoutDashboard,
+  MessagesSquare,
+  Package,
+  Settings,
+  Sparkles,
+} from 'lucide-react';
 import { SidebarNav, MobileTabBar, type NavItem } from '@/components/app-nav';
 
 /**
@@ -17,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/clients', label: 'Clients', icon: Building2 },
   { href: '/admin/chat', label: 'Live Inbox', shortLabel: 'Inbox', icon: MessagesSquare },
   { href: '/admin/orders', label: 'Orders', icon: Package },
+  { href: '/admin/appointments', label: 'Appointments', shortLabel: 'Bookings', icon: CalendarDays },
   { href: '/admin/copilot', label: 'CrewAI', icon: Sparkles },
   { href: '/admin/analytics', label: 'Analytics', icon: ChartNoAxesColumn },
   { href: '/admin/settings', label: 'Settings', icon: Settings },

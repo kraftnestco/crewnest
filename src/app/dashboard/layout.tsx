@@ -47,7 +47,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const supabase = await createSupabaseServerClient();
   const { data: memberTenants, error: tenantsError } = await supabase
     .from('tenants')
-    .select('id, business_name')
+    .select('id, business_name, business_type, booking_enabled')
     .in(
       'id',
       ctx.memberships.map((m) => m.tenantId),
@@ -61,6 +61,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const activeTenantName = tenantNameMap.get(activeTenantId ?? '') ?? 'Client';
 
   const showBusiness = activeMembership?.role === 'tenant_admin';
+  // Appointments nav only for a service business that has booking switched on
+  // (docs/24) — otherwise the page is permanently empty.
+  const activeTenantRow = (memberTenants ?? []).find((t) => t.id === activeTenantId);
+  const showBookings = activeTenantRow?.business_type === 'service' && Boolean(activeTenantRow?.booking_enabled);
 
   return (
     <TopbarHeadingProvider>
@@ -92,7 +96,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               }))}
             />
           )}
-          <DashboardNav showBusiness={showBusiness} />
+          <DashboardNav showBusiness={showBusiness} showBookings={showBookings} />
           <div className="border-t border-sidebar-border p-3">
             <p className="truncate px-1 text-xs text-muted-foreground">{ctx.fullName || ctx.email}</p>
             <form action={signOutAction} className="mt-2">
@@ -106,7 +110,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <AppTopbar accountHref="/dashboard/account" accountTypeLabel={activeTenantName} />
           {/* pb-16 keeps content clear of the fixed mobile tab bar. */}
           <main className="min-h-0 flex-1 overflow-y-auto pb-16 lg:pb-0">{children}</main>
-          <DashboardTabBar showBusiness={showBusiness} />
+          <DashboardTabBar showBusiness={showBusiness} showBookings={showBookings} />
         </div>
       </div>
     </TopbarHeadingProvider>

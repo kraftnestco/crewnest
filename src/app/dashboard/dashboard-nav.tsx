@@ -1,6 +1,16 @@
 'use client';
 
-import { House, MessagesSquare, Package, ChartNoAxesColumn, Store, Boxes, Users, CreditCard } from 'lucide-react';
+import {
+  Boxes,
+  CalendarDays,
+  ChartNoAxesColumn,
+  CreditCard,
+  House,
+  MessagesSquare,
+  Package,
+  Store,
+  Users,
+} from 'lucide-react';
 import { SidebarNav, MobileTabBar, type NavItem } from '@/components/app-nav';
 
 /**
@@ -8,11 +18,16 @@ import { SidebarNav, MobileTabBar, type NavItem } from '@/components/app-nav';
  * desktop sidebar and the mobile bottom tab bar. Home is exact-match so it
  * doesn't stay lit on every child route.
  */
-function buildItems(showBusiness: boolean): NavItem[] {
+function buildItems(showBusiness: boolean, showBookings: boolean): NavItem[] {
   return [
     { href: '/dashboard', label: 'Home', icon: House, exact: true },
     { href: '/dashboard/chat', label: 'My Inbox', shortLabel: 'Inbox', icon: MessagesSquare },
     { href: '/dashboard/orders', label: 'My Orders', shortLabel: 'Orders', icon: Package },
+    // Only for service businesses that have turned booking on — otherwise the
+    // page would always be empty and the tools aren't advertised anyway.
+    ...(showBookings
+      ? [{ href: '/dashboard/appointments', label: 'Appointments', shortLabel: 'Bookings', icon: CalendarDays }]
+      : []),
     { href: '/dashboard/analytics', label: 'Analytics', icon: ChartNoAxesColumn },
     ...(showBusiness ? [{ href: '/dashboard/business', label: 'My Business', shortLabel: 'Business', icon: Store }] : []),
     // Inventory + Team sit past the mobile five-tab cap on purpose — both are
@@ -24,8 +39,8 @@ function buildItems(showBusiness: boolean): NavItem[] {
   ];
 }
 
-export function DashboardNav({ showBusiness }: { showBusiness: boolean }) {
-  return <SidebarNav items={buildItems(showBusiness)} />;
+export function DashboardNav({ showBusiness, showBookings = false }: { showBusiness: boolean; showBookings?: boolean }) {
+  return <SidebarNav items={buildItems(showBusiness, showBookings)} />;
 }
 
 /**
@@ -33,6 +48,6 @@ export function DashboardNav({ showBusiness }: { showBusiness: boolean }) {
  * Home/Inbox/Orders/Analytics/Business — Team (rare, setup-time) stays
  * desktop-only rather than crowding the bar.
  */
-export function DashboardTabBar({ showBusiness }: { showBusiness: boolean }) {
-  return <MobileTabBar items={buildItems(showBusiness)} />;
+export function DashboardTabBar({ showBusiness, showBookings = false }: { showBusiness: boolean; showBookings?: boolean }) {
+  return <MobileTabBar items={buildItems(showBusiness, showBookings)} />;
 }
