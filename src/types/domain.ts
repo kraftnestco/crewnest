@@ -52,6 +52,15 @@ export interface Tenant {
   voiceHandling: VoiceHandling;
   businessType: BusinessType;
   bookingLink: string | null;
+  /** Appointment booking (docs/24). Gates the booking tools; separate from businessType so a service tenant can decline booking. */
+  bookingEnabled: boolean;
+  /** 'own_link' = tenant's own Zoom/Meet room or address. 'calcom' = mint a Google Meet URL per booking. */
+  bookingMode: 'own_link' | 'calcom' | null;
+  bookingOwnLink: string | null;
+  bookingDurationMinutes: number;
+  /** Minimum notice, so the AI can't offer a slot minutes from now. */
+  bookingLeadTimeMinutes: number;
+  bookingMaxDaysAhead: number;
   knowledgeBase: unknown; // JSONB; shape in docs/12 §3.1, serialised deterministically by promptBuilder
   businessHours: unknown; // JSONB; { tz, week:[{ day, open, close }...], note? }, see docs/12 §4
   timezone: string | null; // IANA tz, canonical for the open-now verdict (docs/12 §4.1)
@@ -181,6 +190,34 @@ export interface Order {
   reviewSubmittedAt: string | null;
   /** Set when eraseCustomer/eraseTenant scrubs this order's PII while retaining the shell (docs/17 §4.2). */
   piiErasedAt: string | null;
+  createdAt: string;
+}
+
+export type AppointmentStatus = 'booked' | 'cancelled' | 'completed' | 'no_show';
+
+/** A booked appointment (docs/24-APPOINTMENTS.md). CrewNest owns the schedule; Cal.com only mints the meeting link for `bookingMode='calcom'` tenants. */
+export interface Appointment {
+  id: string;
+  tenantId: string;
+  sessionId: string | null;
+  /** Per-tenant sequential (#1, #2, ...), customer-facing — `id` never is. */
+  appointmentNumber: number | null;
+  /** UTC instant. Rendered in the tenant's timezone at the edges, never stored as wall-clock text. */
+  startsAt: string;
+  /** Snapshotted at booking time, so later config changes can't re-length an agreed appointment. */
+  durationMinutes: number;
+  status: AppointmentStatus;
+  customerName: string | null;
+  customerPhone: string | null;
+  notes: string | null;
+  serviceName: string | null;
+  /** Null is a real, visible state: a Cal.com outage must never fail a booking already promised (docs/24 §4.3). */
+  meetingUrl: string | null;
+  locationText: string | null;
+  /** Path B only — needed to cancel the Cal.com side. */
+  calcomBookingUid: string | null;
+  platform: Platform | null;
+  externalUserId: string | null;
   createdAt: string;
 }
 

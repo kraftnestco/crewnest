@@ -105,6 +105,12 @@ export type Database = {
           csat_prompt_enabled: boolean;
           business_type: string;
           booking_link: string | null;
+          booking_enabled: boolean;
+          booking_mode: string | null;
+          booking_own_link: string | null;
+          booking_duration_minutes: number;
+          booking_lead_time_minutes: number;
+          booking_max_days_ahead: number;
           knowledge_base: Json | null;
           business_hours: Json | null;
           timezone: string | null;
@@ -161,6 +167,12 @@ export type Database = {
           csat_prompt_enabled?: boolean;
           business_type?: string;
           booking_link?: string | null;
+          booking_enabled?: boolean;
+          booking_mode?: string | null;
+          booking_own_link?: string | null;
+          booking_duration_minutes?: number;
+          booking_lead_time_minutes?: number;
+          booking_max_days_ahead?: number;
           knowledge_base?: Json | null;
           business_hours?: Json | null;
           timezone?: string | null;
@@ -216,6 +228,12 @@ export type Database = {
           voice_handling?: string | null;
           business_type?: string;
           booking_link?: string | null;
+          booking_enabled?: boolean;
+          booking_mode?: string | null;
+          booking_own_link?: string | null;
+          booking_duration_minutes?: number;
+          booking_lead_time_minutes?: number;
+          booking_max_days_ahead?: number;
           knowledge_base?: Json | null;
           business_hours?: Json | null;
           timezone?: string | null;
@@ -524,6 +542,71 @@ export type Database = {
         };
         Relationships: [];
       };
+      appointments: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          session_id: string | null;
+          /** Per-tenant sequential, customer-facing (docs/24 §2.1) — `id` never is. */
+          appointment_number: number | null;
+          starts_at: string;
+          duration_minutes: number;
+          status: string;
+          customer_name: string | null;
+          customer_phone: string | null;
+          notes: string | null;
+          service_name: string | null;
+          /** Null is a real state: a Cal.com outage must not fail a promised booking (docs/24 §4.3). */
+          meeting_url: string | null;
+          location_text: string | null;
+          calcom_booking_uid: string | null;
+          platform: Database['public']['Enums']['platform'] | null;
+          external_user_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          session_id?: string | null;
+          appointment_number?: number | null;
+          starts_at: string;
+          duration_minutes: number;
+          status?: string;
+          customer_name?: string | null;
+          customer_phone?: string | null;
+          notes?: string | null;
+          service_name?: string | null;
+          meeting_url?: string | null;
+          location_text?: string | null;
+          calcom_booking_uid?: string | null;
+          platform?: Database['public']['Enums']['platform'] | null;
+          external_user_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          session_id?: string | null;
+          appointment_number?: number | null;
+          starts_at?: string;
+          duration_minutes?: number;
+          status?: string;
+          customer_name?: string | null;
+          customer_phone?: string | null;
+          notes?: string | null;
+          service_name?: string | null;
+          meeting_url?: string | null;
+          location_text?: string | null;
+          calcom_booking_uid?: string | null;
+          platform?: Database['public']['Enums']['platform'] | null;
+          external_user_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       knowledge_chunks: {
         Row: {
           id: string;
@@ -774,6 +857,27 @@ export type Database = {
       bump_inbound_epoch: {
         Args: { p_session_id: string };
         Returns: number;
+      };
+      // docs/24-APPOINTMENTS.md §4.2 — claims the per-tenant number and inserts
+      // in one transaction. Returns the row as jsonb, or NULL when the slot was
+      // taken (a lost race on the partial unique index) — null is "offer
+      // alternatives", not an error.
+      book_appointment_atomic: {
+        Args: {
+          p_tenant_id: string;
+          p_session_id: string | null;
+          p_starts_at: string;
+          p_duration_minutes: number;
+          p_customer_name: string | null;
+          p_customer_phone: string | null;
+          p_service_name: string | null;
+          p_notes: string | null;
+          p_platform: Database['public']['Enums']['platform'] | null;
+          p_external_user_id: string | null;
+          p_meeting_url: string | null;
+          p_location_text: string | null;
+        };
+        Returns: Json;
       };
     };
     Enums: {
