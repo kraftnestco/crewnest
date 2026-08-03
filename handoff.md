@@ -79,9 +79,9 @@ Stripe account (§4d); Phase 3 **Stage P** is done and deployed (§4e).
 - **Message batching (docs/23) — ✅ built, `0039` applied, ✅ VERIFIED LIVE 2026-08-03 on a real
   Instagram thread.** Two messages a few seconds apart now produce ONE combined reply. Getting there
   required two fixes found during that testing, both now in place — see §4e and `0041`.
-  The AI reads a whole burst and replies once instead of firing a turn per message: an **8s** grace
-  window (raised from 4s, see below) plus abort-and-restart supersession, guarded by an atomic
-  per-session lease. Scoped to the queue-driven channels — the website widget is deliberately unchanged.
+  The AI reads a whole burst and replies once instead of firing a turn per message: a **5s** grace
+  window (4s → 8s when the nudge landed, then 8s → 5s after a 504 — see §3.1) plus abort-and-restart
+  supersession, guarded by an atomic per-session lease. Scoped to the queue-driven channels — the website widget is deliberately unchanged.
 
   **The two fixes this needed, both non-obvious:**
   1. **`0041` — the pg_cron schedule that never existed.** `inbound-worker/index.ts`'s own header comment
@@ -99,11 +99,51 @@ Stripe account (§4d); Phase 3 **Stage P** is done and deployed (§4e).
   **Lesson:** a polling interval far larger than a feature's internal timing window makes that feature
   unreachable in practice while every unit test still passes. Both halves worked; the cadence between
   them didn't.
+- **Appointment booking (docs/24) — ✅ built, `0042` applied, ⚠️ NOT yet tested end to end in chat.**
+  Service tenants with `booking_enabled` get three tools (`check_availability`, `book_appointment`,
+  `cancel_appointment`), real slots computed from their own hours/closures/timezone, and dashboards at
+  `/admin/appointments` + `/dashboard/appointments` with the per-client filter.
+  **CrewNest owns the schedule; Cal.com only mints a Google Meet link** for tenants whose meetings have
+  no home of their own (docs/24 §1.1 explains why Cal.com must NOT own availability: one CrewNest-owned
+  Cal.com account means shared availability, so two tenants would collide on the same hour).
+  Verified live: the Cal.com API round trip (slots → book → Meet URL → cancel), the double-booking guard
+  (a second booking of the same slot returns null, not an error), and that cancelling frees the slot.
+  Not verified: an actual booking conversation with a customer.
+- **Customer-facing order references (`KN-0803-5`)** — business initials + MMDD + the per-tenant
+  sequential number, replacing both the raw uuid and the bare `#5`. In `lib/orderRef`, used by all four
+  order tools, the review prompt, and the six admin-triggered messages, so the reference is identical
+  whoever sent it.
+- **Markdown stripping on outbound replies** — `sanitize.stripMarkdown`, applied in the orchestrator.
+  The prompt already forbade markdown explicitly and the model did it anyway; Meta renders none of it,
+  so customers saw literal `**` and raw table pipes.
 - **UI polish (recent):** logo/wordmark font (Baloo 2), topbar headings, inbox layout, hero anti-jank.
 
-Migrations live in `supabase/migrations/` (`0001`–`0041` today). **All applied** to the live project
-as of 2026-08-03 (`0008`, `0035`–`0041` confirmed via direct verification, not assumed). They are
+### 3.1 Two findings from live testing that outlive their fixes
+
+**Free OpenRouter models are the single biggest source of "the AI is broken".** KraftNest Automations
+ran on `openai/gpt-oss-20b:free`, which returned **HTTP 429 on every tool-calling probe**. The symptom
+was not an error — the AI cheerfully told customers "we don't have an online booking system" and, on an
+order attempt, burned all 3 tool rounds and hit the `tool_exhaustion` handoff. Everything downstream was
+working; the model simply never called a tool. Switching to `nvidia/nemotron-3-super-120b-a12b:free`
+(3/3 on repeat tool probes, 262k context, free) fixed both immediately.
+**Anything tool-based — orders, bookings, reviews — is only as reliable as the model's tool-calling.**
+`services/ai/openrouter.ts` carried this warning in a comment from the start; it deserves more weight
+than a comment. Probe a candidate model against a real tool schema before putting a client on it.
+
+**Vercel Hobby's 60s function limit is a real ceiling on the AI turn.** A live turn hit
+`process-message bridge failed (504)`; pgmq then correctly retried, which re-ran the turn and persisted
+the customer's message twice. `0043` makes that retry idempotent, and `BATCH_GRACE_MS` came down 8s→5s
+because the grace window is spent INSIDE that same 60s budget. The duplicate is fixed; **the tightness
+is not.** If timeouts persist, the structural answer is to stop routing the turn through a Vercel
+function at all — the Supabase worker has no such limit, and `api/internal/process-message` is the only
+reason the 60s cap applies.
+
+Migrations live in `supabase/migrations/` (`0001`–`0043` today). **All applied** to the live project
+as of 2026-08-04 (`0008`, `0035`–`0043` confirmed via direct verification, not assumed). They are
 applied **manually** in the Supabase SQL editor — see the drift warning in §5.
+**`0043` needed a data cleanup before its index would create** — three duplicate `provider_msg_id` rows
+existed, the oldest from 2026-07-15, so the retry bug had been duplicating messages quietly for weeks.
+A constraint added to an existing table is worth checking against the data already in it.
 
 ---
 
@@ -445,6 +485,7 @@ just doesn't work" rather than an error):**
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | All email notification fan-out. Domain already verified. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | **Web push (docs/21).** Built and DB-applied, completely inert until all four land. |
 | `CRON_SECRET` | `/api/cron/maintenance` AND `api/internal/process-message` (the Stage P worker bridge) reject every request. **Must be the same value in Vercel and as a Supabase Edge Function secret.** |
+| `CALCOM_API_KEY`, `CALCOM_EVENT_TYPE_ID`, `CALCOM_ATTENDEE_EMAIL` | **Appointment meeting links (docs/24).** Only for tenants with `booking_mode='calcom'`. Unset ⇒ the appointment still books, just with a blank `meeting_url` (docs/24 §4.3 — a link generator failing must never retract a time already promised). Event type id is `6539354`; attendee email is a single fixed CrewNest address by decision (§4.4), so Cal.com confirmations land there, not with the customer. |
 | `SENTRY_DSN` | Error tracking. |
 
 **Optional but fails LOUDLY rather than silently — deliberate:**
@@ -523,6 +564,22 @@ while leaving `git push` and CI working — full write-up in §5 item 2. Disrega
    not yet connected on any tenant (`whatsapp_phone_number_id` is null everywhere).
 6. **Poison-message + crash-recovery criteria** (docs/15 §8) remain unchecked — they need artificially
    induced failures (kill the worker mid-turn; a message engineered to always throw), not real traffic.
+7. **Test appointment booking end to end** (docs/24 §8 — every acceptance criterion is written, NONE
+   exercised in a real conversation). The parts are verified individually: the Cal.com round trip, the
+   double-booking guard, and slot computation against the live tenant's config (8 slots, correct Karachi
+   times, lead time respected). What has never run is a customer actually booking in chat.
+   **Setup that is easy to get wrong** — all of it lives in the client's intake page
+   (`/admin/clients/<id>/intake`), NOT the edit dialog:
+   - `business_type` must be **service**. Switching a tenant to product silently disables booking, since
+     the tools are gated on it.
+   - Booking toggle on, and a meeting mode chosen.
+   - **Business hours and timezone must both be set.** Without them the AI truthfully reports no
+     availability and nothing looks broken — the intake form now warns about exactly this, because the
+     live tenant had seven day-rows with empty open/close times and a null timezone.
+   Then message the channel: "can I book a call?" → expect real times offered → pick one → expect a
+   confirmation with a reference and a Meet link. Check `/admin/appointments` shows it.
+   **Note appointments still use a bare `#N`**, not the `KN-0803-5` format orders got — `lib/orderRef` is
+   already shared, so wiring it into the two appointment tools is a small follow-up if consistency matters.
 
 **C. Independent of both (can happen anytime, own timeline):**
 - Create a Stripe account (test mode is enough to start) + create the Starter ($29/mo) / Pro ($79/mo)
