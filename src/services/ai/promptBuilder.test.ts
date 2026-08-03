@@ -107,3 +107,66 @@ describe('promptBuilder.build cache-prefix byte-identity', () => {
     expect(parts[1]).toEqual({ type: 'image_url', imageUrl: 'https://example.com/signed-url.jpg' });
   });
 });
+
+/**
+ * docs/24 — booking guidance gating. Every one of these failed live on
+ * 2026-08-03: the tenant had booking on, the tools were correctly advertised,
+ * and the AI still told customers "we don't have online call booking set up
+ * yet" — because that sentence was literally in the prompt as a GOOD example,
+ * and the booking guidance was gated on `ordersEnabled` so it never rendered.
+ */
+describe('booking prompt gating', () => {
+  const base = {
+    id: 't',
+    systemPrompt: 'Assistant.',
+    catalogData: {},
+    catalogFreeformText: null,
+    customOrdersRequireApproval: true,
+    customOrderInstructions: null,
+    mediaHandling: 'match_catalogue',
+    voiceHandling: 'human_review',
+    csatPromptEnabled: false,
+    knowledgeBase: null,
+    businessHours: null,
+    timezone: 'Asia/Karachi',
+    paymentsEnabled: false,
+    paymentMethods: [],
+    paymentInstructions: null,
+    bookingLink: null,
+    ordersEnabled: false,
+    customOrdersEnabled: false,
+  } as unknown as BuildArgs['tenant'];
+
+  const textOf = (t: Record<string, unknown>) =>
+    build({ tenant: { ...base, ...t } as BuildArgs['tenant'], history: [], userText: 'x' })
+      .messages.map((m) => (typeof m.content === 'string' ? m.content : ''))
+      .join('\n');
+
+  it('renders booking guidance with orders OFF — the case that shipped broken', () => {
+    expect(textOf({ businessType: 'service', bookingEnabled: true })).toContain('## APPOINTMENT BOOKING');
+  });
+
+  it('drops the "we cannot schedule anything" denial when real booking is on', () => {
+    const text = textOf({ businessType: 'service', bookingEnabled: true });
+    expect(text).not.toContain('no way to actually schedule a call');
+    expect(text).not.toContain("We don't have online call booking set up yet");
+  });
+
+  it('keeps that denial for a tenant WITHOUT real booking', () => {
+    const text = textOf({ businessType: 'service', bookingEnabled: false });
+    expect(text).toContain('no way to actually schedule a call');
+    expect(text).not.toContain('## APPOINTMENT BOOKING');
+  });
+
+  it('never gives booking guidance to a product business', () => {
+    expect(textOf({ businessType: 'product', bookingEnabled: true, ordersEnabled: true })).not.toContain(
+      '## APPOINTMENT BOOKING',
+    );
+  });
+
+  it('renders booking AND the service flow when orders are on too', () => {
+    const text = textOf({ businessType: 'service', bookingEnabled: true, ordersEnabled: true });
+    expect(text).toContain('## APPOINTMENT BOOKING');
+    expect(text).toContain('SERVICE FLOW');
+  });
+});
