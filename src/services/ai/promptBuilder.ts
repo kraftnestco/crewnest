@@ -134,12 +134,32 @@ function buildBookingRule(tenant: Pick<Tenant, 'bookingLink'>): string {
  * via the existing manual-send/take-over chat action, doc 09 §3.4 — no new tool
  * or table needed).
  */
-function buildServiceFlowBlock(tenant: Pick<Tenant, 'bookingLink'>): string {
+function buildServiceFlowBlock(
+  tenant: Pick<Tenant, 'bookingLink' | 'bookingEnabled' | 'businessType'>,
+): string {
   const bookingLink = tenant.bookingLink?.trim();
+  const bookingOn = tenant.bookingEnabled && tenant.businessType === 'service';
   const parts = [
     '## SERVICE FLOW',
     'This business offers services, not shipped products. Use the CATALOGUE as reference for services and pricing.',
   ];
+  // Real in-chat booking (docs/24) supersedes both the external booking link and
+  // the quote-request fallback: when it's on, scheduling happens through the
+  // tools, not by handing over a URL.
+  if (bookingOn) {
+    parts.push(
+      '### BOOKING',
+      'You can book appointments directly in this chat. Never hand out an external booking link when you can book.',
+      '1. When the customer wants to book, call check_availability and offer the returned times in your own words.',
+      '2. Ask which time they want, and get their name (and phone, if they will give it).',
+      '3. ONLY after they pick a specific time, call book_appointment. Pass starts_at back EXACTLY as check_availability gave it to you — never reformat or invent a time.',
+      '4. If the tool says the slot is gone, apologise briefly, call check_availability again, and offer the new times.',
+      '5. After a successful booking, tell the customer the appointment number and the meeting link if there is one.',
+      'Never claim an appointment is booked before book_appointment has returned successfully.',
+      'To cancel, call cancel_appointment with the number. To reschedule, cancel first, then book the new time.',
+      'Never invent availability, and never promise a time you have not booked.',
+    );
+  }
   if (!bookingLink) {
     parts.push(
       '1. When a customer wants a quote, find out exactly what service they need and any relevant details (dates, quantities, specifics).',
@@ -418,6 +438,7 @@ export function buildSystemPrefix(
     | 'catalogData'
     | 'ordersEnabled'
     | 'customOrdersEnabled'
+    | 'bookingEnabled'
     | 'customOrderInstructions'
     | 'mediaHandling'
     | 'customOrdersRequireApproval'
@@ -493,6 +514,7 @@ export interface BuildArgs {
     | 'catalogData'
     | 'ordersEnabled'
     | 'customOrdersEnabled'
+    | 'bookingEnabled'
     | 'customOrderInstructions'
     | 'mediaHandling'
     | 'customOrdersRequireApproval'

@@ -40,6 +40,13 @@ const schema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
+  // Optional — Cal.com (docs/24 §4.4), used ONLY to mint a meeting link for
+  // tenants with booking_mode='calcom'. Unset ⇒ those tenants still get their
+  // appointment booked, just without a link (§4.3) — never a crash.
+  CALCOM_API_KEY: z.string().optional(),
+  CALCOM_EVENT_TYPE_ID: z.string().optional(),
+  /** Fixed attendee address for every Cal.com booking — see docs/24 §4.4 for why it isn't the customer's. */
+  CALCOM_ATTENDEE_EMAIL: z.string().optional(),
   // Optional — Stripe billing (docs/22). Unlike Resend/push, billing has no
   // meaningful partial state: unset ⇒ the checkout/portal actions refuse with
   // a clear error rather than silently no-op-ing (a paywall that pretends to

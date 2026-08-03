@@ -13,6 +13,7 @@ const TENANT: BuildArgs['tenant'] = {
   customOrdersRequireApproval: false,
   businessType: 'product' as Tenant['businessType'],
   bookingLink: null,
+  bookingEnabled: false,
   knowledgeBase: { location: '123 Main St' },
   businessHours: null,
   paymentsEnabled: false,

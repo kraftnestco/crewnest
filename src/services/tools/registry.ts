@@ -16,6 +16,9 @@ import { editOrderTool } from './editOrder';
 import { cancelOrderTool } from './cancelOrder';
 import { submitReviewTool } from './submitReview';
 import { flagImageAmbiguousTool } from './flagImageAmbiguous';
+import { checkAvailabilityTool } from './checkAvailability';
+import { bookAppointmentTool } from './bookAppointment';
+import { cancelAppointmentTool } from './cancelAppointment';
 import { log } from '@/lib/log';
 
 export interface ToolContext {
@@ -39,6 +42,9 @@ const ALL_TOOLS: ToolExecutor[] = [
   cancelOrderTool,
   submitReviewTool,
   flagImageAmbiguousTool,
+  checkAvailabilityTool,
+  bookAppointmentTool,
+  cancelAppointmentTool,
 ];
 
 /**
@@ -67,6 +73,13 @@ function isToolEnabledForTenant(toolName: string, tenant: Tenant, session?: Chat
   // Images are only ever shown to the model for custom-orders tenants (docs/10 §4) —
   // this tool would be unreachable for anyone else regardless, but gate explicitly.
   if (toolName === 'flag_image_ambiguous') return tenant.customOrdersEnabled;
+  // Appointment booking (docs/24 §4.1) — service businesses that have actually
+  // turned it on. `bookingEnabled` is separate from `businessType` so a service
+  // tenant can decline booking without changing what it calls its jobs.
+  const bookingOn = tenant.bookingEnabled && tenant.businessType === 'service';
+  if (toolName === 'check_availability') return bookingOn;
+  if (toolName === 'book_appointment') return bookingOn;
+  if (toolName === 'cancel_appointment') return bookingOn;
   return false;
 }
 

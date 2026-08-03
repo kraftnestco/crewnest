@@ -92,6 +92,9 @@ export async function POST(req: NextRequest) {
     customOrdersRequireApproval: demoTenant.customOrdersRequireApproval,
     businessType: demoTenant.businessType,
     bookingLink: demoTenant.bookingLink,
+    // The public demo never books real appointments — it has no tenant row, so
+    // no schedule, no availability, and nothing to write to.
+    bookingEnabled: false,
     knowledgeBase: demoTenant.knowledgeBase,
     businessHours: demoTenant.businessHours,
     paymentsEnabled: demoTenant.paymentsEnabled,
