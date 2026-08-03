@@ -74,17 +74,35 @@ Stripe account (§4d); Phase 3 **Stage P** is done and deployed (§4e).
 - **Notifications:** ✅ in-app (`notifications` table + dashboard bell) + ✅ email via **Resend**
   (`services/email.ts`) — domain verified (`mail.kraftnest.co`), API key live locally, real send confirmed;
   Vercel env still pending (§4c). ✅ **Web push (docs/21)** — built, `0037` applied, urgent-only fan-out
-  (`handoff` + `alert_signal`); a real end-to-end push through a live channel is still unverified (§5.1 A5).
-- **Message batching (docs/23) — ✅ built, `0039` applied and verified, ⚠️ never tested on live traffic.**
-  The AI now reads a whole burst and replies once instead of firing a turn per message: a 4s grace
-  window plus abort-and-restart supersession, guarded by an atomic per-session lease. Scoped to the
-  queue-driven channels — the website widget is deliberately unchanged. Two follow-ups before it can be
-  trusted in prod: the Edge Function worker must be redeployed (§5.1 A7) and the acceptance criteria in
-  docs/23 §10 must actually be exercised (§5.1 B6).
+  (`handoff` + `alert_signal`); VAPID vars are now in Vercel, but a real end-to-end push has still never
+  been confirmed — see §5.2 B-remaining item 4.
+- **Message batching (docs/23) — ✅ built, `0039` applied, ✅ VERIFIED LIVE 2026-08-03 on a real
+  Instagram thread.** Two messages a few seconds apart now produce ONE combined reply. Getting there
+  required two fixes found during that testing, both now in place — see §4e and `0041`.
+  The AI reads a whole burst and replies once instead of firing a turn per message: an **8s** grace
+  window (raised from 4s, see below) plus abort-and-restart supersession, guarded by an atomic
+  per-session lease. Scoped to the queue-driven channels — the website widget is deliberately unchanged.
+
+  **The two fixes this needed, both non-obvious:**
+  1. **`0041` — the pg_cron schedule that never existed.** `inbound-worker/index.ts`'s own header comment
+     always claimed it "is invoked on a schedule by pg_cron + pg_net", but no migration ever created one.
+     Messages sat in the queue indefinitely until the worker was triggered by hand. Stage P's queue and
+     dedup logic were correct all along — only the wake-up call was missing.
+  2. **Webhook nudges the worker on arrival** (`api/webhooks/meta/route.ts`). pg_cron's floor is one
+     minute, so even with `0041` the worker polled once every 60s — and a grace window of a few seconds
+     cannot span a 60s polling gap. Two messages seconds apart landed in *different* worker invocations
+     and were answered separately; supersession never fired either, because the first turn's LLM call had
+     already finished by the time the second message was looked at. Verified: messages at 09:57:02 and
+     09:57:23 → two replies, zero `superseded` rows. The nudge (in `after()`, fire-and-forget) starts
+     processing in ~1s instead of 0–60s. pg_cron remains the safety net.
+
+  **Lesson:** a polling interval far larger than a feature's internal timing window makes that feature
+  unreachable in practice while every unit test still passes. Both halves worked; the cadence between
+  them didn't.
 - **UI polish (recent):** logo/wordmark font (Baloo 2), topbar headings, inbox layout, hero anti-jank.
 
-Migrations live in `supabase/migrations/` (`0001`–`0039` today). **All applied** to the live project
-as of 2026-07-3x (`0008`, `0035`–`0039` confirmed via direct verification, not assumed). They are
+Migrations live in `supabase/migrations/` (`0001`–`0041` today). **All applied** to the live project
+as of 2026-08-03 (`0008`, `0035`–`0041` confirmed via direct verification, not assumed). They are
 applied **manually** in the Supabase SQL editor — see the drift warning in §5.
 
 ---
@@ -275,7 +293,7 @@ Resend domain. **Do 4b before QA (4g)** — most "bugs" at this stage are missin
   allow/deny, take-over mutes AI, signup→free-tenant→hit caps→notify. **Run these against a real
   configured environment (4b), ideally on a preview deploy, not by creating junk in prod.**
 - **Unverified-on-live-traffic features** (built + DB applied, acceptance criteria written but never
-  exercised against real users): **message batching** (docs/23 §10 → run via §5.1 B6) and **web push**
+  exercised against real users): ~~message batching~~ (✅ verified live 2026-08-03) and **web push**
   (docs/21 → §5.1 B4). Both are blocked on the same thing: a real deployment plus a live Meta channel.
 
 ---
@@ -454,30 +472,24 @@ steps depend on an earlier one.
 was **wrong**. The real cause was the repo moving to `kraftnestco/crewnest`, which broke Vercel's webhook
 while leaving `git push` and CI working — full write-up in §5 item 2. Disregard the App-installation theory.
 
-**A0. Before anything else — reconnect Vercel to the MOVED repo:**
-- All code is committed and pushed; `origin/main` is current. Nothing is waiting on a push.
-- Vercel → Settings → Git → disconnect, reconnect to **`kraftnestco/crewnest`** (§5 item 2).
-- Then push (or Redeploy) and confirm a NEW deployment row appears — not just that the project page loads.
-- **Verify by looking at the site, not the dashboard.** Production currently serves 2026-07-27 code. Quick
-  tells that the new build is live: an **"Agency" badge** under the sidebar logo; the **profile avatar menu
-  opens instead of crashing**; a **client-filter dropdown** in the notification bell. If those are absent,
-  the deploy did not take, whatever the dashboard says.
+**A. Vercel / deploy pipeline — ✅ ALL DONE 2026-08-03.** Kept for the record; skip to B.
+- ~~A0. Reconnect Vercel to the moved repo~~ — done. Pushes to `main` now auto-deploy; verified by
+  `gh api repos/kraftnestco/crewnest/deployments` showing new `vercel[bot]` rows per push.
+- ~~A1. Env vars in Vercel~~ — done (9 added: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_APP_URL`,
+  `RESEND_*`, the four `VAPID_*`, `CRON_SECRET`), plus `INBOUND_WORKER_SECRET` for the nudge.
+- ~~A2. Confirm deployed URL~~ — `https://crewnest-rouge.vercel.app`.
+- ~~A3. Re-point the worker~~ — done: `APP_URL`, `CRON_SECRET`, `INBOUND_WORKER_SECRET` set as Edge
+  Function secrets and confirmed via `npx supabase secrets list`.
+- ~~A4. Stage P happy path~~ — **verified live**: a real Instagram message went webhook → queue → worker
+  → bridge → `handleInboundMessage` → reply delivered. docs/15 §8's open criterion is now met.
+- ~~A7. Redeploy the Edge Function worker~~ — done (`npx supabase functions deploy inbound-worker
+  --no-verify-jwt`), shipping the 30s→120s visibility-timeout change.
+- **Migration `0041` applied** — the pg_cron schedule that was always assumed to exist but never was.
+  Confirmed firing every minute via `cron.job_run_details` (status `succeeded`).
 
-**A. Once Vercel deploys are confirmed working:**
-1. Set every secret in §5's table on the **Vercel project** (Production + Preview) — not just
-   `.env.local`. This alone unblocks nothing by itself but is a prerequisite for everything after.
-2. Confirm the real deployed URL (e.g. `crewnest-rouge.vercel.app` or a custom domain, §5 item 7).
-3. **Re-point the Stage P worker at it**: `npx supabase secrets set APP_URL=<real-deployed-url>` (currently
-   `localhost:3000`, which Supabase's cloud cannot reach — this is the ONLY reason the worker's happy
-   path is unverified, §4e). No redeploy needed — Edge Function secrets take effect immediately.
-4. **Test the Stage P happy path** (docs/15 §8, still unchecked): send a real inbound message through
-   whatever channel is live, confirm it reaches `handleInboundMessage` via the worker → internal bridge
-   route, and the customer gets exactly one reply. This is the one Stage P acceptance criterion that
-   couldn't be verified locally.
-5. **Web push** (docs/21): this session's push code is committed locally but never pushed to `main` —
-   confirm it's actually pushed, then land the four `VAPID_*` vars in Vercel too. Re-verify a real
-   push fires end-to-end (this session's local test was inconclusive — see step B4's related note on
-   why testing through a real Meta channel is ambiguous until a real deployment exists).
+**A-remaining. Still open:**
+5. **Web push** (docs/21): VAPID vars are now in Vercel, so this is testable for the first time — but a
+   real end-to-end push has still never been confirmed. See B4.
 6. **Billing** (docs/22): once you also have a real Stripe account (independent of Vercel, see below),
    land `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_STARTER`/`STRIPE_PRICE_PRO` in Vercel,
    and register the webhook endpoint (`https://<your-domain>/api/webhooks/stripe`) in the Stripe
@@ -489,41 +501,28 @@ while leaving `git push` and CI working — full write-up in §5 item 2. Disrega
    duplicate, so it degrades rather than breaks — but that's defence-in-depth doing load-bearing work,
    which is not where you want it.
 
-**B. Once you have Meta Developer access (independent of Vercel, but most useful paired with it):**
-1. Follow §7's live-connection checklist (IG/Messenger, Development mode, no App Review needed for your
-   own test accounts) to connect a real test channel.
-2. **Register the webhook URL** — this must point at a server Meta can actually reach: either the real
-   deployed Vercel URL (once step A is done), or a tunnel (ngrok/cloudflared) to a local dev server if
-   you want to test before deploying. **Meta can never reach `localhost` directly** — this is exactly
-   the ambiguity that made this session's push test inconclusive (a real Instagram message was sent,
-   but it was unclear whether production, a stale local path, or nothing actually processed it).
-3. Send a real customer-side message and confirm the full round trip: webhook → pgmq → worker →
-   `handleInboundMessage` → reply delivered back on the same channel. This double-checks step A4 above
-   under real conditions, not a synthetic test.
-4. **Re-test push notifications for real** (deferred from this session by your own choice): with a real
-   channel connected and the app actually deployed, trigger a `handoff` (message "I want to talk to a
-   real person") or `alert_signal` from a genuine customer message, with the CrewNest tab **not**
-   focused on the receiving device, and confirm a real OS notification appears. Do this from the SAME
-   deployment that has the VAPID env vars set (step A5) — testing against a deployment without them
-   will silently no-op (push is a no-op-by-design bolt-on when unconfigured, docs/21 §2.5/§4).
+**B. Meta channel testing — mostly DONE 2026-08-03.**
+- ~~B1/B2. Connect a real channel + register the webhook~~ — done. Instagram + Messenger are live on the
+  **KraftNest Automations** tenant (`meta_page_id`, `instagram_id`, `meta_token_secret_id` all set).
+- ~~B3. Full round trip~~ — verified: real Instagram message → webhook → pgmq → worker → bridge → reply
+  delivered back on Instagram.
+- ~~B6. Message batching for real~~ — **verified**: two messages a few seconds apart produce ONE combined
+  reply. Took two fixes to get there (`0041`'s missing cron schedule, then the webhook nudge) — see §3.
+- ~~B7. Tune `BATCH_GRACE_MS`~~ — raised 4000 → 8000 alongside the nudge. Revisit only if real traffic
+  shows a meaningful share of `superseded = true` rows in `usage_logs` (that means bursts are still
+  escaping the window).
+
+**B-remaining. Still open:**
+4. **Re-test push notifications for real.** VAPID vars are now in Vercel and a real channel is connected,
+   so nothing blocks this any more. Trigger a `handoff` (customer messages "I want to talk to a real
+   person") or an `alert_signal`, with the CrewNest tab **not focused** on the receiving device, and
+   confirm a real OS notification appears. Push is a no-op-by-design when unconfigured (docs/21 §2.5/§4),
+   so a silent failure means the VAPID vars didn't take, not that the code is wrong.
 5. **WhatsApp business-initiated messages** (owner notifications, future out-of-window follow-ups) need
-   Meta-approved message templates — a separate ops step inside the Meta dashboard, not code (§5 item 4).
-6. **Test message batching for real** (docs/23 §10 — the acceptance criteria are written but NONE are
-   verified against live traffic; migration 0039 and the unit tests verify the *parts*, not the
-   behaviour). Requires step A7 (worker redeployed) first. Send, from a real customer device:
-   - **Two messages ~1s apart** ⇒ expect exactly ONE reply addressing both. This is the whole feature.
-   - **One message, then nothing** ⇒ expect a normal reply, delayed by no more than `BATCH_GRACE_MS`
-     (4s). Confirms batching didn't make the common case feel dead.
-   - **A message sent while the AI is visibly typing/generating** ⇒ expect one combined reply, not two.
-     This is the supersession path (docs/23 §5) and the hardest to trigger deliberately — send the
-     follow-up ~5-8s after the first, i.e. after the grace window closed but mid-LLM-call.
-   - **Then check `usage_logs`**: `select count(*), superseded from usage_logs group by superseded`.
-     Rows with `superseded = true` are aborted calls (docs/23 §5.4) — they carry exact prompt tokens
-     and NULL completion tokens. If that count is a meaningful fraction of all rows, `BATCH_GRACE_MS`
-     is too short and bursts are escaping the grace window; tune it up.
-7. **Tune `BATCH_GRACE_MS`** (`src/lib/constants.ts`, currently 4000). It is a starting guess, never
-   measured against real users. The `superseded` count from step B6 is the signal: lots of superseded
-   rows ⇒ raise it; near-zero superseded rows AND complaints about sluggishness ⇒ lower it.
+   Meta-approved message templates — an ops step in the Meta dashboard, not code (§5 item 4). WhatsApp is
+   not yet connected on any tenant (`whatsapp_phone_number_id` is null everywhere).
+6. **Poison-message + crash-recovery criteria** (docs/15 §8) remain unchecked — they need artificially
+   induced failures (kill the worker mid-turn; a message engineered to always throw), not real traffic.
 
 **C. Independent of both (can happen anytime, own timeline):**
 - Create a Stripe account (test mode is enough to start) + create the Starter ($29/mo) / Pro ($79/mo)
