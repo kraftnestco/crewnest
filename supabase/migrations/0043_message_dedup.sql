@@ -17,6 +17,20 @@
 -- insert, the same posture as orders' dedupe_fingerprint and appointments'
 -- partial unique index.
 
+-- Existing duplicates must go first, or the index creation fails outright with
+-- 23505 (it did, on the live project — three pairs dating back to 2026-07-15,
+-- so this had been happening quietly for weeks). Keeps the OLDEST row of each
+-- group: that's the one the first, non-retried turn created, and the one any
+-- other record already points at.
+delete from public.chat_messages c
+where c.provider_msg_id is not null
+  and exists (
+    select 1 from public.chat_messages keep
+    where keep.provider_msg_id = c.provider_msg_id
+      and (keep.created_at < c.created_at
+           or (keep.created_at = c.created_at and keep.id < c.id))
+  );
+
 -- Partial: only rows that actually carry a provider id participate. Web-widget
 -- messages and assistant/system rows have provider_msg_id null and must stay
 -- freely insertable — a null would otherwise collide on a plain unique index.
