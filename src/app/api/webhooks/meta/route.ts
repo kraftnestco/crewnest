@@ -1,4 +1,5 @@
 import { type NextRequest } from 'next/server';
+import { after } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import { env } from '@/lib/env';
 import { verifyMetaSignature } from '@/services/meta/signature';
@@ -82,7 +83,66 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // 5. Nudge the worker so it picks this up NOW rather than on the next pg_cron
+  // tick. pg_cron's floor is one minute, which made the whole batching feature
+  // (docs/23) mostly unreachable: a 4s grace window can't span a 60s polling
+  // gap, so two messages a few seconds apart routinely landed in DIFFERENT
+  // worker invocations and were answered separately. Confirmed live 2026-08-03.
+  //
+  // Runs in `after()` so it never delays the 200 below — Meta redelivers on a
+  // slow ACK, and a redelivery storm is a far worse failure than a late nudge.
+  // The pg_cron schedule stays as the safety net: if this nudge fails for any
+  // reason, the message is still queued and the next tick collects it.
+  if (inbound.length > 0) {
+    after(() => nudgeWorker());
+  }
+
   return new Response('OK', { status: 200 });
+}
+
+/**
+ * Fire-and-forget wake-up call to the inbound-worker Edge Function.
+ *
+ * Deliberately swallows every failure: the queue + pg_cron fallback already
+ * guarantee the message gets processed, so a failed nudge costs latency, never
+ * correctness. Throwing here would surface as a webhook error for a message
+ * that is, in fact, safely enqueued.
+ */
+async function nudgeWorker(): Promise<void> {
+  if (!env.INBOUND_WORKER_SECRET) return; // not configured ⇒ cron-only, as before.
+
+  // Derived from the Supabase URL rather than a second env var — the Edge
+  // Function is always on the same project as the queue it reads.
+  const workerUrl = `${env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/inbound-worker`;
+
+  try {
+    const res = await fetch(workerUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.INBOUND_WORKER_SECRET}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+      // The worker processes the WHOLE batch before responding — including the
+      // LLM turn — so this request can legitimately outlive this route's own
+      // 15s maxDuration. We only need the worker to have STARTED, not finished,
+      // so abort after 10s and let it run on. It's a separate process on
+      // Supabase; dropping our end of the connection doesn't cancel its work.
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) {
+      log.warn('[meta webhook] worker nudge non-2xx — falling back to cron tick', {
+        status: res.status,
+      });
+    }
+  } catch (err) {
+    // Includes the expected TimeoutError above — the worker is mid-batch, which
+    // is success, not failure. Logged at warn (not error) precisely because the
+    // common case here is benign and the queue guarantees eventual processing.
+    log.warn('[meta webhook] worker nudge did not complete — worker may still be running, cron covers the rest', {
+      error: err instanceof Error ? err.message : 'unknown',
+    });
+  }
 }
 
 /**

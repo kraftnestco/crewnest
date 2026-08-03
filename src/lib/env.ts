@@ -27,6 +27,12 @@ const schema = z.object({
   SENTRY_DSN: z.string().optional(),
   // Optional — Vercel Cron auth (docs/17 §3.1) rejects every request until set.
   CRON_SECRET: z.string().optional(),
+  // Optional — authenticates the webhook's "nudge" to the inbound-worker Edge
+  // Function (docs/15 §2). Must match the value set via
+  // `npx supabase secrets set INBOUND_WORKER_SECRET=...`. Unset ⇒ no nudge is
+  // sent and inbound messages simply wait for the next pg_cron tick, which is
+  // the pre-existing behaviour — degraded latency, never lost messages.
+  INBOUND_WORKER_SECRET: z.string().optional(),
   // Optional — Web Push (docs/21). Push is a no-op until all three are set, the
   // same bolt-on posture as Resend/Sentry. The PRIVATE key is server-only and
   // must never be exposed; only NEXT_PUBLIC_VAPID_PUBLIC_KEY reaches the browser.

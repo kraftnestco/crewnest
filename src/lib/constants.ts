@@ -156,7 +156,13 @@ export const QUEUE_VISIBILITY_TIMEOUT_SECONDS = 120;
  * renewed on every supersession restart. Keep it below
  * QUEUE_VISIBILITY_TIMEOUT_SECONDS above.
  */
-export const BATCH_GRACE_MS = 4000;
+// 4000 → 8000 (2026-08-03). The original 4s was chosen assuming the worker
+// picked messages up promptly; in practice it polled once a minute, so the
+// window almost never coincided with the customer still typing. Now that the
+// webhook nudges the worker on arrival (api/webhooks/meta/route.ts), the window
+// lands where it was designed to — and 8s matches a real "type, send, type
+// again" rhythm better than 4s, at the cost of 8s on a lone message.
+export const BATCH_GRACE_MS = 8000;
 export const SUPERSEDE_POLL_MS = 1500;
 export const MAX_TURN_SUPERSESSIONS = 3;
 export const MAX_SWEEP_ROUNDS = 2;
