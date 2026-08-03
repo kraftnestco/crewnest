@@ -32,6 +32,7 @@ import {
   detectEscalationKeywords,
   extractSignal,
   stripSignalTokens,
+  stripMarkdown,
 } from './security/sanitize';
 import {
   MEMORY_TOKEN_BUDGET,
@@ -708,7 +709,10 @@ async function runTurn(
 
   // 10. Handoff detection — honoured ONLY from assistant output.
   const handoff = assistantRequestedHandoff(finalText);
-  const replyText = stripSignalTokens(stripHandoffToken(finalText));
+  // Markdown last: the prompt forbids it, but a real reply still reached a
+  // customer as "*KN-0803-5*" on Instagram, which renders none of it. Applied
+  // to the STORED text too, so the inbox shows what the customer actually saw.
+  const replyText = stripMarkdown(stripSignalTokens(stripHandoffToken(finalText)));
 
   // 10b. Live Inbox alert signal (docs/08 GUARDRAIL_RULES) — sticky until a human
   // acts on it; only ever SET here, never auto-cleared by a calmer follow-up turn,

@@ -109,3 +109,48 @@ export function detectEscalationKeywords(text: string): boolean {
 
   return false;
 }
+
+/**
+ * Strip Markdown formatting from assistant output before it is stored or sent.
+ *
+ * The prompt already forbids markdown explicitly ("no markdown bold (**), no
+ * headers, no tables") — and a real reply on Instagram still arrived as
+ * "*KN-0803-5*" (2026-08-03). Prompt rules are advisory; a weaker model ignores
+ * them. Meta channels render none of this, so the customer sees the literal
+ * characters. This is the enforcement the prompt instruction cannot be.
+ *
+ * Deliberately conservative — it unwraps emphasis and headings rather than
+ * trying to parse Markdown properly. Anything ambiguous is left alone: a
+ * mangled price or product name would be far worse than a stray asterisk.
+ */
+export function stripMarkdown(text: string): string {
+  let out = text;
+
+  // Bold/italic wrappers. Longest first so ** isn't half-eaten by the * rule.
+  // Requires non-space immediately inside, so "2 * 3" and "5*" survive.
+  out = out.replace(/\*\*\*(\S(?:[^*]*\S)?)\*\*\*/g, '$1');
+  out = out.replace(/\*\*(\S(?:[^*]*\S)?)\*\*/g, '$1');
+  // Single-asterisk emphasis must open on a letter/digit and contain no comma
+  // or newline. Without that, "Sizes: S*, M*" reads the span between the two
+  // asterisks (", M") as emphasis and eats both markers — footnote-style
+  // asterisks after sizes are entirely plausible in a shop's catalogue.
+  out = out.replace(/\*([A-Za-z0-9](?:[^*,\n]*[^\s*,])?)\*/g, '$1');
+  out = out.replace(/__(\S(?:[^_]*\S)?)__/g, '$1');
+
+  // Inline code and code fences — the text inside is usually what matters.
+  out = out.replace(/```[a-z]*\n?([\s\S]*?)```/g, '$1');
+  out = out.replace(/`([^`\n]+)`/g, '$1');
+
+  // Leading heading markers ("## Services" -> "Services").
+  out = out.replace(/^#{1,6}\s+/gm, '');
+
+  // Markdown links: keep the label, drop the target. The raw URL would be
+  // noise, and Meta linkifies bare URLs anyway when we do want one.
+  out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '$1');
+
+  // Bullet markers become a simple dash; list structure still reads fine as
+  // plain text and this avoids a wall of asterisks.
+  out = out.replace(/^\s*[*+]\s+/gm, '- ');
+
+  return out.trim();
+}

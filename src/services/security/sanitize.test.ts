@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  assistantRequestedHandoff,
-  extractSignal,
-  sanitizeInbound,
-  stripHandoffToken,
-  stripSignalTokens,
-} from './sanitize';
+import { assistantRequestedHandoff, extractSignal, sanitizeInbound, stripHandoffToken, stripMarkdown, stripSignalTokens } from './sanitize';
 import { HUMAN_HANDOFF_TOKEN, MAX_INBOUND_CHARS, SIGNAL_TOKENS } from '@/lib/constants';
 
 describe('sanitizeInbound', () => {
@@ -75,5 +69,53 @@ describe('extractSignal / stripSignalTokens', () => {
   it('only ever reports one signal even if multiple tokens are (incorrectly) present, honouring declaration order', () => {
     const text = `${SIGNAL_TOKENS.price_objection} ${SIGNAL_TOKENS.frustrated}`;
     expect(extractSignal(text)).toBe('frustrated');
+  });
+});
+
+describe('stripMarkdown', () => {
+  it('unwraps the bold that reached a real customer', () => {
+    expect(stripMarkdown('Your latest order ID is **KN-0803-5** (pending).')).toBe(
+      'Your latest order ID is KN-0803-5 (pending).',
+    );
+  });
+
+  it('unwraps single-asterisk emphasis', () => {
+    expect(stripMarkdown('That is *important*.')).toBe('That is important.');
+  });
+
+  it('unwraps bold-italic and underscore emphasis', () => {
+    expect(stripMarkdown('***very***')).toBe('very');
+    expect(stripMarkdown('__also bold__')).toBe('also bold');
+  });
+
+  it('leaves arithmetic and stray asterisks alone', () => {
+    expect(stripMarkdown('2 * 3 = 6')).toBe('2 * 3 = 6');
+    expect(stripMarkdown('Sizes: S*, M*')).toBe('Sizes: S*, M*');
+  });
+
+  it('strips heading markers but keeps the text', () => {
+    expect(stripMarkdown('## Our services\nWe build agents.')).toBe('Our services\nWe build agents.');
+  });
+
+  it('unwraps inline code and fenced blocks', () => {
+    expect(stripMarkdown('Use `KN-0803-5` please.')).toBe('Use KN-0803-5 please.');
+    expect(stripMarkdown('```\nplain\n```')).toBe('plain');
+  });
+
+  it('keeps the label from a markdown link and drops the url', () => {
+    expect(stripMarkdown('See [our pricing](https://example.com/p) here.')).toBe('See our pricing here.');
+  });
+
+  it('normalises asterisk bullets to dashes', () => {
+    expect(stripMarkdown('* one\n* two')).toBe('- one\n- two');
+  });
+
+  it('leaves ordinary text untouched', () => {
+    const plain = 'Your order KN-0803-5 is confirmed. Total 1750 PKR, cash on delivery.';
+    expect(stripMarkdown(plain)).toBe(plain);
+  });
+
+  it('does not mangle a price or product name', () => {
+    expect(stripMarkdown('Merch T-Shirt Small - 1500 PKR - 10 left')).toBe('Merch T-Shirt Small - 1500 PKR - 10 left');
   });
 });
