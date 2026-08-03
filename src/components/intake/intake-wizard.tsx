@@ -63,6 +63,15 @@ export function IntakeWizard({
 
   const [businessType, setBusinessType] = useState(tenant.business_type ?? 'product');
   const [bookingLink, setBookingLink] = useState(tenant.booking_link ?? '');
+  // Appointment booking (docs/24). Service-only — the tools are gated on
+  // businessType === 'service' in the registry, so offering this to a product
+  // business would enable a feature that silently does nothing.
+  const [bookingEnabled, setBookingEnabled] = useState(tenant.booking_enabled ?? false);
+  const [bookingMode, setBookingMode] = useState(tenant.booking_mode ?? 'calcom');
+  const [bookingOwnLink, setBookingOwnLink] = useState(tenant.booking_own_link ?? '');
+  const [bookingDuration, setBookingDuration] = useState(String(tenant.booking_duration_minutes ?? 30));
+  const [bookingLeadTime, setBookingLeadTime] = useState(String(tenant.booking_lead_time_minutes ?? 120));
+  const [bookingMaxDays, setBookingMaxDays] = useState(String(tenant.booking_max_days_ahead ?? 30));
   const [systemPrompt, setSystemPrompt] = useState(tenant.system_prompt ?? '');
   const [catalogFreeform, setCatalogFreeform] = useState(tenant.catalog_freeform_text ?? '');
   const [customOrdersEnabled, setCustomOrdersEnabled] = useState(tenant.custom_orders_enabled);
@@ -100,6 +109,14 @@ export function IntakeWizard({
     const fd = new FormData();
     fd.set('business_type', businessType);
     fd.set('booking_link', bookingLink);
+    // Only ever submit booking config for a service business, so flipping the
+    // type to 'product' can't leave a stale enabled flag behind.
+    fd.set('booking_enabled', businessType === 'service' && bookingEnabled ? 'on' : '');
+    fd.set('booking_mode', bookingMode);
+    fd.set('booking_own_link', bookingOwnLink);
+    fd.set('booking_duration_minutes', bookingDuration);
+    fd.set('booking_lead_time_minutes', bookingLeadTime);
+    fd.set('booking_max_days_ahead', bookingMaxDays);
     fd.set('system_prompt', systemPrompt);
     fd.set('catalog_freeform', catalogFreeform);
     if (customOrdersEnabled) fd.set('custom_orders_enabled', 'on');
@@ -175,6 +192,122 @@ export function IntakeWizard({
                   Set this if customers should book appointments directly, and the AI shares the link instead of
                   collecting details. Leave blank and the AI will collect a quote request for your team to price.
                 </p>
+              </div>
+            )}
+
+            {/* Appointment booking (docs/24) — service businesses only. */}
+            {businessType === 'service' && (
+              <div className="flex flex-col gap-3 rounded-lg border p-3">
+                <label className="flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={bookingEnabled}
+                    onChange={(e) => setBookingEnabled(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="text-sm font-medium">Let the AI book appointments in chat</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      The AI offers real times from your business hours and books them, instead of handing out a link.
+                      This replaces the booking link above.
+                    </span>
+                  </span>
+                </label>
+
+                {bookingEnabled && (
+                  <div className="flex flex-col gap-3 border-t pt-3">
+                    <div className="flex flex-col gap-1.5">
+                      <Label>Where do meetings happen?</Label>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={() => setBookingMode('calcom')}
+                          className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                            bookingMode === 'calcom' ? 'border-primary bg-primary/5' : 'border-input'
+                          }`}
+                        >
+                          <span className="block text-sm font-medium">Create a link for me</span>
+                          <span className="block text-xs text-muted-foreground">
+                            A fresh Google Meet link per booking.
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBookingMode('own_link')}
+                          className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                            bookingMode === 'own_link' ? 'border-primary bg-primary/5' : 'border-input'
+                          }`}
+                        >
+                          <span className="block text-sm font-medium">I have my own</span>
+                          <span className="block text-xs text-muted-foreground">
+                            Your Zoom/Meet room, or a street address.
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {bookingMode === 'own_link' && (
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="booking_own_link">Your meeting link or address</Label>
+                        <Input
+                          id="booking_own_link"
+                          value={bookingOwnLink}
+                          onChange={(e) => setBookingOwnLink(e.target.value)}
+                          placeholder="https://zoom.us/j/… or 12 Main St, Lahore"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Shared with every customer who books. A web address becomes a clickable link; anything else is
+                          treated as a physical location.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="booking_duration_minutes">Appointment length</Label>
+                        <Input
+                          id="booking_duration_minutes"
+                          type="number"
+                          min={5}
+                          step={5}
+                          value={bookingDuration}
+                          onChange={(e) => setBookingDuration(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">Minutes</p>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="booking_lead_time_minutes">Minimum notice</Label>
+                        <Input
+                          id="booking_lead_time_minutes"
+                          type="number"
+                          min={0}
+                          step={15}
+                          value={bookingLeadTime}
+                          onChange={(e) => setBookingLeadTime(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Minutes. Stops same-minute bookings.
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="booking_max_days_ahead">Book up to</Label>
+                        <Input
+                          id="booking_max_days_ahead"
+                          type="number"
+                          min={1}
+                          value={bookingMaxDays}
+                          onChange={(e) => setBookingMaxDays(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">Days ahead</p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      Times come from your business hours and timezone, set further down. Holiday closures are respected
+                      automatically.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

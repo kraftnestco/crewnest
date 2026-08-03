@@ -24,7 +24,7 @@ export default async function ClientsPage() {
   const { data: tenants, error } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, slug, meta_page_id, instagram_id, whatsapp_phone_number_id, widget_public_key, widget_allowed_origins, system_prompt, catalog_data, is_active, created_at, openai_key_secret_id, meta_token_secret_id, whatsapp_token_secret_id, requested_platforms, platform_setup_notes, platform_setup_requested_at',
+      'id, business_name, slug, meta_page_id, instagram_id, whatsapp_phone_number_id, widget_public_key, widget_allowed_origins, system_prompt, catalog_data, is_active, created_at, openai_key_secret_id, meta_token_secret_id, whatsapp_token_secret_id, requested_platforms, platform_setup_notes, platform_setup_requested_at, business_type, booking_enabled, booking_mode, booking_own_link, booking_duration_minutes',
     )
     .order('created_at', { ascending: false });
 

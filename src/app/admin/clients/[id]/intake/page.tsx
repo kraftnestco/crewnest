@@ -9,7 +9,7 @@ export default async function ClientIntakePage({ params }: { params: Promise<{ i
   const { data: tenant } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, system_prompt, catalog_data, catalog_freeform_text, custom_orders_enabled, custom_orders_require_approval, custom_order_instructions, media_handling, voice_handling, business_type, booking_link, knowledge_base, business_hours, timezone, payments_enabled, payment_methods, payment_instructions, default_currency, prepaid_required',
+      'id, business_name, system_prompt, catalog_data, catalog_freeform_text, custom_orders_enabled, custom_orders_require_approval, custom_order_instructions, media_handling, voice_handling, business_type, booking_link, booking_enabled, booking_mode, booking_own_link, booking_duration_minutes, booking_lead_time_minutes, booking_max_days_ahead, knowledge_base, business_hours, timezone, payments_enabled, payment_methods, payment_instructions, default_currency, prepaid_required',
     )
     .eq('id', id)
     .maybeSingle();

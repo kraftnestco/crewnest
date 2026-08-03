@@ -142,6 +142,7 @@ export async function updateTenantAction(
   const allowedOriginsRaw = optionalString(formData.get('widget_allowed_origins'));
   const isActive = formData.get('is_active') === 'on';
 
+
   let catalogData: Json = {};
   if (catalogRaw) {
     try {
@@ -159,6 +160,30 @@ export async function updateTenantAction(
     : [];
 
   const supabase = await createSupabaseServerClient();
+
+  // Appointment booking (docs/24). The dialog only shows these for a service
+  // business, but that's UI convenience — re-check the stored business_type
+  // here so a hand-crafted POST can't enable booking on a product tenant,
+  // where the tools are gated off and the setting would do nothing.
+  const { data: existing } = await supabase
+    .from('tenants')
+    .select('business_type')
+    .eq('id', tenantId)
+    .maybeSingle();
+  const isService = existing?.business_type === 'service';
+
+  const bookingModeRaw = String(formData.get('booking_mode') ?? '').trim();
+  const bookingUpdates = isService
+    ? {
+        booking_enabled: formData.get('booking_enabled') === 'on',
+        booking_mode: bookingModeRaw === 'own_link' || bookingModeRaw === 'calcom' ? bookingModeRaw : null,
+        booking_own_link: String(formData.get('booking_own_link') ?? '').trim() || null,
+        booking_duration_minutes: Math.min(
+          Math.max(Number.parseInt(String(formData.get('booking_duration_minutes') ?? ''), 10) || 30, 5),
+          480,
+        ),
+      }
+    : {};
 
   const secretUpdates: TenantSecretIdFields = {};
   const openaiKey = optionalString(formData.get('openai_byok_key'));
@@ -194,6 +219,7 @@ export async function updateTenantAction(
       catalog_data: catalogData,
       widget_allowed_origins: widgetAllowedOrigins,
       is_active: isActive,
+      ...bookingUpdates,
       ...secretUpdates,
     })
     .eq('id', tenantId);

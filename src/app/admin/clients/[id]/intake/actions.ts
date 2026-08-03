@@ -142,6 +142,24 @@ export async function updateIntakeAction(
     ? businessTypeRaw
     : 'product';
   const bookingLink = String(formData.get('booking_link') ?? '').trim() || null;
+
+  // Appointment booking (docs/24). Force-disabled for a product business: the
+  // tools are gated on businessType === 'service' in the tool registry, so an
+  // enabled flag on a product tenant would be a setting that silently does
+  // nothing. Enforced here, server-side, not only in the form.
+  const bookingEnabled = businessType === 'service' && formData.get('booking_enabled') === 'on';
+  const bookingModeRaw = String(formData.get('booking_mode') ?? '').trim();
+  const bookingMode = bookingModeRaw === 'own_link' || bookingModeRaw === 'calcom' ? bookingModeRaw : null;
+  const bookingOwnLink = String(formData.get('booking_own_link') ?? '').trim() || null;
+  /** Clamped, not just parsed — a hand-edited form must not produce a 0-minute or 10-year window. */
+  const clampInt = (raw: FormDataEntryValue | null, fallback: number, min: number, max: number): number => {
+    const n = Number.parseInt(String(raw ?? ''), 10);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(Math.max(n, min), max);
+  };
+  const bookingDurationMinutes = clampInt(formData.get('booking_duration_minutes'), 30, 5, 480);
+  const bookingLeadTimeMinutes = clampInt(formData.get('booking_lead_time_minutes'), 120, 0, 10080);
+  const bookingMaxDaysAhead = clampInt(formData.get('booking_max_days_ahead'), 30, 1, 365);
   const customOrdersEnabled = formData.get('custom_orders_enabled') === 'on';
   const customOrdersRequireApproval = formData.get('custom_orders_require_approval') === 'on';
   const knowledgeBaseRaw = String(formData.get('knowledge_base_json') ?? '').trim();
@@ -212,6 +230,12 @@ export async function updateIntakeAction(
       custom_orders_require_approval: customOrdersRequireApproval,
       business_type: businessType,
       booking_link: bookingLink,
+      booking_enabled: bookingEnabled,
+      booking_mode: bookingMode,
+      booking_own_link: bookingOwnLink,
+      booking_duration_minutes: bookingDurationMinutes,
+      booking_lead_time_minutes: bookingLeadTimeMinutes,
+      booking_max_days_ahead: bookingMaxDaysAhead,
       knowledge_base: knowledgeBase,
       business_hours: businessHours,
       timezone,

@@ -34,6 +34,13 @@ const BLANK_TENANT: IntakeTenant = {
   voice_handling: 'human_review',
   business_type: 'product',
   booking_link: null,
+  // The demo has no tenant row, so no schedule to book against (docs/24).
+  booking_enabled: false,
+  booking_mode: null,
+  booking_own_link: null,
+  booking_duration_minutes: 30,
+  booking_lead_time_minutes: 120,
+  booking_max_days_ahead: 30,
   knowledge_base: null,
   business_hours: null,
   timezone: null,
