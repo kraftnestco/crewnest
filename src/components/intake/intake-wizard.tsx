@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { PromptArchitect } from '@/components/intake/prompt-architect';
+import { COMMON_TIMEZONES, CURRENCY_OPTIONS } from '@/lib/constants';
 import {
   BUSINESS_TYPE_OPTIONS,
   MEDIA_HANDLING_OPTIONS,
@@ -82,6 +83,26 @@ export function IntakeWizard({
   const [knowledge, setKnowledge] = useState(() => parseKnowledgeBase(tenant.knowledge_base));
   const [hours, setHours] = useState(() => parseBusinessHours(tenant.business_hours));
   const [timezone, setTimezone] = useState(tenant.timezone ?? '');
+  /**
+   * Every IANA zone the runtime knows (~418), rather than a hardcoded list that
+   * would drift as the tz database changes. Guarded because
+   * `Intl.supportedValuesOf` is relatively new — a runtime without it falls
+   * back to the common list rather than rendering an empty dropdown.
+   *
+   * A stored timezone outside the list is appended so an existing value is
+   * never silently dropped from the options (which would look like the field
+   * had reset itself).
+   */
+  const allTimezones = useMemo(() => {
+    let zones: string[];
+    try {
+      zones = Intl.supportedValuesOf('timeZone') as string[];
+    } catch {
+      zones = [...COMMON_TIMEZONES];
+    }
+    const stored = tenant.timezone;
+    return stored && !zones.includes(stored) ? [stored, ...zones] : zones;
+  }, [tenant.timezone]);
   const [paymentsEnabled, setPaymentsEnabled] = useState(tenant.payments_enabled);
   const [paymentMethods, setPaymentMethods] = useState<string[]>(
     tenant.payment_methods.length ? tenant.payment_methods : ['cod'],
@@ -302,10 +323,25 @@ export function IntakeWizard({
                       </div>
                     </div>
 
-                    <p className="text-xs text-muted-foreground">
-                      Times come from your business hours and timezone, set further down. Holiday closures are respected
-                      automatically.
-                    </p>
+                    {/* Booking silently offers nothing without BOTH of these, and
+                        nothing else in the form would tell you — the toggle looks
+                        on, the AI just says there's no availability. */}
+                    {(() => {
+                      const missing = [
+                        !timezone && 'a timezone',
+                        !hours.week.some((r) => r.open && r.close) && 'opening hours',
+                      ].filter(Boolean);
+                      return missing.length > 0 ? (
+                        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
+                          Set {missing.join(' and ')} in the Business hours step, or the AI will tell every customer
+                          there is no availability.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Times come from your business hours and timezone. Holiday closures are respected automatically.
+                        </p>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -528,8 +564,32 @@ export function IntakeWizard({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="timezone">Timezone (e.g. Asia/Karachi)</Label>
-              <Input id="timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="Asia/Karachi" />
+              <Label htmlFor="timezone">Timezone</Label>
+              <select
+                id="timezone"
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+              >
+                <option value="">Select a timezone…</option>
+                <optgroup label="Common">
+                  {COMMON_TIMEZONES.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {tz.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="All timezones">
+                  {allTimezones.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {tz.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Used for &quot;are you open now?&quot; and, if booking is on, for every appointment time.
+              </p>
             </div>
             <div className="flex flex-col gap-2">
               {hours.week.map((row) => (
@@ -611,13 +671,23 @@ export function IntakeWizard({
                 )}
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="default_currency">Currency</Label>
-                  <Input
+                  <select
                     id="default_currency"
-                    className="max-w-[10rem]"
+                    className="h-9 max-w-[16rem] rounded-md border border-input bg-transparent px-3 text-sm"
                     value={defaultCurrency}
                     onChange={(e) => setDefaultCurrency(e.target.value)}
-                    placeholder="PKR"
-                  />
+                  >
+                    {/* A stored value outside the shortlist is kept as an option
+                        rather than silently rewritten to PKR on the next save. */}
+                    {!CURRENCY_OPTIONS.some((c) => c.code === defaultCurrency) && defaultCurrency && (
+                      <option value={defaultCurrency}>{defaultCurrency}</option>
+                    )}
+                    {CURRENCY_OPTIONS.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </>
             )}

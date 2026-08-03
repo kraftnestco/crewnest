@@ -252,3 +252,38 @@ export const WEBHOOK_EVENTS_RETENTION_DAYS = 30;
  */
 export const MEMBER_ROLE_VALUES = ['tenant_admin', 'tenant_agent'] as const;
 export type AssignableMemberRole = (typeof MEMBER_ROLE_VALUES)[number];
+
+/**
+ * Currencies offered in the intake dropdown. Deliberately a short list rather
+ * than every ISO code — these are the ones this product's clients actually
+ * price in. The column stays free-text so an existing value outside this list
+ * is preserved rather than silently rewritten.
+ */
+export const CURRENCY_OPTIONS = [
+  { code: 'PKR', label: 'PKR — Pakistani Rupee' },
+  { code: 'USD', label: 'USD — US Dollar' },
+  { code: 'GBP', label: 'GBP — British Pound' },
+  { code: 'EUR', label: 'EUR — Euro' },
+  { code: 'AED', label: 'AED — UAE Dirham' },
+  { code: 'SAR', label: 'SAR — Saudi Riyal' },
+  { code: 'INR', label: 'INR — Indian Rupee' },
+  { code: 'CAD', label: 'CAD — Canadian Dollar' },
+  { code: 'AUD', label: 'AUD — Australian Dollar' },
+] as const;
+
+/**
+ * Surfaced at the top of the timezone dropdown. The full list comes from
+ * `Intl.supportedValuesOf('timeZone')` at runtime (~418 zones) rather than
+ * being hardcoded — that way it can never drift out of date as the IANA
+ * database changes. These few are just the ones worth not scrolling for.
+ */
+export const COMMON_TIMEZONES = [
+  'Asia/Karachi',
+  'Asia/Dubai',
+  'Asia/Riyadh',
+  'Asia/Kolkata',
+  'Europe/London',
+  'Europe/Berlin',
+  'America/New_York',
+  'America/Los_Angeles',
+] as const;

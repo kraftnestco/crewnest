@@ -43,12 +43,12 @@ type EditableTenant = Pick<
 
 export function EditClientDialog({ tenant }: { tenant: EditableTenant }) {
   const [open, setOpen] = useState(false);
-  // Appointment booking (docs/24) is service-only — the tools are gated on
-  // businessType === 'service', so showing this for a product business would
-  // offer a switch that does nothing. The server action enforces it too.
+  // Booking config lives ONLY in the intake wizard (docs/24 §5). It was briefly
+  // duplicated here, which was a mistake: this dialog has no business-hours or
+  // timezone fields, and booking is useless without both — so the toggle could
+  // be switched on here and silently produce no availability at all. One home
+  // for the whole setting, with a link across.
   const isService = tenant.business_type === 'service';
-  const [bookingEnabled, setBookingEnabled] = useState(tenant.booking_enabled ?? false);
-  const [bookingMode, setBookingMode] = useState(tenant.booking_mode ?? 'calcom');
   const boundAction = updateTenantAction.bind(null, tenant.id);
   const [state, formAction, isPending] = useActionState(boundAction, initialUpdateTenantState);
 
@@ -144,64 +144,14 @@ export function EditClientDialog({ tenant }: { tenant: EditableTenant }) {
             </div>
           </div>
 
-          {/* Appointment booking (docs/24) — service businesses only. */}
           {isService && (
-            <div className="flex flex-col gap-3 rounded-lg border p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="booking_enabled">Book appointments in chat</Label>
-                  <p className="text-xs text-muted-foreground">
-                    The AI offers real times from this business&apos;s hours and books them.
-                  </p>
-                </div>
-                <Switch
-                  id="booking_enabled"
-                  name="booking_enabled"
-                  checked={bookingEnabled}
-                  onCheckedChange={setBookingEnabled}
-                />
-              </div>
-
-              {bookingEnabled && (
-                <div className="grid gap-3 border-t pt-3 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="booking_mode">Meeting location</Label>
-                    <select
-                      id="booking_mode"
-                      name="booking_mode"
-                      value={bookingMode}
-                      onChange={(e) => setBookingMode(e.target.value)}
-                      className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-                    >
-                      <option value="calcom">Create a link per booking</option>
-                      <option value="own_link">Their own link / address</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="booking_duration_minutes">Length (minutes)</Label>
-                    <Input
-                      id="booking_duration_minutes"
-                      name="booking_duration_minutes"
-                      type="number"
-                      min={5}
-                      step={5}
-                      defaultValue={tenant.booking_duration_minutes ?? 30}
-                    />
-                  </div>
-                  {bookingMode === 'own_link' && (
-                    <div className="col-span-full flex flex-col gap-1.5">
-                      <Label htmlFor="booking_own_link">Meeting link or address</Label>
-                      <Input
-                        id="booking_own_link"
-                        name="booking_own_link"
-                        defaultValue={tenant.booking_own_link ?? ''}
-                        placeholder="https://zoom.us/j/… or 12 Main St, Lahore"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+              Appointment booking, business hours and timezone are set in{' '}
+              <a href={`/admin/clients/${tenant.id}/intake`} className="text-primary underline underline-offset-2">
+                this client&apos;s setup
+              </a>
+              . They belong together — booking can&apos;t offer times without hours and a timezone.
+            </p>
           )}
 
           <div className="flex flex-col gap-1.5">
