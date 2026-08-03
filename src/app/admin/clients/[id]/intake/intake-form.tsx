@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { PromptArchitect } from '@/components/intake/prompt-architect';
+import { COMMON_TIMEZONES, CURRENCY_OPTIONS } from '@/lib/constants';
 import {
   BUSINESS_TYPE_OPTIONS,
   MEDIA_HANDLING_OPTIONS,
@@ -30,10 +31,24 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
   const [state, formAction, isPending] = useActionState(boundAction, initialUpdateIntakeState);
   const [mediaHandling, setMediaHandling] = useState(tenant.media_handling ?? 'match_catalogue');
   const [businessType, setBusinessType] = useState(tenant.business_type ?? 'product');
+  // Appointment booking (docs/24) — service-only, mirroring the client wizard.
+  const [bookingEnabled, setBookingEnabled] = useState(tenant.booking_enabled ?? false);
+  const [bookingMode, setBookingMode] = useState(tenant.booking_mode ?? 'calcom');
   const [systemPrompt, setSystemPrompt] = useState(tenant.system_prompt ?? '');
   const [knowledge, setKnowledge] = useState<KnowledgeBaseState>(() => parseKnowledgeBase(tenant.knowledge_base));
   const [hours, setHours] = useState<BusinessHoursState>(() => parseBusinessHours(tenant.business_hours));
   const [timezone, setTimezone] = useState(tenant.timezone ?? '');
+  /** Every IANA zone the runtime knows, with a stored-but-unlisted value preserved. */
+  const allTimezones = useMemo(() => {
+    let zones: string[];
+    try {
+      zones = Intl.supportedValuesOf('timeZone') as string[];
+    } catch {
+      zones = [...COMMON_TIMEZONES];
+    }
+    const stored = tenant.timezone;
+    return stored && !zones.includes(stored) ? [stored, ...zones] : zones;
+  }, [tenant.timezone]);
   const [paymentsEnabled, setPaymentsEnabled] = useState(tenant.payments_enabled);
   const [paymentMethods, setPaymentMethods] = useState<string[]>(
     tenant.payment_methods.length ? tenant.payment_methods : ['cod'],
@@ -89,21 +104,103 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
               </button>
             ))}
           </div>
+          {/* Appointment booking (docs/24) — service businesses only. */}
           {businessType === 'service' && (
-            <div className="flex flex-col gap-1.5 pt-1">
-              <Label htmlFor="booking_link">Booking link (optional)</Label>
-              <Input
-                id="booking_link"
-                name="booking_link"
-                type="url"
-                defaultValue={tenant.booking_link ?? ''}
-                placeholder="https://calendly.com/…"
-              />
-              <p className="text-xs text-muted-foreground">
-                Set this if customers should book appointments directly, and the AI shares the link instead of
-                collecting details. Leave blank and the AI will collect a quote request for your team to price
-                (appears in the approval queue on Orders; reply with the priced quote via chat take-over).
-              </p>
+            <div className="flex flex-col gap-3 rounded-lg border p-3">
+              <label className="flex items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  name="booking_enabled"
+                  checked={bookingEnabled}
+                  onChange={(e) => setBookingEnabled(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="text-sm font-medium">Let the AI book appointments in chat</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    The AI offers real times from this business&apos;s hours and books them.
+                  </span>
+                </span>
+              </label>
+
+              {bookingEnabled && (
+                <div className="flex flex-col gap-3 border-t pt-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="booking_mode">Where do meetings happen?</Label>
+                    <select
+                      id="booking_mode"
+                      name="booking_mode"
+                      value={bookingMode}
+                      onChange={(e) => setBookingMode(e.target.value)}
+                      className="h-9 max-w-sm rounded-md border border-input bg-transparent px-3 text-sm"
+                    >
+                      <option value="calcom">Create a link per booking (Google Meet)</option>
+                      <option value="own_link">They have their own link or address</option>
+                    </select>
+                  </div>
+
+                  {bookingMode === 'own_link' && (
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="booking_own_link">Their meeting link or address</Label>
+                      <Input
+                        id="booking_own_link"
+                        name="booking_own_link"
+                        defaultValue={tenant.booking_own_link ?? ''}
+                        placeholder="https://zoom.us/j/… or 12 Main St, Lahore"
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="booking_duration_minutes">Length (minutes)</Label>
+                      <Input
+                        id="booking_duration_minutes"
+                        name="booking_duration_minutes"
+                        type="number"
+                        min={5}
+                        step={5}
+                        defaultValue={tenant.booking_duration_minutes ?? 30}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="booking_lead_time_minutes">Minimum notice (minutes)</Label>
+                      <Input
+                        id="booking_lead_time_minutes"
+                        name="booking_lead_time_minutes"
+                        type="number"
+                        min={0}
+                        step={15}
+                        defaultValue={tenant.booking_lead_time_minutes ?? 120}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="booking_max_days_ahead">Book up to (days)</Label>
+                      <Input
+                        id="booking_max_days_ahead"
+                        name="booking_max_days_ahead"
+                        type="number"
+                        min={1}
+                        defaultValue={tenant.booking_max_days_ahead ?? 30}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Booking silently offers nothing without BOTH of these. */}
+                  {(() => {
+                    const missing = [
+                      !timezone && 'a timezone',
+                      !hours.week.some((r) => r.open && r.close) && 'opening hours',
+                    ].filter(Boolean);
+                    return missing.length > 0 ? (
+                      <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
+                        Set {missing.join(' and ')} in Business hours below, or the AI will tell every customer there is
+                        no availability.
+                      </p>
+                    ) : null;
+                  })()}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -309,13 +406,29 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="timezone">Timezone (IANA, e.g. Asia/Karachi)</Label>
-            <Input
+            <Label htmlFor="timezone">Timezone</Label>
+            <select
               id="timezone"
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              placeholder="Asia/Karachi"
-            />
+              className="h-9 max-w-sm rounded-md border border-input bg-transparent px-3 text-sm"
+            >
+              <option value="">Select a timezone…</option>
+              <optgroup label="Common">
+                {COMMON_TIMEZONES.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="All timezones">
+                {allTimezones.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
           </div>
           <div className="flex flex-col gap-2">
             {hours.week.map((row) => (
@@ -412,14 +525,22 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
               )}
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="default_currency">Currency</Label>
-                <Input
+                <select
                   id="default_currency"
                   name="default_currency"
-                  className="max-w-[10rem]"
+                  className="h-9 max-w-[16rem] rounded-md border border-input bg-transparent px-3 text-sm"
                   value={defaultCurrency}
                   onChange={(e) => setDefaultCurrency(e.target.value)}
-                  placeholder="PKR"
-                />
+                >
+                  {!CURRENCY_OPTIONS.some((c) => c.code === defaultCurrency) && defaultCurrency && (
+                    <option value={defaultCurrency}>{defaultCurrency}</option>
+                  )}
+                  {CURRENCY_OPTIONS.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="flex items-center justify-between">
                 <div>

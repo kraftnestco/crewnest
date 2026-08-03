@@ -63,7 +63,6 @@ export function IntakeWizard({
   const [step, setStep] = useState(0);
 
   const [businessType, setBusinessType] = useState(tenant.business_type ?? 'product');
-  const [bookingLink, setBookingLink] = useState(tenant.booking_link ?? '');
   // Appointment booking (docs/24). Service-only — the tools are gated on
   // businessType === 'service' in the registry, so offering this to a product
   // business would enable a feature that silently does nothing.
@@ -129,7 +128,9 @@ export function IntakeWizard({
   function handleFinish() {
     const fd = new FormData();
     fd.set('business_type', businessType);
-    fd.set('booking_link', bookingLink);
+    // Superseded by real in-chat booking (docs/24); no longer editable here.
+    // Still submitted unchanged so an existing value is preserved, not wiped.
+    fd.set('booking_link', tenant.booking_link ?? '');
     // Only ever submit booking config for a service business, so flipping the
     // type to 'product' can't leave a stale enabled flag behind.
     fd.set('booking_enabled', businessType === 'service' && bookingEnabled ? 'on' : '');
@@ -199,23 +200,6 @@ export function IntakeWizard({
                 </button>
               ))}
             </div>
-            {businessType === 'service' && (
-              <div className="flex flex-col gap-1.5 pt-1">
-                <Label htmlFor="booking_link">Booking link (optional)</Label>
-                <Input
-                  id="booking_link"
-                  type="url"
-                  value={bookingLink}
-                  onChange={(e) => setBookingLink(e.target.value)}
-                  placeholder="https://calendly.com/…"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Set this if customers should book appointments directly, and the AI shares the link instead of
-                  collecting details. Leave blank and the AI will collect a quote request for your team to price.
-                </p>
-              </div>
-            )}
-
             {/* Appointment booking (docs/24) — service businesses only. */}
             {businessType === 'service' && (
               <div className="flex flex-col gap-3 rounded-lg border p-3">
