@@ -176,11 +176,27 @@ Version headers are **per-endpoint** and differ; getting one wrong returns a con
 Auth: `Authorization: Bearer $CALCOM_API_KEY`. Body: `{ start, eventTypeId, attendee: { name, email,
 timeZone, language } }`. The response carries `meetingUrl` (also mirrored in `location`) and `uid`.
 
-**Attendee email:** Cal.com requires one. Customers on WhatsApp/Instagram rarely have one on file, so a
-tenant-level fallback address is used and the customer's real name is passed through. The Meet link
-does not depend on the attendee's email being real — confirmed in testing.
+**Attendee email — decided, with a known trade-off.** Cal.com requires an attendee email. A customer
+messaging on WhatsApp/Instagram has given us a name and a phone number, never an email, and asking for
+one mid-booking is friction for something they don't need.
 
-Env: `CALCOM_API_KEY`, `CALCOM_EVENT_TYPE_ID` (both optional in `env.ts` — unset means path B is
+**Decision: a single fixed CrewNest address (`CALCOM_ATTENDEE_EMAIL`) is used for every booking**, with
+the customer's real name passed through as `attendee.name` so Cal.com's records and the calendar event
+still identify them. Verified in testing: the Meet link does not depend on the attendee email being the
+customer's.
+
+**Consequence, accepted:** Cal.com's confirmation and reminder emails go to that CrewNest address, not
+to the customer, and every booking across every tenant lands in one inbox. The customer's record of the
+appointment is the chat message the AI sends them, which is where they already are. If customers should
+later get an emailed confirmation, send it from CrewNest via the existing Resend integration rather
+than by putting a real customer address into Cal.com — that keeps Cal.com as a pure link generator
+(§1.1) instead of a second source of truth about the booking.
+
+Rejected: asking the customer for an email (a question in every booking conversation, to serve a
+minority who'd notice), and synthetic per-customer addresses like `wa-<phone>@bookings.…` (needs DNS
+catch-all setup for no user-visible gain).
+
+Env: `CALCOM_API_KEY`, `CALCOM_EVENT_TYPE_ID`, `CALCOM_ATTENDEE_EMAIL` (all optional in `env.ts` — unset means path B is
 unavailable and `booking_mode='calcom'` degrades to "we'll send the link separately", never a crash).
 
 ---
