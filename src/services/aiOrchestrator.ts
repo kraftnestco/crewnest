@@ -584,17 +584,6 @@ async function runTurn(
   // single-call path (provider.chat with tools: undefined).
   const provider = getProvider(tenant.llmProvider);
   const tools = getEnabledTools(tenant, session);
-  // TEMPORARY DIAGNOSTIC (2026-08-04): booking tools verified present in the
-  // registry, the DB, and the model — yet a live turn still refuses to book.
-  // Log what the RUNNING server actually resolves, since every component
-  // passes in isolation. Remove once the cause is found.
-  log.info('[orchestrator] tool gating', {
-    tenantId: tenant.id,
-    businessType: tenant.businessType,
-    bookingEnabled: tenant.bookingEnabled,
-    llmModel: tenant.llmModel,
-    toolNames: tools.map((t) => t.def.name).join(',') || '(none)',
-  });
   const conversation: LlmMessage[] = [...built.messages];
   let finalText = '';
   let finalCompletionTokens = 0;
