@@ -435,12 +435,12 @@ async function runTurn(
   // built when the order still needs a rating; submitReview.ts clears the pointer on
   // success, but re-checking reviewSubmittedAt here guards a stale pointer surviving a
   // crash mid-turn.
-  let pendingReview: { orderId: string; itemsSummary: string } | undefined;
+  let pendingReview: { orderNumber: number | null; itemsSummary: string } | undefined;
   if (session.pendingReviewOrderId) {
     const reviewOrder = await orders.getById(session.pendingReviewOrderId);
     if (reviewOrder && !reviewOrder.reviewSubmittedAt) {
       const itemsSummary = reviewOrder.items.map((i) => `${i.name} x${i.qty}`).join(', ') || 'their order';
-      pendingReview = { orderId: reviewOrder.id, itemsSummary };
+      pendingReview = { orderNumber: reviewOrder.orderNumber, itemsSummary };
     }
   }
 

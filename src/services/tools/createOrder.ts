@@ -150,7 +150,7 @@ export const createOrderTool: ToolExecutor = {
     );
 
     if (duplicate || !order) {
-      return { orderId: null, status, duplicate: true };
+      return { orderNumber: null, status, duplicate: true };
     }
 
     // A new order in this session makes any earlier pending review pointer stale —
@@ -238,7 +238,11 @@ export const createOrderTool: ToolExecutor = {
       : undefined;
 
     return {
-      orderId: order.id,
+      // The per-tenant sequential number (#7), NEVER order.id. Anything returned
+      // here can be read aloud to the customer, and the model did exactly that
+      // with the raw uuid — "Order ID: 4f5e0565-0fb5-..." (2026-08-03). The
+      // uuid stays internal; migration 0040 exists precisely for this.
+      orderNumber: order.orderNumber,
       status: order.status,
       paymentStatus: order.paymentStatus,
       ...(payment ? { payment } : {}),

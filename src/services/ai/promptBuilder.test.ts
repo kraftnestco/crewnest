@@ -36,7 +36,7 @@ describe('promptBuilder.build cache-prefix byte-identity', () => {
         { role: 'user', content: 'I want to order 3 widgets' },
       ],
       userText: 'actually make that 5',
-      pendingReview: { orderId: 'ord_1', itemsSummary: '5x Widget' },
+      pendingReview: { orderNumber: 1, itemsSummary: '5x Widget' },
     });
 
     expect(first.messages[0].content).toBe(second.messages[0].content);
@@ -52,7 +52,7 @@ describe('promptBuilder.build cache-prefix byte-identity', () => {
       tenant: TENANT,
       history: [{ role: 'user', content: 'UNIQUE_HISTORY_MARKER' }],
       userText: 'UNIQUE_USER_TEXT_MARKER',
-      pendingReview: { orderId: 'ord_2', itemsSummary: 'UNIQUE_REVIEW_MARKER' },
+      pendingReview: { orderNumber: 2, itemsSummary: 'UNIQUE_REVIEW_MARKER' },
     });
     const prefix = result.messages[0].content as string;
     expect(prefix).not.toContain('UNIQUE_HISTORY_MARKER');
@@ -84,13 +84,13 @@ describe('promptBuilder.build cache-prefix byte-identity', () => {
       tenant: TENANT,
       history: [{ role: 'user', content: 'hi' }],
       userText: 'thanks!',
-      pendingReview: { orderId: 'ord_3', itemsSummary: '1x Widget' },
+      pendingReview: { orderNumber: 3, itemsSummary: '1x Widget' },
     });
     const last = result.messages[result.messages.length - 1];
     const secondToLast = result.messages[result.messages.length - 2];
     expect(last).toEqual({ role: 'user', content: 'thanks!' });
     expect(secondToLast.role).toBe('system');
-    expect(secondToLast.content).toContain('ord_3');
+    expect(secondToLast.content).toContain('order #3');
   });
 
   it('builds a multi-part user message when imageUrls are present', () => {

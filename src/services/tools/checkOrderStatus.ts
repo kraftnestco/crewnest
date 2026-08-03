@@ -45,7 +45,7 @@ export const checkOrderStatusTool: ToolExecutor = {
     return {
       found: true,
       orders: matches.map((o) => ({
-        orderId: o.id,
+        orderNumber: o.orderNumber,
         status: o.status,
         items: o.items.map((i) => ({ name: i.name, qty: i.qty })),
         placedAt: o.createdAt,

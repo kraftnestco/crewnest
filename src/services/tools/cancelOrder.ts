@@ -66,6 +66,6 @@ export const cancelOrderTool: ToolExecutor = {
       },
     });
 
-    return { orderId: updated.id, status: updated.status };
+    return { orderNumber: updated.orderNumber, status: updated.status };
   },
 };

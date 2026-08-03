@@ -113,6 +113,6 @@ export const editOrderTool: ToolExecutor = {
       },
     });
 
-    return { orderId: updated.id, status: updated.status };
+    return { orderNumber: updated.orderNumber, status: updated.status };
   },
 };
