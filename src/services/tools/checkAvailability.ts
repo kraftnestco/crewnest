@@ -66,6 +66,18 @@ function slotMinutes(slot: Slot, timezone: string | null): number {
   return g('hour') * 60 + g('minute');
 }
 
+/** "2026-08-04" — the tenant-local calendar date, for adjacency checks. */
+function isoDate(slot: Slot, timezone: string | null): string {
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone || 'UTC',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(slot.startsAt);
+  const g = (t: string) => p.find((x) => x.type === t)?.value ?? '';
+  return `${g('year')}-${g('month')}-${g('day')}`;
+}
+
 /** "Tue 4 Aug" — the day label, without the time. */
 function dayLabel(slot: Slot, timezone: string | null): string {
   return new Intl.DateTimeFormat('en-GB', {
@@ -121,17 +133,37 @@ export const checkAvailabilityTool: ToolExecutor = {
             'There is no availability in the booking window at all. Apologise and offer to take their details so the business can follow up.',
         };
       }
-      const days: string[] = [];
+      // Collect the distinct available days, keeping the ISO date alongside the
+      // label so we can tell whether they actually run consecutively.
+      const seen = new Map<string, string>(); // isoDate -> label
       for (const s of slots) {
-        const label = dayLabel(s, tz);
-        if (!days.includes(label)) days.push(label);
-        if (days.length >= 5) break;
+        const iso = isoDate(s, tz);
+        if (!seen.has(iso)) seen.set(iso, dayLabel(s, tz));
+        if (seen.size >= 5) break;
       }
+      const isoDays = [...seen.keys()];
+      const labels = [...seen.values()];
+
+      // Only describe it as a range when the days are genuinely contiguous.
+      // A business closed on Sunday would otherwise have "4 Aug – 8 Aug"
+      // quietly promise a day it cannot actually offer.
+      const contiguous = isoDays.every((d, i) => {
+        if (i === 0) return true;
+        const prev = new Date(isoDays[i - 1] + 'T00:00:00Z').getTime();
+        return new Date(d + 'T00:00:00Z').getTime() - prev === 86_400_000;
+      });
+
       return {
         ok: true,
-        available_days: days,
+        available_days: labels,
+        // Set only when it is safe to say "X to Y" — the model is told to use
+        // this phrasing when present, and to name the days otherwise.
+        available_range:
+          contiguous && labels.length > 1 ? { from: labels[0], to: labels[labels.length - 1] } : null,
         message:
-          'Ask the customer WHICH DAY suits them, mentioning these days naturally. Do not list any times yet.',
+          contiguous && labels.length > 1
+            ? `Tell the customer availability runs from ${labels[0]} to ${labels[labels.length - 1]}, then ask which day suits them. Do not list the days individually and do not mention any times yet.`
+            : 'Ask the customer WHICH DAY suits them, mentioning these days naturally. Do not list any times yet.',
       };
     }
 
