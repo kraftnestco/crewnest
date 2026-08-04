@@ -175,7 +175,12 @@ export const MAX_SWEEP_ROUNDS = 2;
 export const TURN_LEASE_TTL_SECONDS = 90;
 
 /** Bounds tool-calling rounds per inbound message — caps cost and prevents infinite loops. */
-export const MAX_TOOL_ROUNDS = 3;
+// 3 -> 5. Rounds are shared between tool calls AND retries of a bad
+// generation (aiOrchestrator discards replies that leak tool names). A booking
+// turn already spends one round calling the tool and one replying, so at 3 a
+// single bad roll left no room and the conversation handed off permanently.
+// Still bounded — cost and latency scale with this.
+export const MAX_TOOL_ROUNDS = 5;
 
 /** Idempotency window: identical (items+customer) orders within this many minutes are deduped. */
 export const ORDER_DEDUPE_WINDOW_MINUTES = 5;

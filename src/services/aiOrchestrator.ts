@@ -680,6 +680,28 @@ async function runTurn(
       continue; // let the model see the tool results and produce the next turn
     }
 
+    // A generation that leaked internal reasoning is discarded, not accepted.
+    // A single bad roll of the dice should cost a retry, not the conversation:
+    // the old code let it through here and then handed off permanently, so one
+    // rambling reply muted the AI for good (observed live 2026-08-04 twice).
+    // Nudge the model and let the loop try again; only a round cap reached with
+    // nothing usable falls through to the handoff below.
+    if (looksLikeLeakedReasoning(result.text)) {
+      log.warn('[orchestrator] discarded leaked-reasoning generation, retrying', {
+        tenantId: tenant.id,
+        sessionId: session.id,
+        round,
+        completionTokens: result.usage.completionTokens,
+      });
+      conversation.push({ role: 'assistant', content: result.text });
+      conversation.push({
+        role: 'system',
+        content:
+          '[context] That reply exposed internal tool names or was cut off mid-thought. Reply again, briefly and directly to the customer, in plain language. Never mention tool names.',
+      });
+      continue;
+    }
+
     finalText = result.text;
     finalCompletionTokens = result.usage.completionTokens;
     break; // plain-text turn ⇒ done
@@ -715,37 +737,6 @@ async function runTurn(
   // to the STORED text too, so the inbox shows what the customer actually saw.
   const replyText = stripMarkdown(stripSignalTokens(stripHandoffToken(finalText)));
 
-  // 10a. Leaked-reasoning backstop. A weak model can lose the thread and narrate
-  // its own plan at the customer — observed live 2026-08-04:
-  // "We need to check availability for tomorrow. Use check_availability with no
-  // args<unk><unk><unk>". Sending that is worse than sending nothing, and it is
-  // not something a prompt rule can prevent. Hand to a human instead: the
-  // customer's message is already persisted, so staff see the full context.
-  if (looksLikeLeakedReasoning(replyText)) {
-    log.warn('[orchestrator] suppressed leaked reasoning', {
-      tenantId: tenant.id,
-      sessionId: session.id,
-      completionTokens: finalCompletionTokens,
-    });
-    await sessions.setHandoff(session.id, true, 'tool_exhaustion');
-    await notifyBoth({
-      tenantId: tenant.id,
-      type: 'handoff',
-      entityType: 'session',
-      entityId: session.id,
-      agency: {
-        title: 'Handoff needed',
-        body: `${tenant.businessName} — the assistant produced an unusable reply`,
-        link: `/admin/chat?session=${session.id}`,
-      },
-      tenant: {
-        title: 'A conversation needs you',
-        body: 'The assistant produced an unusable reply',
-        link: `/dashboard/chat?session=${session.id}`,
-      },
-    });
-    return { sessionId: session.id, replyText: null, handoff: true };
-  }
 
   // 10b. Live Inbox alert signal (docs/08 GUARDRAIL_RULES) — sticky until a human
   // acts on it; only ever SET here, never auto-cleared by a calmer follow-up turn,
