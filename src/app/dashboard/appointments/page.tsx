@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { APPOINTMENT_VISIBLE_GRACE_MINUTES } from '@/lib/constants';
+import { MAX_APPOINTMENT_LOOKBACK_MINUTES, isUnfinished } from '@/lib/appointmentWindow';
 import { AppointmentsView } from '@/app/admin/appointments/appointments-view';
 
 /** A single business's own appointments. Same view as the agency page, tenant-scoped. */
@@ -15,15 +15,15 @@ export default async function DashboardAppointmentsPage() {
   if (!activeTenantId) redirect('/dashboard');
 
   const supabase = await createSupabaseServerClient();
-  // eslint-disable-next-line react-hooks/purity -- Server Component render runs once per request; a wall-clock cutoff is the point
-  const visibleFrom = new Date(Date.now() - APPOINTMENT_VISIBLE_GRACE_MINUTES * 60_000).toISOString();
+  const nowDate = new Date();
+  const lookbackIso = new Date(nowDate.getTime() - MAX_APPOINTMENT_LOOKBACK_MINUTES * 60_000).toISOString();
 
-  const [{ data: appointments }, { data: memberTenants }] = await Promise.all([
+  const [{ data: rows }, { data: memberTenants }] = await Promise.all([
     supabase
       .from('appointments')
       .select('*')
       .eq('tenant_id', activeTenantId) // explicit; RLS also enforces
-      .gte('starts_at', visibleFrom)
+      .gte('starts_at', lookbackIso)
       .eq('status', 'booked')
       .order('starts_at', { ascending: true })
       .limit(25),
@@ -36,6 +36,8 @@ export default async function DashboardAppointmentsPage() {
         ctx.memberships.map((m) => m.tenantId),
       ),
   ]);
+
+  const appointments = (rows ?? []).filter((a) => isUnfinished(a, nowDate));
 
   const tenantTimezones = Object.fromEntries((memberTenants ?? []).map((t) => [t.id, t.timezone]));
 

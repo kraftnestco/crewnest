@@ -6,7 +6,7 @@ import * as appointmentService from '@/services/appointments';
 import * as calcom from '@/services/calcom';
 import type { Database } from '@/types/database';
 import type { AppointmentStatus } from '@/types/domain';
-import { APPOINTMENT_VISIBLE_GRACE_MINUTES } from '@/lib/constants';
+import { MAX_APPOINTMENT_LOOKBACK_MINUTES, isUnfinished } from '@/lib/appointmentWindow';
 import { log } from '@/lib/log';
 
 /**
@@ -44,7 +44,11 @@ export async function getAppointmentsPageAction(
   let query = supabase.from('appointments').select('*').limit(PAGE_SIZE);
 
   if (input.upcomingOnly) {
-    query = query.gte('starts_at', new Date(Date.now() - APPOINTMENT_VISIBLE_GRACE_MINUTES * 60_000).toISOString()).order('starts_at', { ascending: true });
+    // Fetch from a generous lookback, then cut precisely below — an
+    // in-progress appointment stays in Upcoming, a finished one does not.
+    query = query
+      .gte('starts_at', new Date(Date.now() - MAX_APPOINTMENT_LOOKBACK_MINUTES * 60_000).toISOString())
+      .order('starts_at', { ascending: true });
     if (input.before) query = query.gt('starts_at', input.before);
   } else {
     query = query.order('starts_at', { ascending: false });
@@ -57,7 +61,11 @@ export async function getAppointmentsPageAction(
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  return { appointments: data ?? [], hasMore: (data ?? []).length === PAGE_SIZE };
+  const rows = data ?? [];
+  const filtered = input.upcomingOnly ? rows.filter((a) => isUnfinished(a)) : rows;
+  // hasMore reflects the PAGE the DB returned, not the filtered count, so
+  // pagination still advances when a page is mostly finished appointments.
+  return { appointments: filtered, hasMore: rows.length === PAGE_SIZE };
 }
 
 async function loadAsAccessCheck(appointmentId: string) {
