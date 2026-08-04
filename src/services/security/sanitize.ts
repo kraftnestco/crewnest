@@ -164,22 +164,27 @@ const TOOL_NAME_RE =
   /\b(check_availability|book_appointment|cancel_appointment|create_order|check_order_status|edit_order|cancel_order|submit_review|flag_image_ambiguous)\b/;
 
 /**
- * True if an assistant reply looks like leaked internal reasoning rather than
- * something to send a customer.
+ * True if an assistant reply is unusable — leaked internal reasoning, or
+ * decoder junk — rather than something to send a customer.
  *
  * Observed live 2026-08-04: a customer received "We need to check availability
- * for tomorrow. Use check_availability with no args<unk><unk><unk>". The model
- * lost the thread, narrated its own plan, and ran to the token ceiling.
+ * for tomorrow. Use check_availability with no args<unk><unk><unk>".
  *
- * Deliberately narrow — it looks for things that have no business in a customer
- * message at all (a tool name, decoder junk), not for style. A false positive
- * costs a reply; a false negative shows a customer the machinery.
+ * SCOPE, narrowed after a false positive on 2026-08-04: an earlier version also
+ * rejected any reply OPENING with "we need to" / "i should" / "let me call".
+ * That suppressed a perfectly good reply and forced a needless handoff — "We
+ * need your name to finish the booking" is ordinary customer-facing English,
+ * and phrasing is far too weak a signal to hang a handoff on. Only two things
+ * are checked now, both of which are unambiguous machinery rather than style:
+ * a literal tool identifier, and `<unk>` decoder artefacts.
+ *
+ * Truncation is deliberately NOT treated as unusable here — a reply cut off at
+ * the token ceiling is usually still readable, and the caller has the token
+ * count if it wants to decide otherwise.
  */
 export function looksLikeLeakedReasoning(text: string): boolean {
   if (TOOL_NAME_RE.test(text)) return true;
   // `<unk>` is a decoder artefact — never legitimate output.
   if (/<unk>/i.test(text)) return true;
-  // Second-person-plural planning aimed at itself, not the customer.
-  if (/^\s*(we need to|i should|let me call|i will call|next,? i)\b/i.test(text)) return true;
   return false;
 }

@@ -136,9 +136,12 @@ describe('looksLikeLeakedReasoning', () => {
     expect(looksLikeLeakedReasoning('Sure, one moment<unk>')).toBe(true);
   });
 
-  it('catches self-directed planning openers', () => {
-    expect(looksLikeLeakedReasoning('I should ask them for the day first.')).toBe(true);
-    expect(looksLikeLeakedReasoning('Let me call the tool.')).toBe(true);
+  it('does NOT reject ordinary replies that merely open with "we need"', () => {
+    // A false positive on 2026-08-04 suppressed a good reply and forced a
+    // handoff. Phrasing is too weak a signal; only real machinery counts.
+    expect(looksLikeLeakedReasoning('We need your name to finish the booking.')).toBe(false);
+    expect(looksLikeLeakedReasoning('I should have that confirmed shortly.')).toBe(false);
+    expect(looksLikeLeakedReasoning('Let me check that for you.')).toBe(false);
   });
 
   it('leaves normal replies alone', () => {
