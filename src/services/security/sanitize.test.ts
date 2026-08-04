@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assistantRequestedHandoff, extractSignal, sanitizeInbound, stripHandoffToken, stripMarkdown, stripSignalTokens } from './sanitize';
+import { assistantRequestedHandoff, extractSignal, looksLikeLeakedReasoning, sanitizeInbound, stripHandoffToken, stripMarkdown, stripSignalTokens } from './sanitize';
 import { HUMAN_HANDOFF_TOKEN, MAX_INBOUND_CHARS, SIGNAL_TOKENS } from '@/lib/constants';
 
 describe('sanitizeInbound', () => {
@@ -117,5 +117,38 @@ describe('stripMarkdown', () => {
 
   it('does not mangle a price or product name', () => {
     expect(stripMarkdown('Merch T-Shirt Small - 1500 PKR - 10 left')).toBe('Merch T-Shirt Small - 1500 PKR - 10 left');
+  });
+});
+
+describe('looksLikeLeakedReasoning', () => {
+  it('catches the exact reply that reached a customer', () => {
+    expect(
+      looksLikeLeakedReasoning('We need to check availability for tomorrow. Use check_availability with no args<unk><unk>'),
+    ).toBe(true);
+  });
+
+  it('catches any tool name mentioned to a customer', () => {
+    expect(looksLikeLeakedReasoning('Let me run create_order for you.')).toBe(true);
+    expect(looksLikeLeakedReasoning('I will call book_appointment now.')).toBe(true);
+  });
+
+  it('catches decoder junk on its own', () => {
+    expect(looksLikeLeakedReasoning('Sure, one moment<unk>')).toBe(true);
+  });
+
+  it('catches self-directed planning openers', () => {
+    expect(looksLikeLeakedReasoning('I should ask them for the day first.')).toBe(true);
+    expect(looksLikeLeakedReasoning('Let me call the tool.')).toBe(true);
+  });
+
+  it('leaves normal replies alone', () => {
+    expect(looksLikeLeakedReasoning('We have availability from Tue 4 Aug to Sat 8 Aug. Which day suits you?')).toBe(false);
+    expect(looksLikeLeakedReasoning('Your order KN-0803-5 is confirmed.')).toBe(false);
+    expect(looksLikeLeakedReasoning('Thursday works — what time would you like?')).toBe(false);
+  });
+
+  it('does not trip on ordinary uses of "we" or "book"', () => {
+    expect(looksLikeLeakedReasoning('We can book you in for 4pm if that works.')).toBe(false);
+    expect(looksLikeLeakedReasoning('We need your name to finish the booking.')).toBe(false);
   });
 });

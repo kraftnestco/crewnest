@@ -21,7 +21,12 @@ export const openRouterProvider: LlmProvider = {
         model: req.model,
         messages: req.messages.map(toOpenAiMessage),
         temperature: req.temperature ?? 0.4,
-        max_tokens: req.maxTokens ?? 800,
+        // 800 -> 400. Measured over 120 real calls: median 169, p95 471. The
+        // only turns that approached 800 were runaway ones where the model lost
+        // the thread and leaked its own reasoning into the customer reply
+        // (observed live 2026-08-04: 'Use check_availability with no args<unk>').
+        // A tighter ceiling bounds that damage without touching normal replies.
+        max_tokens: req.maxTokens ?? 400,
         tools: req.tools?.map((t) => ({
           type: 'function' as const,
           function: { name: t.name, description: t.description, parameters: t.parameters },

@@ -208,18 +208,18 @@ export function resolveDayHint(hint: string, timezone: string | null, now: Date 
   const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const named = DAYS.findIndex((d) => raw.includes(d) || raw.includes(d.slice(0, 3)));
   if (named >= 0) {
-    // "next friday" means the following week's, not this week's.
     const wantNextWeek = /\bnext\b/.test(raw);
     for (let i = 0; i <= 14; i++) {
       const cand = addDays(now, i);
       const dow = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'long' }).format(cand).toLowerCase();
-      if (dow === DAYS[named]) {
-        // i === 0 is today; skip it for a named weekday, since "Thursday" said
-        // on a Thursday almost always means the coming one once today's slots
-        // are largely gone.
-        if (i === 0) continue;
-        return localDate(wantNextWeek ? addDays(cand, 7) : cand);
-      }
+      if (dow !== DAYS[named]) continue;
+      // "Tuesday" said ON a Tuesday means TODAY. An earlier version skipped
+      // i === 0 on the theory that today's slots would be gone — but that sent
+      // a customer saying "tuesday" at 1pm, with slots running to 11:30pm, to
+      // the following Tuesday a week away. Whether today still has capacity is
+      // the slot generator's job (it already applies lead time); resolving the
+      // date must not pre-empt it. Only "next tuesday" skips ahead.
+      return localDate(wantNextWeek ? addDays(cand, 7) : cand);
     }
   }
 

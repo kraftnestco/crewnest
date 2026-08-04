@@ -18,10 +18,15 @@ describe('resolveDayHint', () => {
     expect(resolveDayHint('2026-08-09', KARACHI, NOW)).toBe('2026-08-09');
   });
 
-  it('resolves a named weekday to the NEXT one, not today', () => {
-    // NOW is a Tuesday; "tuesday" should mean next week's, not today's.
-    expect(resolveDayHint('tuesday', KARACHI, NOW)).toBe('2026-08-11');
+  it('resolves a named weekday said TODAY to today, not next week', () => {
+    // NOW is Tuesday 4 Aug. A customer saying "tuesday" at 1pm, when slots run
+    // to 11:30pm, means today — an earlier version sent them to 11 Aug.
+    expect(resolveDayHint('tuesday', KARACHI, NOW)).toBe('2026-08-04');
     expect(resolveDayHint('thursday', KARACHI, NOW)).toBe('2026-08-06');
+  });
+
+  it('"next tuesday" still means the following week', () => {
+    expect(resolveDayHint('next tuesday', KARACHI, NOW)).toBe('2026-08-11');
   });
 
   it('accepts three-letter abbreviations', () => {

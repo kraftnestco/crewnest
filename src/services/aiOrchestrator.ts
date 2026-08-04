@@ -33,6 +33,7 @@ import {
   extractSignal,
   stripSignalTokens,
   stripMarkdown,
+  looksLikeLeakedReasoning,
 } from './security/sanitize';
 import {
   MEMORY_TOKEN_BUDGET,
@@ -713,6 +714,38 @@ async function runTurn(
   // customer as "*KN-0803-5*" on Instagram, which renders none of it. Applied
   // to the STORED text too, so the inbox shows what the customer actually saw.
   const replyText = stripMarkdown(stripSignalTokens(stripHandoffToken(finalText)));
+
+  // 10a. Leaked-reasoning backstop. A weak model can lose the thread and narrate
+  // its own plan at the customer — observed live 2026-08-04:
+  // "We need to check availability for tomorrow. Use check_availability with no
+  // args<unk><unk><unk>". Sending that is worse than sending nothing, and it is
+  // not something a prompt rule can prevent. Hand to a human instead: the
+  // customer's message is already persisted, so staff see the full context.
+  if (looksLikeLeakedReasoning(replyText)) {
+    log.warn('[orchestrator] suppressed leaked reasoning', {
+      tenantId: tenant.id,
+      sessionId: session.id,
+      completionTokens: finalCompletionTokens,
+    });
+    await sessions.setHandoff(session.id, true, 'tool_exhaustion');
+    await notifyBoth({
+      tenantId: tenant.id,
+      type: 'handoff',
+      entityType: 'session',
+      entityId: session.id,
+      agency: {
+        title: 'Handoff needed',
+        body: `${tenant.businessName} — the assistant produced an unusable reply`,
+        link: `/admin/chat?session=${session.id}`,
+      },
+      tenant: {
+        title: 'A conversation needs you',
+        body: 'The assistant produced an unusable reply',
+        link: `/dashboard/chat?session=${session.id}`,
+      },
+    });
+    return { sessionId: session.id, replyText: null, handoff: true };
+  }
 
   // 10b. Live Inbox alert signal (docs/08 GUARDRAIL_RULES) — sticky until a human
   // acts on it; only ever SET here, never auto-cleared by a calmer follow-up turn,
