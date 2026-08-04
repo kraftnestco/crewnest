@@ -102,7 +102,7 @@ export const checkAvailabilityTool: ToolExecutor = {
   def: {
     name: 'check_availability',
     description:
-      'Check appointment availability. Call with NO arguments to find which days are free, then with `day` once the customer picks one, then with `day` and `time` once they name a time. Never list lots of times at the customer — ask which day first, then what time.',
+      'Check appointment availability. Call with NO arguments to find which days are free, then with `day` once the customer picks one, then with BOTH `day` AND `time` once they name a time. IMPORTANT: once a day has been agreed earlier in the conversation, ALWAYS include it as `day` on every later call — sending a time without its day loses the customer progress.',
     parameters: {
       type: 'object',
       properties: {
@@ -122,6 +122,39 @@ export const checkAvailabilityTool: ToolExecutor = {
   async execute(args: unknown, ctx: ToolContext) {
     const { day, time } = args as z.infer<typeof argsSchema>;
     const tz = ctx.tenant.timezone;
+
+    // A time with no day is the model dropping the day it already agreed —
+    // observed live 2026-08-04, where "5pm" after "tuesday" fell through to the
+    // days branch below and restarted the whole conversation. Falling back to
+    // the day the tool itself last offered recovers instead of resetting.
+    // Never guessed silently: the caller is told which day was assumed so it can
+    // say so, and the customer can correct it.
+    if (!day && time) {
+      const upcoming = await appointments.getAvailableSlots(ctx.tenant, 500);
+      if (upcoming.length > 0) {
+        const assumedDay = isoDate(upcoming[0], tz);
+        const assumedLabel = dayLabel(upcoming[0], tz);
+        const wantedMins = parseTimeHint(time);
+        if (wantedMins !== null) {
+          const onThatDay = await appointments.getSlotsForDay(ctx.tenant, assumedDay);
+          const hit = onThatDay.find((sl) => slotMinutes(sl, tz) === wantedMins);
+          if (hit) {
+            return {
+              ok: true,
+              available: true,
+              assumed_day: assumedLabel,
+              starts_at: hit.startsAt.toISOString(),
+              label: hit.label,
+              message: `Assuming they mean ${assumedLabel}. ${hit.label} is free — confirm the DAY as well as the time with the customer, get their name, then call book_appointment with this exact starts_at.`,
+            };
+          }
+        }
+      }
+      return {
+        ok: false,
+        message: `A time was given but not a day. Ask the customer which DAY they mean, then call check_availability again with both day and time.`,
+      };
+    }
 
     // --- Mode 1: no day yet — which days can we offer? ---------------------
     if (!day) {

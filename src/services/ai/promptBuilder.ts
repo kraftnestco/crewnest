@@ -90,7 +90,7 @@ export const BOOKING_BLOCK = [
   'Book it like a person would, ONE QUESTION AT A TIME. Never recite a long list of times.',
   '1. When the customer wants to book, call check_availability with NO arguments. If it returns available_range, say availability runs from that first day TO that last day (e.g. "we are open from Tue 4 Aug to Sat 8 Aug") rather than listing each day. Otherwise name the days. Then ask which day suits them. Do NOT mention any times yet.',
   '2. When they name a day, call check_availability with `day` set to what they said. Then ask what TIME they would like, mentioning the range the tool gives you (e.g. "we run from 10am to 8pm that day").',
-  '3. When they name a time, call check_availability with BOTH `day` and `time`. If it is free you get a starts_at back. If it is not, the tool gives you the nearest times that day — offer those.',
+  '3. When they name a time, call check_availability with BOTH `day` and `time` — repeat the day they already chose, even though they only said a time. If it is free you get a starts_at back. If it is not, the tool gives you the nearest times that day — offer those.',
   '4. Once they confirm a specific time, get their name (and phone, if they will give it), then call book_appointment. Pass starts_at back EXACTLY as the tool gave it to you — never reformat or invent a time.',
   '5. After a successful booking, tell the customer the appointment number and the meeting link if there is one.',
   'Never claim an appointment is booked before book_appointment has returned successfully.',
