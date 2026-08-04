@@ -6,6 +6,7 @@ import * as appointmentService from '@/services/appointments';
 import * as calcom from '@/services/calcom';
 import type { Database } from '@/types/database';
 import type { AppointmentStatus } from '@/types/domain';
+import { APPOINTMENT_VISIBLE_GRACE_MINUTES } from '@/lib/constants';
 import { log } from '@/lib/log';
 
 /**
@@ -43,7 +44,7 @@ export async function getAppointmentsPageAction(
   let query = supabase.from('appointments').select('*').limit(PAGE_SIZE);
 
   if (input.upcomingOnly) {
-    query = query.gte('starts_at', new Date().toISOString()).order('starts_at', { ascending: true });
+    query = query.gte('starts_at', new Date(Date.now() - APPOINTMENT_VISIBLE_GRACE_MINUTES * 60_000).toISOString()).order('starts_at', { ascending: true });
     if (input.before) query = query.gt('starts_at', input.before);
   } else {
     query = query.order('starts_at', { ascending: false });

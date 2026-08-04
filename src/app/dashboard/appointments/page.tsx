@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { APPOINTMENT_VISIBLE_GRACE_MINUTES } from '@/lib/constants';
 import { AppointmentsView } from '@/app/admin/appointments/appointments-view';
 
 /** A single business's own appointments. Same view as the agency page, tenant-scoped. */
@@ -14,13 +15,15 @@ export default async function DashboardAppointmentsPage() {
   if (!activeTenantId) redirect('/dashboard');
 
   const supabase = await createSupabaseServerClient();
+  // eslint-disable-next-line react-hooks/purity -- Server Component render runs once per request; a wall-clock cutoff is the point
+  const visibleFrom = new Date(Date.now() - APPOINTMENT_VISIBLE_GRACE_MINUTES * 60_000).toISOString();
 
   const [{ data: appointments }, { data: memberTenants }] = await Promise.all([
     supabase
       .from('appointments')
       .select('*')
       .eq('tenant_id', activeTenantId) // explicit; RLS also enforces
-      .gte('starts_at', new Date().toISOString())
+      .gte('starts_at', visibleFrom)
       .eq('status', 'booked')
       .order('starts_at', { ascending: true })
       .limit(25),

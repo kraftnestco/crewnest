@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { APPOINTMENT_VISIBLE_GRACE_MINUTES } from '@/lib/constants';
 import { AppointmentsView } from './appointments-view';
 
 /** Agency-wide appointments (docs/24 §5). RLS scopes the rows; the client filter narrows within them. */
@@ -9,6 +10,8 @@ export default async function AdminAppointmentsPage({
 }) {
   const { tenant: tenantParam } = await searchParams;
   const supabase = await createSupabaseServerClient();
+  // eslint-disable-next-line react-hooks/purity -- Server Component render runs once per request; a wall-clock cutoff is the point
+  const visibleFrom = new Date(Date.now() - APPOINTMENT_VISIBLE_GRACE_MINUTES * 60_000).toISOString();
 
   const { data: tenants } = await supabase.from('tenants').select('id, business_name, timezone');
 
@@ -19,7 +22,7 @@ export default async function AdminAppointmentsPage({
   let query = supabase
     .from('appointments')
     .select('*')
-    .gte('starts_at', new Date().toISOString())
+    .gte('starts_at', visibleFrom)
     .eq('status', 'booked')
     .order('starts_at', { ascending: true })
     .limit(25);

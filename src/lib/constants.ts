@@ -298,3 +298,17 @@ export const COMMON_TIMEZONES = [
   'America/New_York',
   'America/Los_Angeles',
 ] as const;
+
+/**
+ * How far back "upcoming" reaches, in minutes.
+ *
+ * The filter is `starts_at >= now - APPOINTMENT_VISIBLE_GRACE_MINUTES`, not
+ * `starts_at >= now`. With the latter an appointment disappeared from the
+ * dashboard the instant it began (observed live 2026-08-04: a 4:30pm booking
+ * was invisible at 4:38pm), which is exactly when staff want it visible.
+ *
+ * Set above the longest plausible appointment so an in-progress one always
+ * shows, plus a little slack so a just-finished one lingers rather than
+ * blinking out mid-glance.
+ */
+export const APPOINTMENT_VISIBLE_GRACE_MINUTES = 240;
