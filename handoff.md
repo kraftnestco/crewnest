@@ -99,7 +99,11 @@ Stripe account (§4d); Phase 3 **Stage P** is done and deployed (§4e).
   **Lesson:** a polling interval far larger than a feature's internal timing window makes that feature
   unreachable in practice while every unit test still passes. Both halves worked; the cadence between
   them didn't.
-- **Appointment booking (docs/24) — ✅ built, `0042` applied, ⚠️ NOT yet tested end to end in chat.**
+- **Appointment booking (docs/24) — ✅ built, `0042` applied, ✅ VERIFIED END TO END 2026-08-04.**
+  A real Instagram conversation booked appointment `#4` with a live Google Meet link
+  (`calcom_booking_uid` stored), which also confirms the `CALCOM_*` vars are correctly set in Vercel.
+  The flow is day-first: "which day?" → "what time?" → check that time → book.
+  Getting there took five separate fixes; §3.2 records them because most were not in the booking code.
   Service tenants with `booking_enabled` get three tools (`check_availability`, `book_appointment`,
   `cancel_appointment`), real slots computed from their own hours/closures/timezone, and dashboards at
   `/admin/appointments` + `/dashboard/appointments` with the per-client filter.
@@ -107,8 +111,8 @@ Stripe account (§4d); Phase 3 **Stage P** is done and deployed (§4e).
   no home of their own (docs/24 §1.1 explains why Cal.com must NOT own availability: one CrewNest-owned
   Cal.com account means shared availability, so two tenants would collide on the same hour).
   Verified live: the Cal.com API round trip (slots → book → Meet URL → cancel), the double-booking guard
-  (a second booking of the same slot returns null, not an error), and that cancelling frees the slot.
-  Not verified: an actual booking conversation with a customer.
+  (a second booking of the same slot returns null, not an error), that cancelling frees the slot, and now
+  a complete customer booking conversation.
 - **Customer-facing order references (`KN-0803-5`)** — business initials + MMDD + the per-tenant
   sequential number, replacing both the raw uuid and the bare `#5`. In `lib/orderRef`, used by all four
   order tools, the review prompt, and the six admin-triggered messages, so the reference is identical
@@ -117,6 +121,38 @@ Stripe account (§4d); Phase 3 **Stage P** is done and deployed (§4e).
   The prompt already forbade markdown explicitly and the model did it anyway; Meta renders none of it,
   so customers saw literal `**` and raw table pipes.
 - **UI polish (recent):** logo/wordmark font (Baloo 2), topbar headings, inbox layout, hero anti-jank.
+
+### 3.2 What it took to make booking actually work (2026-08-04)
+
+Booking was "done" on 2026-08-03 and still failed for a full day. Five faults, only one of which was in
+the booking code. Recorded because the same shapes will recur.
+
+1. **The prompt was explicitly telling the AI it could not book.** `buildBookingRule` runs whenever no
+   external `bookingLink` is set and instructs the model that the business "has no way to actually
+   schedule a call", with a GOOD example reading *"We don't have online call booking set up yet"* — which
+   is almost verbatim what customers received. The model was obeying an instruction, not ignoring one.
+   Now skipped when real booking is on.
+2. **Booking guidance was gated on `ordersEnabled`.** It lived inside `buildServiceFlowBlock`, which only
+   renders for order-taking tenants. A service business that takes bookings but not orders got the tools
+   and no instructions. Booking has its own block now.
+3. **`resolveDayHint` sent "tuesday" said ON a Tuesday to next week.** Whether today still has capacity is
+   the slot generator's job (it applies lead time); date resolution must not pre-empt it.
+4. **A time with no day silently restarted the conversation.** Both tool args are optional, so `{time}`
+   without `{day}` fell through to the "which day?" branch. The tool now recovers by assuming the soonest
+   available day and saying so.
+5. **The leaked-reasoning guard ended conversations instead of retrying.** The model does sometimes ramble
+   to the token ceiling and write a literal tool name at the customer — blocking that is right — but the
+   check ran AFTER the tool loop and handed off permanently. One bad generation muted the AI for the whole
+   conversation. It now runs inside the loop, discards the bad generation, and retries;
+   `MAX_TOOL_ROUNDS` went 3 → 5 because retries and tool calls share that budget.
+
+**The method lesson, which cost most of the time:** every component passed in isolation — the database
+row, the gate expression, the tool registry, the model given the real prompt and tools. Each isolated
+test succeeded, so the search kept moving down the stack. The fault was never in a component; it was in
+what they composed into. **Two things ended it, both quickly: printing the assembled prompt, and reading
+the Vercel runtime log.** When the running system disagrees with every isolated test, reach for those
+first — not fifth. `usage_logs` is the cheapest first look: `completion_tokens` at the ceiling (400) means
+a runaway generation, and one LLM call where a working turn shows two means the tool was never reached.
 
 ### 3.1 Two findings from live testing that outlive their fixes
 
@@ -359,7 +395,8 @@ Resend domain. **Do 4b before QA (4g)** — most "bugs" at this stage are missin
   allow/deny, take-over mutes AI, signup→free-tenant→hit caps→notify. **Run these against a real
   configured environment (4b), ideally on a preview deploy, not by creating junk in prod.**
 - **Unverified-on-live-traffic features** (built + DB applied, acceptance criteria written but never
-  exercised against real users): ~~message batching~~ (✅ verified live 2026-08-03) and **web push**
+  exercised against real users): ~~message batching~~ (✅ 2026-08-03), ~~appointment booking~~
+  (✅ 2026-08-04) and **web push**
   (docs/21 → §5.1 B4). Both are blocked on the same thing: a real deployment plus a live Meta channel.
 
 ---
@@ -590,22 +627,21 @@ while leaving `git push` and CI working — full write-up in §5 item 2. Disrega
    not yet connected on any tenant (`whatsapp_phone_number_id` is null everywhere).
 6. **Poison-message + crash-recovery criteria** (docs/15 §8) remain unchecked — they need artificially
    induced failures (kill the worker mid-turn; a message engineered to always throw), not real traffic.
-7. **Test appointment booking end to end** (docs/24 §8 — every acceptance criterion is written, NONE
-   exercised in a real conversation). The parts are verified individually: the Cal.com round trip, the
-   double-booking guard, and slot computation against the live tenant's config (8 slots, correct Karachi
-   times, lead time respected). What has never run is a customer actually booking in chat.
-   **Setup that is easy to get wrong** — all of it lives in the client's intake page
-   (`/admin/clients/<id>/intake`), NOT the edit dialog:
-   - `business_type` must be **service**. Switching a tenant to product silently disables booking, since
-     the tools are gated on it.
-   - Booking toggle on, and a meeting mode chosen.
-   - **Business hours and timezone must both be set.** Without them the AI truthfully reports no
-     availability and nothing looks broken — the intake form now warns about exactly this, because the
-     live tenant had seven day-rows with empty open/close times and a null timezone.
-   Then message the channel: "can I book a call?" → expect real times offered → pick one → expect a
-   confirmation with a reference and a Meet link. Check `/admin/appointments` shows it.
-   **Note appointments still use a bare `#N`**, not the `KN-0803-5` format orders got — `lib/orderRef` is
-   already shared, so wiring it into the two appointment tools is a small follow-up if consistency matters.
+- ~~7. Test appointment booking end to end~~ — **DONE 2026-08-04.** A real Instagram conversation booked
+  appointment `#4` with a live Google Meet link. Also confirms the `CALCOM_*` vars are set in Vercel.
+  **Setup, for the next tenant** (all in `/admin/clients/<id>/intake`, NOT the edit dialog):
+  `business_type` must be **service** (the tools are gated on it, so switching to product silently
+  disables booking), the booking toggle on with a meeting mode, and **business hours AND timezone both
+  set** — without them the AI truthfully reports no availability and nothing looks broken. The intake
+  form now warns about exactly that.
+
+**B-remaining, still open:**
+8. **Appointments still show a bare `#N`**, not the `KN-0803-5` format orders use. `lib/orderRef` is
+   already shared, so wiring it into the two appointment tools is a small follow-up.
+9. **Cancel and reschedule have never been exercised in a real conversation.** Booking has; the other two
+   paths are code-complete and untested against a customer.
+10. **A fully-booked day, and a taken time slot**, are both unexercised. The code returns alternatives in
+    each case (`alternative_days`, `nearest_times`) but no customer has hit either.
 
 **C. Independent of both (can happen anytime, own timeline):**
 - Create a Stripe account (test mode is enough to start) + create the Starter ($29/mo) / Pro ($79/mo)
