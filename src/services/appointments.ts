@@ -174,3 +174,70 @@ export async function listUpcomingForSession(sessionId: string, limit = 5): Prom
   if (error) throw error;
   return (data ?? []).map(mapAppointment);
 }
+
+/**
+ * Resolve a customer's plain-language day ("thursday", "tomorrow", "4 Aug",
+ * "2026-08-07") to a tenant-local calendar date, or null if it can't be read
+ * confidently.
+ *
+ * Deliberately narrow: a wrong guess books someone on the wrong day, which is
+ * far worse than asking them to say it again. Anything ambiguous returns null
+ * and the tool asks the customer to clarify.
+ */
+export function resolveDayHint(hint: string, timezone: string | null, now: Date = new Date()): string | null {
+  const tz = timezone || 'UTC';
+  const raw = hint.trim().toLowerCase();
+  if (!raw) return null;
+
+  const localDate = (d: Date): string => {
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(d);
+    const g = (t: string) => p.find((x) => x.type === t)?.value ?? '';
+    return `${g('year')}-${g('month')}-${g('day')}`;
+  };
+  const addDays = (d: Date, n: number) => new Date(d.getTime() + n * 86_400_000);
+
+  // Explicit ISO date wins outright.
+  const iso = raw.match(/^(\d{4}-\d{2}-\d{2})$/);
+  if (iso) return iso[1];
+
+  if (/\btoday\b|\btonight\b/.test(raw)) return localDate(now);
+  if (/\btomorrow\b|\btmrw\b|\bkal\b/.test(raw)) return localDate(addDays(now, 1));
+  if (/day after tomorrow/.test(raw)) return localDate(addDays(now, 2));
+
+  const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const named = DAYS.findIndex((d) => raw.includes(d) || raw.includes(d.slice(0, 3)));
+  if (named >= 0) {
+    // "next friday" means the following week's, not this week's.
+    const wantNextWeek = /\bnext\b/.test(raw);
+    for (let i = 0; i <= 14; i++) {
+      const cand = addDays(now, i);
+      const dow = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'long' }).format(cand).toLowerCase();
+      if (dow === DAYS[named]) {
+        // i === 0 is today; skip it for a named weekday, since "Thursday" said
+        // on a Thursday almost always means the coming one once today's slots
+        // are largely gone.
+        if (i === 0) continue;
+        return localDate(wantNextWeek ? addDays(cand, 7) : cand);
+      }
+    }
+  }
+
+  return null;
+}
+
+/** Every bookable slot on ONE tenant-local calendar date (YYYY-MM-DD). */
+export async function getSlotsForDay(tenant: Tenant, day: string): Promise<Slot[]> {
+  if (!tenant.bookingEnabled) return [];
+  // Ask for a wide window, then keep only the requested day. The slot generator
+  // already handles hours, closures, lead time and existing bookings; filtering
+  // its output keeps one source of truth for what "available" means.
+  const slots = await getAvailableSlots(tenant, 500, new Date());
+  const tz = tenant.timezone || 'UTC';
+  return slots.filter((s) => {
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(s.startsAt);
+    const g = (t: string) => p.find((x) => x.type === t)?.value ?? '';
+    return `${g('year')}-${g('month')}-${g('day')}` === day;
+  });
+}
