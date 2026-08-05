@@ -113,6 +113,10 @@ Stripe account (§4d); Phase 3 **Stage P** is done and deployed (§4e).
   Verified live: the Cal.com API round trip (slots → book → Meet URL → cancel), the double-booking guard
   (a second booking of the same slot returns null, not an error), that cancelling frees the slot, and now
   a complete customer booking conversation.
+  **"Upcoming" means NOT FINISHED, and that lives in `lib/appointmentWindow.ts`, not the database** —
+  see §3.2 fault 6. Both appointment pages and `getAppointmentsPageAction` query from a bounded
+  `MAX_APPOINTMENT_LOOKBACK_MINUTES` (480) lookback and then filter with `isUnfinished()`; don't
+  reintroduce a `starts_at >= now` filter, and don't try to add a generated `ends_at` column.
 - **Customer-facing order references (`KN-0803-5`)** — business initials + MMDD + the per-tenant
   sequential number, replacing both the raw uuid and the bare `#5`. In `lib/orderRef`, used by all four
   order tools, the review prompt, and the six admin-triggered messages, so the reference is identical
@@ -145,6 +149,17 @@ the booking code. Recorded because the same shapes will recur.
    check ran AFTER the tool loop and handed off permanently. One bad generation muted the AI for the whole
    conversation. It now runs inside the loop, discards the bad generation, and retries;
    `MAX_TOOL_ROUNDS` went 3 → 5 because retries and tool calls share that budget.
+6. **A booking confirmed in chat never appeared on the appointments pages.** The queries filtered
+   `starts_at >= now`, so an appointment vanished from "Upcoming" the moment it started — the exact
+   window in which staff most need to see it. Two fixes were wrong before the third was right:
+   a bare `starts_at >= now` (drops a 4:30pm booking at 4:30pm) and then a blanket lookback (still
+   listed it at 6:15pm, long after it ended). The correct rule is `starts_at + duration > now`.
+   **A generated `ends_at` column is the obvious way to express that and Postgres refuses it** —
+   `42P17`, the interval expression is not immutable; `make_interval` and interval multiplication were
+   both rejected. Migration `0044` was written, failed, and was deleted. The rule now lives in
+   `lib/appointmentWindow.ts` (`isUnfinished`, `MAX_APPOINTMENT_LOOKBACK_MINUTES`), applied by both
+   pages and the paginated action, with both wrong versions pinned as named boundary tests.
+   The DB query keeps a generous lookback purely so the exact cut has rows to work on.
 
 **The method lesson, which cost most of the time:** every component passed in isolation — the database
 row, the gate expression, the tool registry, the model given the real prompt and tools. Each isolated
