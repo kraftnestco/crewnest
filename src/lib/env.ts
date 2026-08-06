@@ -54,7 +54,30 @@ const schema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_PRICE_STARTER: z.string().optional(),
+  /** Growth ($49) — added alongside the tier; unset ⇒ Growth checkout refuses loudly, like the others. */
+  STRIPE_PRICE_GROWTH: z.string().optional(),
   STRIPE_PRICE_PRO: z.string().optional(),
+  // Optional — Safepay billing for Pakistani tenants (docs/25). Same posture as
+  // Stripe above: unset ⇒ checkout/portal refuse loudly rather than no-op.
+  SAFEPAY_SECRET_KEY: z.string().optional(),
+  SAFEPAY_WEBHOOK_SECRET: z.string().optional(),
+  SAFEPAY_PLAN_STARTER: z.string().optional(),
+  /** Growth ($49) — see STRIPE_PRICE_GROWTH. */
+  SAFEPAY_PLAN_GROWTH: z.string().optional(),
+  SAFEPAY_PLAN_PRO: z.string().optional(),
+  /** 'production' | 'sandbox' — Safepay's API host. Defaults to sandbox so a
+   *  half-configured deploy can never take real money by accident. */
+  SAFEPAY_ENVIRONMENT: z.enum(['production', 'sandbox']).default('sandbox'),
+  /**
+   * USD→PKR rate used to convert PAYWALL_PLANS' USD prices at checkout time.
+   *
+   * Deliberately an env var, not a live FX API call: a rate-feed outage must
+   * never block a tenant from subscribing, and a checkout amount must be
+   * reproducible when reconciling a charge later. Safepay bills a FIXED
+   * recurring amount, so this rate is locked per subscription at subscribe
+   * time — see docs/25 §3.2 for what that means and how to reprice.
+   */
+  SAFEPAY_USD_TO_PKR: z.coerce.number().positive().default(278),
 });
 
 const parsed = schema.safeParse(process.env);

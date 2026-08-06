@@ -63,6 +63,12 @@ function mapTenant(row: TenantRow): Tenant {
     messageRetentionDays: row.message_retention_days,
     stripeCustomerId: row.stripe_customer_id,
     stripeSubscriptionId: row.stripe_subscription_id,
+    billingProvider: (row.billing_provider === 'safepay' ? 'safepay' : 'stripe'),
+    billingCountry: row.billing_country,
+    safepayCustomerId: row.safepay_customer_id,
+    safepaySubscriptionId: row.safepay_subscription_id,
+    safepayAmountMinor: row.safepay_amount_minor,
+    safepayCurrency: row.safepay_currency,
   };
 }
 

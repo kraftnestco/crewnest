@@ -233,6 +233,29 @@ export async function countRecentAttachments(sessionId: string, windowMinutes: n
 }
 
 /**
+ * How many CUSTOMER messages this conversation has had, ever.
+ *
+ * Backs the per-plan conversation-length limit (lib/entitlements.ts —
+ * "mid-sized conversations only" on the free plan). Counts `role='user'` rows
+ * only: the assistant's own replies must not consume the customer's budget, or
+ * a verbose AI would silently shorten how much the customer is allowed to say.
+ *
+ * Not time-windowed — the limit is per CONVERSATION, and a session that has
+ * already run long stays long however slowly it got there.
+ */
+export async function countUserMessages(sessionId: string): Promise<number> {
+  const client = createServiceClient();
+  const { count, error } = await client
+    .from('chat_messages')
+    .select('*', { count: 'exact', head: true })
+    .eq('session_id', sessionId)
+    .eq('role', 'user');
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
  * Storage path of the most recent image attachment in this session within the window,
  * or null. Backs cross-turn image memory (mediaIntake.getRecentImageUrl): images ride
  * only the turn they arrive on, so a later "the picture I sent you" needs the prior

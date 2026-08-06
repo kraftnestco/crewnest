@@ -6,12 +6,11 @@ import { Button } from '@/components/ui/button';
 import { provisionTenantAction } from '../provision-actions';
 import { createCheckoutSessionAction } from '@/app/dashboard/billing/actions';
 import { DEMO_HANDOFF_KEY, type DemoHandoff } from '@/services/demo/handoff';
+// Shared allow-list (lib/entitlements.ts) rather than a local copy — a private
+// duplicate here silently skipped checkout for any newly added paid tier.
+import { isPaidPlanId } from '@/lib/entitlements';
 
 type Status = 'provisioning' | 'done_pending_upgrade' | 'nothing_to_provision' | 'error';
-
-function isPaidPlanId(id: string): id is 'starter' | 'pro' {
-  return id === 'starter' || id === 'pro';
-}
 
 /**
  * Lands here after either typed-code verify or the Google OAuth round trip

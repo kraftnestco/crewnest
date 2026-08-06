@@ -2,7 +2,8 @@ import { type NextRequest } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import type Stripe from 'stripe';
 import { env } from '@/lib/env';
-import { getStripeClientForWebhook } from '@/services/stripe';
+import { getStripeClientForWebhook, planForPriceId } from '@/services/stripe';
+import { isPaidPlanId, planDisplayName, planRank } from '@/lib/entitlements';
 import { createServiceClient } from '@/lib/supabase/service';
 import { notifyBoth, notify } from '@/services/notifications';
 import { log } from '@/lib/log';
@@ -94,7 +95,10 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
   const tenantId = session.client_reference_id ?? session.metadata?.tenant_id;
   const planId = session.metadata?.plan_id;
-  if (!tenantId || (planId !== 'starter' && planId !== 'pro')) {
+  // Validated against the PAID plan allow-list — a hardcoded two-id check here
+  // silently refused to upgrade anyone on a newly added tier, i.e. they paid and
+  // stayed on their old plan.
+  if (!tenantId || !planId || !isPaidPlanId(planId)) {
     log.error('[stripe webhook] checkout.session.completed missing tenant_id/plan_id', {
       sessionId: session.id,
     });
@@ -115,12 +119,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
     tenantId,
     type: 'upgrade_request',
     agency: {
-      title: `${tenant?.business_name ?? 'A client'} is now on ${planId}`,
+      title: `${tenant?.business_name ?? 'A client'} is now on ${planDisplayName(planId)}`,
       body: 'Payment confirmed via Stripe.',
       link: `/admin/clients/${tenantId}`,
     },
     tenant: {
-      title: `You're now on ${planId === 'starter' ? 'Starter' : 'Pro'}`,
+      title: `You're now on ${planDisplayName(planId)}`,
       body: 'Thanks for upgrading — your new plan is active now.',
       link: '/dashboard/billing',
     },
@@ -163,8 +167,22 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
   });
 }
 
-/** docs/22 §2.4 — the subscription moved to a non-active status short of full deletion (Stripe's own Smart Retries dunning in progress). Flags plan_status without changing plan, so the tenant keeps their tier while the card issue is being resolved. */
+/**
+ * docs/22 §2.4 + docs/26 §4 — `customer.subscription.updated` carries TWO
+ * distinct things we care about:
+ *
+ *   1. A TIER CHANGE made through the Customer Portal (handled first, below).
+ *      The portal lets a tenant switch plans without ever touching our checkout,
+ *      so this webhook is the ONLY signal. Ignoring it meant an upgrade charged
+ *      the new amount while `tenants.plan` kept the old tier — and a downgrade
+ *      left the tenant over-entitled. Invisible with two plans; a real path with
+ *      four.
+ *   2. Dunning (`past_due`/`unpaid`) — flags plan_status WITHOUT changing plan,
+ *      so the tenant keeps their tier while the card issue is resolved.
+ */
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Promise<void> {
+  await syncPlanFromSubscription(subscription);
+
   if (subscription.status !== 'past_due' && subscription.status !== 'unpaid') return;
 
   const svc = createServiceClient();
@@ -186,5 +204,63 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Pro
     title: 'Payment failed',
     body: "We couldn't charge your card. Please update your payment method to keep your plan active.",
     link: '/dashboard/billing',
+  });
+}
+
+/**
+ * docs/26 §4 — reconcile `tenants.plan` with the tier the subscription is
+ * ACTUALLY priced at, for changes made outside our checkout (the Customer
+ * Portal's plan switcher).
+ *
+ * Deliberately quiet when nothing changed: `customer.subscription.updated`
+ * fires for many reasons (renewals, card updates, dunning), and only a genuine
+ * tier change should write or notify.
+ *
+ * An unrecognised price is left ALONE rather than downgraded — a Price created
+ * by hand in the Stripe dashboard must never silently strip a paying tenant's
+ * plan. It's logged so the mismatch is visible.
+ */
+async function syncPlanFromSubscription(subscription: Stripe.Subscription): Promise<void> {
+  const priceId = subscription.items?.data?.[0]?.price?.id ?? null;
+  const newPlan = planForPriceId(priceId);
+  if (!newPlan) {
+    if (priceId) {
+      log.warn('[stripe webhook] subscription price does not map to a known plan', {
+        subscriptionId: subscription.id,
+        priceId,
+      });
+    }
+    return;
+  }
+
+  const svc = createServiceClient();
+  const { data: tenant, error: lookupError } = await svc
+    .from('tenants')
+    .select('id, business_name, plan')
+    .eq('stripe_subscription_id', subscription.id)
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+  if (!tenant || tenant.plan === newPlan) return; // no tier change — nothing to do
+
+  const previousPlan = tenant.plan;
+  const { error } = await svc.from('tenants').update({ plan: newPlan }).eq('id', tenant.id);
+  if (error) throw error;
+
+  const upgraded = planRank(newPlan) > planRank(previousPlan);
+  await notifyBoth({
+    tenantId: tenant.id,
+    type: 'upgrade_request',
+    agency: {
+      title: `${tenant.business_name} moved to ${planDisplayName(newPlan)}`,
+      body: `Changed from ${planDisplayName(previousPlan)} via the Stripe customer portal.`,
+      link: `/admin/clients/${tenant.id}`,
+    },
+    tenant: {
+      title: `You're now on ${planDisplayName(newPlan)}`,
+      body: upgraded
+        ? 'Your new plan is active — enjoy the higher limits.'
+        : `Your plan changed from ${planDisplayName(previousPlan)}. Your new limits apply right away.`,
+      link: '/dashboard/billing',
+    },
   });
 }

@@ -6,7 +6,8 @@ import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getTenantNeedsAttention } from '@/services/overview';
 import { countSessionsToday } from '@/services/sessions';
-import { FREE_PLAN_DAILY_SESSION_CAP } from '@/lib/constants';
+import { entitlementsFor, isLimited } from '@/lib/entitlements';
+import { PAYWALL_PLANS } from '@/services/demo/plans';
 import { PageHeader } from '@/components/page-header';
 import { EmptyState } from '@/components/empty-state';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -88,8 +89,17 @@ export default async function DashboardHomePage() {
   const ratings = (ratingRows ?? []).map((r) => r.review_rating).filter((r): r is number => r !== null);
   const avgRating = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : null;
 
-  const isFreePlan = tenant?.plan === 'free';
-  const freeQuotaRemaining = Math.max(0, FREE_PLAN_DAILY_SESSION_CAP - conversationsToday);
+  // Plan entitlements drive both the quota banner and whether the Copilot shows
+  // (lib/entitlements.ts is the single source of truth — see its header note on
+  // why marketing copy and enforcement must not live in separate places).
+  const entitlements = entitlementsFor(tenant?.plan);
+  const hasCopilot = entitlements.hasCopilot;
+  const dailyCap = entitlements.dailyConversations;
+  // The daily cap now applies to Starter/Growth too, not just free — so the
+  // banner is shown for any LIMITED plan rather than keyed off plan === 'free'.
+  const showQuotaBanner = isLimited(dailyCap);
+  const quotaRemaining = Math.max(0, dailyCap - conversationsToday);
+  const planLabel = PAYWALL_PLANS.find((p) => p.id === tenant?.plan)?.name ?? 'Free';
 
   const channelConnected: Record<string, boolean> = {
     whatsapp: Boolean(tenant?.whatsapp_phone_number_id),
@@ -132,24 +142,45 @@ export default async function DashboardHomePage() {
         description="Here's what's happening with your AI assistant."
       />
 
-      {isFreePlan && (
+      {showQuotaBanner && (
         <div
           className={`rounded-xl p-4 text-sm ring-1 ${
-            freeQuotaRemaining === 0
+            quotaRemaining === 0
               ? 'bg-destructive/10 text-destructive ring-destructive/20'
               : 'bg-card ring-foreground/10'
           }`}
         >
-          <span className="font-medium">Free plan:</span>{' '}
-          {freeQuotaRemaining === 0
+          <span className="font-medium">{planLabel} plan:</span>{' '}
+          {quotaRemaining === 0
             ? "You've used all of today's new-conversation slots. New customers won't get a reply until tomorrow."
-            : `${freeQuotaRemaining} of ${FREE_PLAN_DAILY_SESSION_CAP} new conversations left today.`}
+            : `${quotaRemaining} of ${dailyCap} new conversations left today.`}{' '}
+          <Link href="/dashboard/billing" className="underline underline-offset-2">
+            {quotaRemaining === 0 ? 'Upgrade for more' : 'See plans'}
+          </Link>
         </div>
       )}
 
-      {canEditBusiness ? (
-        // Owners get the copilot as the home surface — needs-attention/activity
-        // stats live inside it as an overview instead of as separate cards.
+      {/* Owners below Growth see what the AI assistant is, rather than nothing
+          where the Copilot would be — the upgrade path is the point of the tier. */}
+      {canEditBusiness && !hasCopilot && (
+        <div className="rounded-xl bg-card p-4 text-sm ring-1 ring-foreground/10">
+          <p className="font-medium">Get your own AI assistant</p>
+          <p className="mt-1 text-muted-foreground">
+            On Growth, CrewAI helps you run {tenant?.business_name ?? 'your business'} — update your
+            catalogue, hours, and prices just by describing the change.
+          </p>
+          <Link
+            href="/dashboard/billing"
+            className="mt-2 inline-block text-primary underline underline-offset-2"
+          >
+            See plans
+          </Link>
+        </div>
+      )}
+
+      {canEditBusiness && hasCopilot ? (
+        // Owners on Growth+ get the copilot as the home surface — needs-attention/
+        // activity stats live inside it as an overview instead of as separate cards.
         <BusinessCopilot tenantId={activeTenantId} businessName={tenant?.business_name ?? 'your business'} overview={overview} />
       ) : !hasActivity ? (
         // Staff (tenant_agent) can't edit the business, so they keep the plain

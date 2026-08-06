@@ -35,10 +35,10 @@ import {
   stripMarkdown,
   looksLikeLeakedReasoning,
 } from './security/sanitize';
+import { entitlementsFor, isLimited } from '@/lib/entitlements';
 import {
   MEMORY_TOKEN_BUDGET,
   MAX_TOOL_ROUNDS,
-  FREE_PLAN_DAILY_SESSION_CAP,
   DEFAULT_FREE_MONTHLY_CAP_USD,
   RECENT_IMAGE_REATTACH_WINDOW_MINUTES,
   BATCH_GRACE_MS,
@@ -58,9 +58,26 @@ export interface OrchestratorResult {
   handoff: boolean;
 }
 
-/** Shown to the customer, and returned to the web widget, when Phase D's free-plan cap blocks a NEW conversation. */
-const FREE_PLAN_LIMIT_REACHED_TEXT =
-  "Thanks for reaching out! We've reached today's conversation limit on our free plan — please try again tomorrow, or the business will get back to you soon.";
+/**
+ * Shown to the customer, and returned to the web widget, when the plan's DAILY
+ * new-conversation cap blocks a NEW conversation.
+ *
+ * Deliberately says "conversation limit" and not "free plan": the cap now
+ * applies to Starter and Growth as well (lib/entitlements.ts), and telling a
+ * paying customer's customer that the business is on a free plan would be both
+ * wrong and embarrassing.
+ */
+const DAILY_CONVERSATION_LIMIT_REACHED_TEXT =
+  "Thanks for reaching out! We've reached today's conversation limit — please try again tomorrow, or the business will get back to you soon.";
+
+/**
+ * Shown when a conversation exceeds the plan's per-conversation message budget
+ * (free plan: "mid-sized conversations only"). The AI stops replying and the
+ * conversation is handed to a human, so the customer is never left with no path
+ * forward — see step 3b.
+ */
+const CONVERSATION_LENGTH_LIMIT_TEXT =
+  "Thanks for all the detail! I'm passing you to someone from the team who can take it from here.";
 
 /** Shown when a free-plan, non-BYOK tenant crosses its MONTHLY cost ceiling mid-conversation (docs/18 §3, Stage U-cap). */
 const FREE_PLAN_MONTHLY_CAP_REACHED_TEXT =
@@ -101,14 +118,16 @@ export async function handleInboundMessage(
     return null;
   }
 
-  // 2. Session (one per customer per channel). Free-plan tenants cap NEW
-  // conversations/day (docs: self-serve signup plan, Phase D); existing
-  // sessions are unaffected — see sessions.findOrCreate's doc comment.
+  // 2. Session (one per customer per channel). The plan's daily NEW-conversation
+  // cap applies here (lib/entitlements.ts — free/starter 5, growth 20, pro
+  // unlimited); existing sessions are unaffected, since they were counted on the
+  // day they were created — see sessions.findOrCreate's doc comment.
+  const entitlements = entitlementsFor(tenant.plan);
   const sessionOrCap = await sessions.findOrCreate(
     tenant.id,
     input.platform,
     input.externalUserId,
-    tenant.plan === 'free' ? FREE_PLAN_DAILY_SESSION_CAP : undefined,
+    isLimited(entitlements.dailyConversations) ? entitlements.dailyConversations : undefined,
     input.customerName,
   );
 
@@ -118,11 +137,11 @@ export async function handleInboundMessage(
         tenant,
         platform: input.platform,
         to: input.externalUserId,
-        text: FREE_PLAN_LIMIT_REACHED_TEXT,
+        text: DAILY_CONVERSATION_LIMIT_REACHED_TEXT,
       });
       return { sessionId: null, replyText: null, handoff: false };
     }
-    return { sessionId: null, replyText: FREE_PLAN_LIMIT_REACHED_TEXT, handoff: false };
+    return { sessionId: null, replyText: DAILY_CONVERSATION_LIMIT_REACHED_TEXT, handoff: false };
   }
   const session = sessionOrCap;
 
@@ -200,6 +219,56 @@ export async function handleInboundMessage(
     attachments: media.attachments,
     bumpEpoch: true,
   });
+
+  // 5a. Per-plan conversation-LENGTH limit (lib/entitlements.ts — free plan is
+  // "mid-sized conversations only"). Checked AFTER the persist above, so the
+  // customer's message is already saved and visible in the inbox no matter what
+  // happens here: the limit stops the AI from replying, it never drops input.
+  //
+  // Handing off (rather than just refusing) is deliberate — the customer always
+  // keeps a path to a human, and the owner sees the conversation waiting rather
+  // than a silently dead thread.
+  if (isLimited(entitlements.maxMessagesPerConversation)) {
+    const userMessageCount = await messages.countUserMessages(session.id);
+    if (userMessageCount > entitlements.maxMessagesPerConversation) {
+      await sessions.setHandoff(session.id, true, 'length_limit');
+      await messages.persist({
+        sessionId: session.id,
+        tenantId: tenant.id,
+        role: 'assistant',
+        content: CONVERSATION_LENGTH_LIMIT_TEXT,
+      });
+      if (input.platform !== 'web') {
+        await sendText({
+          tenant,
+          platform: input.platform,
+          to: input.externalUserId,
+          text: CONVERSATION_LENGTH_LIMIT_TEXT,
+        });
+      }
+      await notifyBoth({
+        tenantId: tenant.id,
+        type: 'handoff',
+        entityType: 'session',
+        entityId: session.id,
+        agency: {
+          title: 'Conversation length limit reached',
+          body: `${tenant.businessName} — a conversation hit the plan's message limit and needs a human`,
+          link: `/admin/chat?session=${session.id}`,
+        },
+        tenant: {
+          title: 'A conversation needs you',
+          body: "This chat reached your plan's message limit — reply to keep helping this customer.",
+          link: `/dashboard/chat?session=${session.id}`,
+        },
+      });
+      return {
+        sessionId: session.id,
+        replyText: input.platform === 'web' ? CONVERSATION_LENGTH_LIMIT_TEXT : null,
+        handoff: true,
+      };
+    }
+  }
 
   // 5b. The website widget answers synchronously on its own HTTP response and is
   // explicitly out of scope for batching (docs/23 §1) — run the turn directly,

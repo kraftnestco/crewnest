@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { env } from '@/lib/env';
 import { createServiceClient } from '@/lib/supabase/service';
 import type { Tenant } from '@/types/domain';
+import { PAID_PLAN_IDS, type PaidPlanId } from '@/lib/entitlements';
 
 /**
  * Stripe wrapper (docs/22-BILLING-STRIPE.md §4). Thin: create a Checkout
@@ -27,11 +28,43 @@ function getStripeClient(): Stripe {
   return stripeClient;
 }
 
-/** `PAYWALL_PLANS.id` → the Stripe Price id to subscribe to (docs/22 §4). */
-export function priceIdForPlan(planId: 'starter' | 'pro'): string {
-  const priceId = planId === 'starter' ? env.STRIPE_PRICE_STARTER : env.STRIPE_PRICE_PRO;
+/**
+ * `PAYWALL_PLANS.id` → the Stripe Price id to subscribe to (docs/22 §4).
+ *
+ * Exhaustive over `PaidPlanId`, so adding a tier to lib/entitlements.ts without
+ * wiring its price here is a compile error rather than a runtime surprise at
+ * someone's checkout.
+ */
+const STRIPE_PRICE_ENV: Record<PaidPlanId, () => string | undefined> = {
+  starter: () => env.STRIPE_PRICE_STARTER,
+  growth: () => env.STRIPE_PRICE_GROWTH,
+  pro: () => env.STRIPE_PRICE_PRO,
+};
+
+export function priceIdForPlan(planId: PaidPlanId): string {
+  const priceId = STRIPE_PRICE_ENV[planId]();
   if (!priceId) throw new Error(`Billing is not configured (no Stripe price for plan "${planId}").`);
   return priceId;
+}
+
+/**
+ * Reverse of `priceIdForPlan`: which plan does this Stripe Price belong to?
+ *
+ * Needed because the Customer Portal lets a tenant CHANGE TIER without going
+ * through our checkout — the only signal is a `customer.subscription.updated`
+ * carrying the new price. Without this mapping an upgrade through the portal
+ * charges the new amount while `tenants.plan` silently keeps the old tier (and
+ * a downgrade leaves them over-entitled).
+ *
+ * Returns null for an unrecognised price, so a Price created directly in the
+ * Stripe dashboard can never map onto a tier by accident.
+ */
+export function planForPriceId(priceId: string | null | undefined): PaidPlanId | null {
+  if (!priceId) return null;
+  for (const plan of PAID_PLAN_IDS) {
+    if (STRIPE_PRICE_ENV[plan]() === priceId) return plan;
+  }
+  return null;
 }
 
 /**
@@ -62,7 +95,7 @@ async function ensureStripeCustomer(tenant: Tenant): Promise<string> {
  */
 export async function createCheckoutSession(args: {
   tenant: Tenant;
-  planId: 'starter' | 'pro';
+  planId: PaidPlanId;
   successUrl: string;
   cancelUrl: string;
 }): Promise<{ url: string }> {

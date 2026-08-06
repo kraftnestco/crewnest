@@ -247,9 +247,13 @@ export default function Home() {
                 Start free, no card required. Upgrade when your AI employee is earning its keep.
               </p>
             </div>
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {/* Four tiers now — 2-up on tablet, 4-up on desktop (was md:grid-cols-3
+                with three plans, which would have orphaned the fourth card). */}
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {PAYWALL_PLANS.map((plan) => {
-                const highlighted = plan.id === 'starter';
+                // Driven by the plan config, not a hardcoded id, so moving the
+                // emphasis is a one-line data change.
+                const highlighted = Boolean(plan.highlight);
                 return (
                   // Badge lives on a wrapper — Card itself is overflow-hidden and would clip it.
                   <div key={plan.id} className="relative h-full">

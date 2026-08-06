@@ -11,6 +11,7 @@ import { runCopilotTurn } from '@/services/ai/copilot/runCopilotTurn';
 import { validatePatch, type ApplyPatchState, type CopilotMessage, type CopilotTurnState } from '@/services/ai/copilot/tiers';
 import { validateCopilotAction, type ApplyActionResult } from '@/services/ai/copilot/actions';
 import { inviteMember } from '@/services/teamMembers';
+import { entitlementsFor } from '@/lib/entitlements';
 import { setItemStockAction, restockItemAction } from '@/app/dashboard/inventory/inventory-actions';
 import type { Database, Json } from '@/types/database';
 import { log } from '@/lib/log';
@@ -41,7 +42,18 @@ import { log } from '@/lib/log';
 
 type TenantUpdate = Database['public']['Tables']['tenants']['Update'];
 
-/** Shared auth gate — mirrors generateSystemPromptAction in the intake actions. */
+/**
+ * Shared auth gate — mirrors generateSystemPromptAction in the intake actions.
+ *
+ * Also enforces the PLAN gate: the Copilot ("your own AI assistant") is a
+ * Growth-and-above entitlement (lib/entitlements.ts). Checked here rather than
+ * only in the UI because hiding a button is not access control — every copilot
+ * action routes through this function, so a hand-crafted request from a
+ * lower-tier tenant is refused too.
+ *
+ * Platform admins bypass the plan check: agency staff support clients on every
+ * tier, and their access is a support tool, not a purchased entitlement.
+ */
 async function requireTenantAdmin(tenantId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const ctx = await getCallerContext();
   if (!ctx) return { ok: false, error: 'Unauthorized.' };
@@ -52,6 +64,12 @@ async function requireTenantAdmin(tenantId: string): Promise<{ ok: true } | { ok
   }
   if (!ctx.isPlatformAdmin && !ctx.memberships.some((m) => m.tenantId === tenantId && m.role === 'tenant_admin')) {
     return { ok: false, error: 'Forbidden: only a tenant admin may edit business settings.' };
+  }
+  if (!ctx.isPlatformAdmin) {
+    const tenant = await tenants.getById(tenantId);
+    if (!entitlementsFor(tenant?.plan).hasCopilot) {
+      return { ok: false, error: 'Your AI assistant is available on the Growth plan and above.' };
+    }
   }
   return { ok: true };
 }

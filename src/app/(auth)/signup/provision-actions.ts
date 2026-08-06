@@ -10,6 +10,7 @@ import { parseCatalogueFreeform } from '@/services/ai/catalogueParser';
 import { ingestTenantKnowledge } from '@/services/knowledge';
 import * as tenantsService from '@/services/tenants';
 import type { DemoTenantInput } from '@/services/demo/schema';
+import { isPlanId } from '@/lib/entitlements';
 import type { Json } from '@/types/database';
 import { log } from '@/lib/log';
 
@@ -28,7 +29,9 @@ export interface ProvisionTenantResult {
   planStatus: 'pending_upgrade' | null;
 }
 
-const PLAN_IDS = ['free', 'starter', 'pro'] as const;
+// Plan allow-list comes from lib/entitlements.ts. A local copy here silently
+// downgraded any newly added tier to 'free' at signup — the user picks Growth,
+// pays nothing, and lands on the free plan with no error anywhere.
 
 export async function provisionTenantAction(input: {
   demoTenant: DemoTenantInput;
@@ -44,7 +47,7 @@ export async function provisionTenantAction(input: {
   }
 
   const { demoTenant } = input;
-  const planId = (PLAN_IDS as readonly string[]).includes(input.planId) ? input.planId : 'free';
+  const planId = isPlanId(input.planId) ? input.planId : 'free';
   const isFree = planId === 'free';
 
   const svc = createServiceClient();

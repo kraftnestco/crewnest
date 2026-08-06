@@ -7,6 +7,7 @@ import { assertTenantAccess, getCallerContext } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { notify } from '@/services/notifications';
 import * as tenants from '@/services/tenants';
+import { entitlementsFor, isLimited } from '@/lib/entitlements';
 import { PLATFORM_CHANNEL_VALUES, type PlatformChannel, type RequestPlatformSetupState } from './action-state';
 
 /** Switches the active tenant for a multi-membership caller. Validated server-side against ctx.memberships. */
@@ -58,6 +59,42 @@ export async function requestPlatformSetupAction(
 
   if (requestedPlatforms.length === 0) {
     return { error: 'Pick at least one channel to request.', success: false };
+  }
+
+  // Per-plan channel limit (lib/entitlements.ts — free plan is one channel at a
+  // time; every paid plan is unlimited). Enforced at REQUEST time, not on
+  // inbound traffic: a tenant who already has channels connected must never have
+  // real customer messages silently dropped because their plan changed. The
+  // already-connected count is included so the limit covers the resulting total,
+  // not just this request in isolation.
+  const tenantForLimit = await tenants.getById(tenantId);
+  const entitlements = entitlementsFor(tenantForLimit?.plan);
+  if (isLimited(entitlements.maxChannels)) {
+    const connectedCount = tenantForLimit
+      ? [
+          tenantForLimit.whatsappPhoneNumberId,
+          tenantForLimit.metaPageId,
+          tenantForLimit.instagramId,
+          tenantForLimit.widgetPublicKey,
+        ].filter(Boolean).length
+      : 0;
+    // Requests for channels that are ALREADY connected shouldn't count twice.
+    const alreadyConnected = new Set<PlatformChannel>();
+    if (tenantForLimit?.whatsappPhoneNumberId) alreadyConnected.add('whatsapp');
+    if (tenantForLimit?.metaPageId) alreadyConnected.add('facebook');
+    if (tenantForLimit?.instagramId) alreadyConnected.add('instagram');
+    if (tenantForLimit?.widgetPublicKey) alreadyConnected.add('web');
+    const newChannels = requestedPlatforms.filter((p) => !alreadyConnected.has(p));
+
+    if (connectedCount + newChannels.length > entitlements.maxChannels) {
+      return {
+        error:
+          entitlements.maxChannels === 1
+            ? 'Your plan includes one channel at a time. Upgrade to connect more.'
+            : `Your plan includes up to ${entitlements.maxChannels} channels. Upgrade to connect more.`,
+        success: false,
+      };
+    }
   }
 
   const supabase = await createSupabaseServerClient();

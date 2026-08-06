@@ -135,6 +135,12 @@ export type Database = {
           referred_by: string | null;
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
+          billing_provider: string;
+          billing_country: string | null;
+          safepay_customer_id: string | null;
+          safepay_subscription_id: string | null;
+          safepay_amount_minor: number | null;
+          safepay_currency: string | null;
         };
         Insert: {
           id?: string;
@@ -197,6 +203,12 @@ export type Database = {
           referred_by?: string | null;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
+          billing_provider?: string;
+          billing_country?: string | null;
+          safepay_customer_id?: string | null;
+          safepay_subscription_id?: string | null;
+          safepay_amount_minor?: number | null;
+          safepay_currency?: string | null;
         };
         Update: {
           id?: string;
@@ -258,6 +270,12 @@ export type Database = {
           referred_by?: string | null;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
+          billing_provider?: string;
+          billing_country?: string | null;
+          safepay_customer_id?: string | null;
+          safepay_subscription_id?: string | null;
+          safepay_amount_minor?: number | null;
+          safepay_currency?: string | null;
         };
         Relationships: [];
       };
@@ -665,6 +683,24 @@ export type Database = {
         Relationships: [];
       };
       stripe_events: {
+        Row: {
+          id: string;
+          type: string;
+          processed_at: string;
+        };
+        Insert: {
+          id: string;
+          type: string;
+          processed_at?: string;
+        };
+        Update: {
+          id?: string;
+          type?: string;
+          processed_at?: string;
+        };
+        Relationships: [];
+      };
+      safepay_events: {
         Row: {
           id: string;
           type: string;

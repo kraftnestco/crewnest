@@ -6,6 +6,7 @@
  * on the constant before editing, several encode a constraint (e.g. the queue
  * visibility timeout must stay above the turn lease TTL).
  */
+import { ENTITLEMENTS } from './entitlements';
 
 /** Meta Graph API base (version comes from env.META_GRAPH_VERSION at call sites). */
 export const META_GRAPH_BASE = 'https://graph.facebook.com';
@@ -230,8 +231,14 @@ export const RETRIEVED_CONTEXT_TOKEN_BUDGET = 2000;
  * self-serve signup plan, Phase D). Resets at UTC midnight. Existing sessions
  * already counted for the day keep replying normally — only a brand-new
  * (tenant, platform, external user) session is gated.
+ *
+ * @deprecated The daily cap is now PER PLAN (free/starter 5, growth 20, pro
+ * unlimited) and lives in `lib/entitlements.ts`. Read
+ * `entitlementsFor(tenant.plan).dailyConversations` instead — this alias is kept
+ * only so any external reference keeps compiling, and is derived from the
+ * entitlements table so the two can never disagree.
  */
-export const FREE_PLAN_DAILY_SESSION_CAP = 5;
+export const FREE_PLAN_DAILY_SESSION_CAP = ENTITLEMENTS.free.dailyConversations;
 
 /**
  * Stage U-cap (docs/18 §3, finding #7) — platform default for the free-plan

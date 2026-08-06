@@ -4,6 +4,7 @@ import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/page-header';
 import { PAYWALL_PLANS } from '@/services/demo/plans';
+import { providerForCountry } from '@/services/billing';
 import { BillingPanel } from './billing-panel';
 
 /**
@@ -25,11 +26,18 @@ export default async function DashboardBillingPage() {
   const supabase = await createSupabaseServerClient();
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('id, business_name, plan, plan_status')
+    .select('id, business_name, plan, plan_status, billing_provider, billing_country, safepay_subscription_id')
     .eq('id', activeTenantId)
     .single();
 
   if (!tenant) redirect('/dashboard');
+
+  // Provider decides both the displayed currency and how the tenant manages an
+  // existing subscription (hosted portal vs. in-app cancel) — docs/25 §2.
+  const provider = providerForCountry(tenant.billing_country);
+  const billingProvider = tenant.billing_provider === 'safepay' || tenant.billing_provider === 'stripe'
+    ? tenant.billing_provider
+    : provider;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
@@ -39,6 +47,8 @@ export default async function DashboardBillingPage() {
         currentPlan={tenant.plan}
         planStatus={tenant.plan_status}
         plans={PAYWALL_PLANS}
+        billingProvider={billingProvider}
+        hasSubscription={Boolean(tenant.safepay_subscription_id)}
       />
     </div>
   );

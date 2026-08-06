@@ -20,7 +20,7 @@ export type VoiceHandling = 'ai_autonomous' | 'human_review';
 /** Product vs service framing — picks which flow block (ORDER_FLOW vs SERVICE_FLOW) the prompt shows. */
 export type BusinessType = 'product' | 'service';
 /** Why a session was handed to a human — set at each handoff-emit site alongside the existing notification. See docs/16 §2. */
-export type HandoffCause = 'requested' | 'alert' | 'tool_exhaustion' | 'media_review';
+export type HandoffCause = 'requested' | 'alert' | 'tool_exhaustion' | 'media_review' | 'length_limit';
 /** Who produced a `role:'assistant'` reply — distinguishes an LLM turn from a staff manual send (docs/16 §2.1). */
 export type AuthoredBy = 'ai' | 'human' | 'system';
 
@@ -71,7 +71,7 @@ export interface Tenant {
   paymentKeySecretId: string | null;
   defaultCurrency: string;
   prepaidRequired: boolean;
-  /** App-validated tier id ('free'/'starter'/'pro', docs: self-serve signup Phase C) — not a DB enum. */
+  /** App-validated tier id ('free'/'starter'/'growth'/'pro') — not a DB enum. Limits live in lib/entitlements.ts. */
   plan: string;
   /** Non-null only while a self-serve paid selection awaits agency activation (docs Phase C). */
   planStatus: string | null;
@@ -87,7 +87,22 @@ export interface Tenant {
   stripeCustomerId: string | null;
   /** Stripe Subscription id (docs/22 §2.3) — set by the webhook on checkout.session.completed, cleared on cancellation. */
   stripeSubscriptionId: string | null;
+  /** Which billing provider this tenant transacts on (docs/25 §2). Derived from `billingCountry` at signup; 'stripe' for everyone pre-Safepay. */
+  billingProvider: BillingProviderId;
+  /** ISO-3166-1 alpha-2 country used to route billing (docs/25 §2.1). Null ⇒ falls back to the default provider. */
+  billingCountry: string | null;
+  /** Safepay customer id — null until the tenant's first Safepay checkout. */
+  safepayCustomerId: string | null;
+  /** Safepay subscription id — set by the webhook on subscription activation, cleared on cancellation. */
+  safepaySubscriptionId: string | null;
+  /** PKR minor units this tenant's Safepay subscription recurs at (docs/25 §3.2 — the rate is locked at subscribe time). */
+  safepayAmountMinor: number | null;
+  /** Currency of `safepayAmountMinor` (always 'PKR' today). */
+  safepayCurrency: string | null;
 }
+
+/** The billing providers CrewNest can charge a tenant through (docs/25 §2). */
+export type BillingProviderId = 'stripe' | 'safepay';
 
 /**
  * A single open "needs a human" flag on a session — voice/video the AI is

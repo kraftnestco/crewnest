@@ -30,16 +30,17 @@ export function PaywallModal({
           <DialogTitle className={cn(displayFont.className, 'text-xl')}>Keep this AI for your business</DialogTitle>
           <DialogDescription>Pick a plan to create your account, and we&apos;ll set up the tenant from what you just built.</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3 sm:grid-cols-3">
+        {/* Four tiers — 2-up then 4-up (was sm:grid-cols-3 for three plans). */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {PAYWALL_PLANS.map((plan) => (
             <Card
               key={plan.id}
               className={cn(
                 'relative',
-                plan.id === 'starter' && 'ring-2 ring-primary shadow-lg sm:-my-1 sm:scale-[1.03]',
+                plan.highlight && 'ring-2 ring-primary shadow-lg sm:-my-1 sm:scale-[1.03]',
               )}
             >
-              {plan.id === 'starter' && (
+              {plan.highlight && (
                 <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2">Popular</Badge>
               )}
               <CardHeader>
