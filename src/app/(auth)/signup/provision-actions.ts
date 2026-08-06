@@ -70,7 +70,19 @@ export async function provisionTenantAction(input: {
       payment_methods: demoTenant.paymentMethods,
       payment_instructions: demoTenant.paymentInstructions,
       intake_completed_at: new Date().toISOString(),
-      plan: planId,
+      // ALWAYS provisioned on 'free', even when a paid tier was selected. The
+      // billing webhook is the single writer of `tenants.plan` (see the Stripe
+      // and Safepay routes), and it is the only thing that can confirm money
+      // actually moved. Writing the SELECTED tier here granted its full
+      // entitlements immediately: `entitlementsFor()` reads `tenants.plan` and
+      // never consults `plan_status`, so a visitor could pick Pro, abandon the
+      // client-side redirect to checkout, and keep unlimited conversations,
+      // unlimited channels and the Copilot for free, forever, with nothing to
+      // reconcile it. `plan_status` still records the intent so the agency can
+      // follow up on an abandoned checkout, and the selected tier round-trips
+      // through the provider itself (Stripe metadata.plan_id /
+      // Safepay's `<tenantId>:<planId>` reference), not through this row.
+      plan: 'free',
       plan_status: isFree ? null : 'pending_upgrade',
     })
     .select('id')

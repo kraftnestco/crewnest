@@ -75,9 +75,11 @@ Stripe account (§4d); Phase 3 **Stage P** is done and deployed (§4e).
   gated (§4a Item 2 — done). ✅ **Admin System Health** (`/admin/health`, docs/20).
 - **Notifications:** ✅ in-app (`notifications` table + dashboard bell) + ✅ email via **Resend**
   (`services/email.ts`) — domain verified (`mail.kraftnest.co`), API key live locally, real send confirmed;
-  Vercel env still pending (§4c). ✅ **Web push (docs/21)** — built, `0037` applied, urgent-only fan-out
-  (`handoff` + `alert_signal`); VAPID vars are now in Vercel, but a real end-to-end push has still never
-  been confirmed — see §5.2 B-remaining item 4.
+  Vercel env still pending (§4c). ✅ **Web push (docs/21) — built, `0037` applied, ✅ VERIFIED LIVE
+  2026-08-06**: a real OS notification from PRODUCTION reached a phone, unprompted, from the
+  conversation-length handoff. Urgent-only fan-out (`handoff` + `alert_signal`). One gotcha came with
+  it — **the notification was labelled `localhost:3000`** — which is a stale subscription, not a bug;
+  see §7 "The localhost push notification".
 - **Message batching (docs/23) — ✅ built, `0039` applied, ✅ VERIFIED LIVE 2026-08-03 on a real
   Instagram thread.** Two messages a few seconds apart now produce ONE combined reply. Getting there
   required two fixes found during that testing, both now in place — see §4e and `0041`.
@@ -392,6 +394,20 @@ hosted portal; every activation carries its own plan reference).
 - **Gating the Copilot at Growth removes it from all 3 current tenants** (all on `free`, all have it
   today). Deliberate product decision — grandfather explicitly if that's not wanted.
 
+#### 4d.1b Signup provisions on FREE, never the selected tier (fixed 2026-08-06)
+
+`provisionTenantAction` used to write the **selected** plan onto the new tenant row. Once
+`lib/entitlements.ts` started reading `tenants.plan` to grant real limits, that became an
+entitlement bypass: `entitlementsFor()` reads `plan` and **never consults `plan_status`**, so a
+visitor could pick Pro at signup, abandon the client-side redirect to checkout, and keep unlimited
+conversations, unlimited channels and the Copilot **for free, forever**, with nothing to reconcile it.
+
+Signup now always inserts `plan: 'free'`. `plan_status: 'pending_upgrade'` still records the intent so
+the agency can chase an abandoned checkout, and the chosen tier round-trips through the **provider**
+(Stripe `metadata.plan_id`, Safepay's `<tenantId>:<planId>` reference) rather than through this row.
+**The billing webhook stays the single writer of `tenants.plan`** — the same rule docs/22 and docs/25
+already state. Pinned by a test in `entitlements.test.ts`.
+
 #### 4d.2 The one code gap left, deliberately not built
 
 **Signup does not capture `billing_country`.** The column exists, `services/billing.ts` reads it, and
@@ -523,10 +539,9 @@ change to `(auth)/signup/`; left out because it was outside the build request. S
   and each doc's §Acceptance — e.g. real Meta message e2e, two-tenant RLS isolation, widget origin
   allow/deny, take-over mutes AI, signup→free-tenant→hit caps→notify. **Run these against a real
   configured environment (4b), ideally on a preview deploy, not by creating junk in prod.**
-- **Unverified-on-live-traffic features** (built + DB applied, acceptance criteria written but never
-  exercised against real users): ~~message batching~~ (✅ 2026-08-03), ~~appointment booking~~
-  (✅ 2026-08-04) and **web push**
-  (docs/21 → §5.1 B4). Both are blocked on the same thing: a real deployment plus a live Meta channel.
+- **Unverified-on-live-traffic features** — ~~message batching~~ (✅ 2026-08-03), ~~appointment
+  booking~~ (✅ 2026-08-04), ~~web push~~ (✅ 2026-08-06, see §7). **This list is now empty** — every
+  built feature has been exercised against real traffic at least once.
 
 ---
 
@@ -574,7 +589,7 @@ The prior owner must privately hand you the **secret values** (never in git/this
 | `META_APP_SECRET`, `META_VERIFY_TOKEN`, `META_GRAPH_VERSION` | Meta webhook + Graph send | Verify token is one *you* choose (must match Meta config); app secret from Meta App → Settings → Basic. |
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | email notifications | ✅ Real values set in `.env.local` (domain `mail.kraftnest.co` verified, real send confirmed). Still need to land in **Vercel** env. |
 | `CRON_SECRET` | `/api/cron/maintenance`, `api/internal/process-message` (the §4e worker bridge), and future `/api/cron/follow-ups` | Set in Vercel env, **and** as an Edge Function secret (`npx supabase secrets set CRON_SECRET=...`) — must be the SAME value in both places. Mirror into **Supabase Vault** too if/when the pg_cron job (4a) is built. |
-| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | web push (docs/21) | ✅ Real keypair generated + set in `.env.local`, migration `0037` applied, verified against a real push service (410 pruning confirmed). Ready for manual browser testing. Still needs to land in **Vercel** env for prod. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | web push (docs/21) | ✅ Real keypair, `0037` applied, **set in Vercel and confirmed working end to end from production 2026-08-06** (real OS notification on a phone). ⚠️ Subscribe from the **prod URL**, not localhost — see §7 "The localhost push notification". |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, **`STRIPE_PRICE_GROWTH`**, `STRIPE_PRICE_PRO` | billing (docs/22) | ⚠️ **No Stripe account exists yet** — none of these have real values. DB schema (`0038`) is applied and ready. Unlike Resend/push, billing has no safe "unconfigured" no-op mode; the checkout/portal actions will refuse with a clear error until these are real. |
 | `SAFEPAY_SECRET_KEY`, `SAFEPAY_WEBHOOK_SECRET`, `SAFEPAY_PLAN_STARTER`, **`SAFEPAY_PLAN_GROWTH`**, `SAFEPAY_PLAN_PRO`, `SAFEPAY_ENVIRONMENT`, `SAFEPAY_USD_TO_PKR` | Safepay billing for PK tenants (docs/25) | ⚠️ **No Safepay account exists yet.** Same fail-loud posture as Stripe. `SAFEPAY_PLAN_*` are Safepay **Plan ids** (`plan_…`) — the plan carries the amount, so repricing also means editing `pricePkr` in `services/demo/plans.ts`. `SAFEPAY_ENVIRONMENT` defaults to `sandbox` so a half-configured deploy can't take real money. |
 | `SENTRY_DSN` | error tracking (optional) | No-op until set. |
@@ -726,8 +741,8 @@ while leaving `git push` and CI working — full write-up in §5 item 2. Disrega
   Confirmed firing every minute via `cron.job_run_details` (status `succeeded`).
 
 **A-remaining. Still open:**
-5. **Web push** (docs/21): VAPID vars are now in Vercel, so this is testable for the first time — but a
-   real end-to-end push has still never been confirmed. See B4.
+- ~~5. **Web push** (docs/21)~~ — **DONE 2026-08-06.** Confirmed end to end from production
+  (Vercel → web-push → FCM → device). Note the `localhost:3000` label gotcha in §7 before re-testing.
 6. **Billing** (docs/22 + docs/25) — **⏸️ ON HOLD, see §4d.** TWO providers now, both needing their own
    account: Stripe for international tenants, **Safepay for Pakistani ones** (Stripe cannot onboard PK
    merchants at all). Land the four `STRIPE_*` **and** the six `SAFEPAY_*` vars in Vercel, and register
@@ -752,11 +767,11 @@ while leaving `git push` and CI working — full write-up in §5 item 2. Disrega
   escaping the window).
 
 **B-remaining. Still open:**
-4. **Re-test push notifications for real.** VAPID vars are now in Vercel and a real channel is connected,
-   so nothing blocks this any more. Trigger a `handoff` (customer messages "I want to talk to a real
-   person") or an `alert_signal`, with the CrewNest tab **not focused** on the receiving device, and
-   confirm a real OS notification appears. Push is a no-op-by-design when unconfigured (docs/21 §2.5/§4),
-   so a silent failure means the VAPID vars didn't take, not that the code is wrong.
+- ~~4. **Re-test push notifications for real.**~~ — **DONE 2026-08-06, unprompted.** A real OS
+  notification ("Conversation length limit reached") arrived on a phone from **production**, triggered
+  by the new conversation-length handoff. End-to-end push is confirmed working: Vercel → `web-push` →
+  FCM → device. **But it was labelled `localhost:3000` and its link points there** — see §7 "The
+  localhost push notification" before concluding anything is broken.
 5. **WhatsApp business-initiated messages** (owner notifications, future out-of-window follow-ups) need
    Meta-approved message templates — an ops step in the Meta dashboard, not code (§5 item 4). WhatsApp is
    not yet connected on any tenant (`whatsapp_phone_number_id` is null everywhere).
@@ -821,6 +836,41 @@ while leaving `git push` and CI working — full write-up in §5 item 2. Disrega
 - **Manual-migration drift** (above) — the #1 source of "works locally, broken in prod."
 - **Widget sessions persist their key in `localStorage`** — clear it between manual tests or a muted
   (handed-off) session stays muted on reload.
+
+### The localhost push notification (2026-08-06) — a stale subscription, NOT a bug
+
+**Symptom.** A real push notification arrived on a phone reading "Conversation length limit reached /
+KraftNest Automations — a conversation hit the…" and, underneath, **`localhost:3000`**. No dev server
+was running at the time, which makes it look like something is badly wrong. Nothing is.
+
+**What that line actually is.** Chrome labels every web notification with the **origin of the service
+worker that displayed it** — it is browser chrome, not part of our message and not a URL we sent. The
+only `push_subscriptions` row was created 2026-07-31 from a browser tab on `http://localhost:3000`, so
+Chrome attributes every push on that subscription to that origin, forever.
+
+**Why it fired with no dev server.** A push subscription lives on the push service, not in our app —
+that row's endpoint is `fcm.googleapis.com`. The real path is:
+
+    Vercel (prod) → web-push → FCM (Google) → device Chrome → wakes the service worker → notification
+
+The dev server is nowhere in it. The service worker is installed **in the browser** against the
+`localhost:3000` origin and Chrome can wake it whether or not anything is listening on port 3000.
+**That is the whole point of a service worker** — it is independent of any open tab or running server.
+So this was PRODUCTION working correctly.
+
+**The one genuinely broken part.** Tapping it opens `http://localhost:3000/dashboard/chat?session=…`
+and fails. `public/sw.js` resolves the link against `self.location.origin` (line ~48), which is
+correct behaviour — the origin is just stale. Cosmetic, and self-inflicted by having subscribed from
+localhost.
+
+**Fix / how to avoid it.** Subscribe from the real deployed URL (`crewnest-rouge.vercel.app`), not
+localhost, then delete the stale localhost row or it keeps firing duplicates to the same device.
+A subscription is bound to the origin it was created on and **cannot be migrated** — origin is part of
+its identity. **When testing push, always subscribe from the prod URL.**
+
+**Lesson worth keeping:** a notification that names an origin you didn't expect is telling you where
+the SUBSCRIPTION came from, not where the message came from. Check `push_subscriptions.endpoint` and
+the subscription's `created_at` before suspecting the sending code.
 
 **Connect a real Instagram/Messenger channel for live testing (Development mode, no App Review):**
 1. IG account must be **Business/Creator**, linked to a Facebook Page (hard Meta requirement).

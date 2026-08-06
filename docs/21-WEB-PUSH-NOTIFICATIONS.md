@@ -159,3 +159,39 @@ action that binds `user_id` from the session, never from client input (same post
       no-offline-caching guarantee in `manifest.ts` still holds.
 - [ ] Push payloads contain no customer name, phone, or message content.
 - [ ] `tsc --noEmit`, `eslint`, `vitest`, and `npm run build` all green.
+
+---
+
+## 6. Verified live (2026-08-06) — and the one gotcha it exposed
+
+**Push is confirmed working end to end from production.** A real OS notification ("Conversation length
+limit reached / KraftNest Automations — a conversation hit the…") reached a phone, unprompted,
+triggered by the new conversation-length handoff (docs/26 §3). Full path exercised:
+
+    Vercel (prod) → services/push.ts → web-push → FCM → device Chrome → sw.js → notification
+
+### 6.1 "Why does it say `localhost:3000`?" — a stale subscription, not a bug
+
+The notification was labelled **`localhost:3000`** even though no dev server was running. This looks
+alarming and is not.
+
+- That line is **Chrome's own origin label** — the origin of the service worker that displayed the
+  notification. It is browser chrome, not part of our payload, and not a URL we send.
+- A subscription is **bound to the origin it was created on**. The only `push_subscriptions` row was
+  created from a tab on `http://localhost:3000`, so Chrome attributes every push on it to that origin.
+- **It fires with no dev server because the subscription lives on FCM, not in our app** (the row's
+  endpoint is `fcm.googleapis.com`). The service worker is installed *in the browser* and Chrome wakes
+  it whether or not anything is listening on port 3000. That independence is the point of a service
+  worker — see §1's note that this SW registers no `fetch` handler and does nothing but receive pushes.
+
+**The genuinely broken part** is only the click target: `notificationclick` resolves the link against
+`self.location.origin` (`public/sw.js`), so tapping it opens `http://localhost:3000/dashboard/chat?…`
+and fails. The code is right; the origin is stale.
+
+**Practical rule: always subscribe from the real deployed URL when testing push.** A subscription
+cannot be migrated between origins — origin is part of its identity. Delete a stale localhost row once
+a prod one exists, or the same device receives duplicates.
+
+**Diagnostic worth remembering:** when a notification names an unexpected origin, it is telling you
+where the SUBSCRIPTION came from, not where the message came from. Check
+`push_subscriptions.endpoint` and `created_at` before suspecting the sending code.

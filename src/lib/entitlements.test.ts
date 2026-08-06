@@ -75,6 +75,23 @@ describe('entitlementsFor — resolving a plan string from the database', () => 
   });
 });
 
+describe('entitlements ignore plan_status — why signup must provision on free', () => {
+  it('grants a tier purely from `tenants.plan`, with no pending/unpaid concept', () => {
+    // This is the reason `provisionTenantAction` writes plan:'free' even when a
+    // paid tier was selected. There is deliberately no `plan_status` input here:
+    // a 'pending_upgrade' row is indistinguishable from a paid one to this
+    // function, so writing the SELECTED tier at signup would hand a visitor full
+    // entitlements before any money moved — pick Pro, abandon checkout, keep
+    // unlimited everything forever. The billing webhook is the only writer of
+    // `tenants.plan` (docs/26 §4).
+    expect(entitlementsFor('pro')).toBe(ENTITLEMENTS.pro);
+    expect(entitlementsFor('free')).toBe(ENTITLEMENTS.free);
+    // entitlementsFor takes ONE argument. If a future change adds a status
+    // parameter, this assertion is the prompt to revisit the signup path.
+    expect(entitlementsFor.length).toBe(1);
+  });
+});
+
 describe('plan id guards', () => {
   it('isPlanId accepts every real plan and rejects others', () => {
     for (const id of PLAN_IDS) expect(isPlanId(id)).toBe(true);
