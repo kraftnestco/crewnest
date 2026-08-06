@@ -31,10 +31,14 @@ function checkRateLimitMemory(
   const max = opts.max ?? WIDGET_RATE_LIMIT.max;
   const now = Date.now();
 
-  const b = buckets.get(key);
+  // Scoped by windowMs for the same reason as the DB path below — so dev
+  // behaviour matches production rather than hiding a cross-limit collision.
+  const scopedKey = `${windowMs}:${key}`;
+
+  const b = buckets.get(scopedKey);
   if (!b || now >= b.resetAt) {
     const resetAt = now + windowMs;
-    buckets.set(key, { count: 1, resetAt });
+    buckets.set(scopedKey, { count: 1, resetAt });
     return { allowed: true, remaining: max - 1, resetAt };
   }
 
@@ -74,11 +78,20 @@ async function checkRateLimitDb(
   const windowStart = Math.floor(now / windowMs) * windowMs;
   const resetAt = windowStart + windowMs;
 
+  // The bucket key must carry the WINDOW SIZE, not just the caller's key. The
+  // SQL function keys rows on (bucket_key, window_start) alone, so two limits
+  // with different windowMs values share a row whenever their window_start
+  // happens to coincide — which is guaranteed at every UTC midnight, where the
+  // 60s widget window and the 24h demo window both floor to the same instant.
+  // Two unrelated limits would then increment the SAME counter, and whichever
+  // has the smaller `max` starts rejecting traffic it never received.
+  const scopedKey = `${windowMs}:${key}`;
+
   try {
     const { createServiceClient } = await import('@/lib/supabase/service');
     const svc = createServiceClient();
     const { data, error } = await svc.rpc('increment_rate_limit_bucket', {
-      p_bucket_key: key,
+      p_bucket_key: scopedKey,
       p_window_start: windowStart,
     });
     if (error) throw error;
