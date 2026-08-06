@@ -58,8 +58,10 @@ Stripe account (§4d); Phase 3 **Stage P** is done and deployed (§4e).
   queue), ✅ **client logins** (tenant_admin past the admin gate; `/dashboard`), ✅ **RAG** (pgvector
   knowledge base), ✅ **conversation summarisation**, ✅ **public self-serve signup** (`(auth)/signup/` →
   `provision-actions.ts`) + **free-plan caps** (daily session cap + monthly cost ceiling in
-  `aiOrchestrator.ts`). ⚠️ **Billing (Stripe) — code-complete, DB applied, still untested** (§4d): schema
-  is live; only a real Stripe account is needed before it can replace today's manual plan provisioning.
+  `aiOrchestrator.ts`). ⏸️ **Billing (Stripe + Safepay) — code-complete, DB applied, still untested,
+  ON HOLD** (§4d): both providers are built and their schema is live (`0038`, `0045`); **neither has
+  ever processed a payment.** Stripe serves international tenants, **Safepay serves Pakistani ones**
+  (Stripe cannot onboard PK merchants). Blocked purely on creating the two merchant accounts — §4d.1.
   ❓ **Embedded Meta OAuth signup** — verify; channel tokens may still be pasted manually via Vault.
 - **Phase 3 — Harden/Prove (Stages P–V, docs 15–18):** ✅ Analytics (`0030`), ✅ data lifecycle / GDPR
   erasure (`0031`), ✅ hardening + rolling memory + free-plan ceiling + team management (`0032`),
@@ -215,8 +217,10 @@ is not.** If timeouts persist, the structural answer is to stop routing the turn
 function at all — the Supabase worker has no such limit, and `api/internal/process-message` is the only
 reason the 60s cap applies.
 
-Migrations live in `supabase/migrations/` (`0001`–`0043` today). **All applied** to the live project
-as of 2026-08-04 (`0008`, `0035`–`0043` confirmed via direct verification, not assumed). They are
+Migrations live in `supabase/migrations/` (`0001`–`0046` today; there is no `0044` — it was written,
+failed, and deleted, see §3.2 fault 6). **ALL APPLIED** as of 2026-08-06 (`0008`, `0035`–`0043`
+confirmed 2026-08-04; `0045` and `0046` confirmed 2026-08-06 — all via direct verification, not
+assumed). They are
 applied **manually** in the Supabase SQL editor — see the drift warning in §5.
 **`0043` needed a data cleanup before its index would create** — three duplicate `provider_msg_id` rows
 existed, the oldest from 2026-07-15, so the retry bug had been duplicating messages quietly for weeks.
@@ -311,11 +315,121 @@ Resend domain. **Do 4b before QA (4g)** — most "bugs" at this stage are missin
   **Model: `[OPUS]` design pass first** (permission UX, subscription lifecycle, which events push). Ref:
   docs/14 (Command Center & Notifications).
 
-### 4d. Payment setup (SaaS billing) — **BUILT, needs a real Stripe account to test**
+### 4d. Payment setup (SaaS billing) — **⏸️ ON HOLD 2026-08-06 — code complete both providers, blocked on real accounts**
+
+> **⏸️ HOLD (2026-08-06, agreed with the user).** Both providers are **code-complete and DB-applied**;
+> **neither has ever processed a payment.** Work is paused here **by decision, not by a blocker in the
+> code** — the remaining work is account creation, which is ops and has its own timeline. **Nothing is
+> half-built: do not "finish" 4d by writing more code.** The next action is creating the two merchant
+> accounts (§4d.1 below), after which the acceptance criteria in docs/22 §6 and docs/25 §8 can finally
+> be run.
+>
+> **Do not push billing to prod while both providers are unconfigured.** The checkout/portal actions
+> fail loudly by design (docs/22 §4, docs/25 §6), so a tenant clicking Upgrade today gets an error, not
+> a silent no-op. That is the intended posture, but it means the paywall is visibly broken until the
+> env vars land.
+
+#### 4d.1 What "unblocking this" actually requires (ops, in order)
+
+**Stripe (international tenants):**
+1. Create a Stripe account — **test mode is enough to start**; business verification can follow.
+2. Create **three** recurring Products/Prices matching `PAYWALL_PLANS` (§4d.1a): Starter **$39/mo**,
+   Growth **$49/mo**, Pro $79/mo.
+3. Note the `price_…` ids → `STRIPE_PRICE_STARTER` / **`STRIPE_PRICE_GROWTH`** / `STRIPE_PRICE_PRO`.
+4. Register the webhook endpoint `https://crewnest-rouge.vercel.app/api/webhooks/stripe`; take the
+   signing secret → `STRIPE_WEBHOOK_SECRET`. Set `STRIPE_SECRET_KEY`.
+
+**Safepay (Pakistani tenants):**
+5. Create a Safepay merchant account + business verification (registration, bank proof, ID). **This is
+   the long pole** — start it first; it is independent of everything else.
+6. Create the **three recurring plans** at fixed PKR amounts. **They must match `pricePkr` in
+   `services/demo/plans.ts`** (Starter Rs 11,000 · Growth Rs 14,000 · Pro Rs 22,000) — the plan carries
+   the amount, so these are two halves of one number (docs/25 §3.2).
+7. Note the `plan_…` ids → `SAFEPAY_PLAN_STARTER` / **`SAFEPAY_PLAN_GROWTH`** / `SAFEPAY_PLAN_PRO`.
+8. Register `https://crewnest-rouge.vercel.app/api/webhooks/safepay`; secret → `SAFEPAY_WEBHOOK_SECRET`.
+   Set `SAFEPAY_SECRET_KEY`. **Keep `SAFEPAY_ENVIRONMENT=sandbox`** until a real end-to-end test passes.
+
+**Both:** set every var in `.env.local` **and** Vercel (Production + Preview). Then run the unchecked
+acceptance criteria — docs/25 §8 (real checkout, duplicate-webhook no-op, cancellation downgrade) and
+the equivalents in docs/22.
+
+#### 4d.1a ⚠️ PRICING CHANGED 2026-08-06 — four tiers now (docs/26)
+
+**Before creating the merchant-account products above, note the prices moved.** Starter is **$39**
+(was $29) and there is a **new Growth tier at $49**:
+
+| Plan | Price | Conversations/day | Msgs/conversation | Channels | AI assistant |
+|---|---|---|---|---|---|
+| Free | $0 | 5 | **20** | **1** | — |
+| Starter | $39 | 5 | Unlimited | All | — |
+| Growth | $49 | **20** | Unlimited | All | **✓** |
+| Pro | $79 | **Unlimited** | Unlimited | All | ✓ |
+
+PKR: Starter Rs 11,000 · Growth Rs 14,000 · Pro Rs 22,000. So §4d.1 needs **three** Products/Prices per
+provider, not two, plus `STRIPE_PRICE_GROWTH` / `SAFEPAY_PLAN_GROWTH`.
+
+**Repricing Starter is not a code-only change** — the charged amount lives in the Stripe Price and the
+Safepay Plan; `services/demo/plans.ts` only displays it. Change one without the other and the card
+advertises a price the customer isn't charged.
+
+**All limits are now genuinely ENFORCED** (they largely weren't before — "One channel at a time" was
+marketing copy enforced nowhere). `lib/entitlements.ts` is the single source of truth, read by both
+enforcement and the plan cards; docs/26 §3 has the enforcement-point table. **Migration `0046` is
+APPLIED and verified (2026-08-06)** — `length_limit` accepted, the four pre-existing handoff causes
+still valid, a bogus cause still rejected.
+
+**Both billing providers were re-audited for the new tier** and exercised across all three paid plans
+(distinct price/plan ids, reference round-trip, webhook plan gate, forged-reference rejection). That
+audit found one more real gap, now fixed: **a tier change made in Stripe's Customer Portal had no code
+path at all** — `handleSubscriptionUpdated` only handled dunning, so an upgrade would charge the new
+amount while `tenants.plan` kept the old tier. See docs/26 §4.1. Safepay needs no equivalent (no
+hosted portal; every activation carries its own plan reference).
+
+**Two live consequences, verified against prod on 2026-08-06:**
+- **2 of 8 existing free-plan conversations already exceed 20 customer messages** and will hand off to
+  a human on their next inbound message. Correct behaviour, but it will look abrupt — including on the
+  KraftNest Automations test tenant.
+- **Gating the Copilot at Growth removes it from all 3 current tenants** (all on `free`, all have it
+  today). Deliberate product decision — grandfather explicitly if that's not wanted.
+
+#### 4d.2 The one code gap left, deliberately not built
+
+**Signup does not capture `billing_country`.** The column exists, `services/billing.ts` reads it, and
+migration `0045` is applied — but until the signup flow collects a country, **every new tenant defaults
+to `stripe`**, so a Pakistani tenant cannot self-serve onto Safepay without a manual DB edit. Small
+change to `(auth)/signup/`; left out because it was outside the build request. See docs/25 §9 item 6.
+
+> **Update 2026-08-06 — a SECOND provider now exists: Safepay, for Pakistani tenants (docs/25).**
+> Stripe **cannot onboard Pakistan-based merchants**, so no configuration of docs/22 could ever charge a
+> PK tenant. Safepay was chosen over PayFast (no recurring API) and over direct JazzCash/Easypaisa
+> (per-transaction approve flows — wrong for subscriptions; Safepay reaches both wallets anyway).
+> - **Routing is by `tenants.billing_country`** (`'PK'` → safepay), in `services/billing.ts` — never
+>   tenant choice, because a wrong pick is a card decline the tenant can't self-diagnose. A **stored**
+>   `billing_provider` wins over the country, so a live subscription is never re-routed under a tenant.
+> - **Three real API differences** shaped the code (docs/25 §3): Safepay has **no customer object**
+>   (identity round-trips through a `"<tenantId>:<planId>"` reference string), **no hosted portal**
+>   (cancel is in-app), and **the plan carries the price** — `createSubscription` takes only a `planId`.
+> - ⚠️ **That last point reversed a decision made in this session.** "Convert USD at checkout" was
+>   chosen, then found to be **not expressible** on Safepay's API — there is no per-checkout amount
+>   field. Prices are now **fixed PKR plan amounts** (`pricePkr` in `services/demo/plans.ts`).
+>   **Repricing is a two-part change:** edit the plan in Safepay's dashboard AND update `pricePkr`.
+> - **Migration `0045_safepay_billing.sql` — ✅ APPLIED and VERIFIED 2026-08-06** against the live
+>   project (not assumed): all six `tenants` columns readable; `safepay_events` exists; the
+>   `billing_provider` CHECK **actually rejects** an invalid value (`23514`, tested with a real write
+>   then restored); all existing tenants defaulted to `stripe` (no silent re-routing); and a duplicate
+>   ledger insert returns `23505`, so the webhook's dedup gate is live.
+> - **Dependency caveat:** `@sfpy/node-sdk@3.0.2` pulls `axios@^0.26.0` (many high-severity advisories).
+>   `package.json` pins `overrides: { axios: "^1.19.0" }`; SDK verified working after the override.
+>   Re-check on any SDK upgrade.
+> - **Verified:** typecheck, lint, 130 tests, `npm run build` all green; 11 new routing/reference unit
+>   tests; webhook HMAC exercised for real (valid accepted, wrong rejected, **tampered reference
+>   rejected**). **Not verified:** any real checkout — no Safepay account exists yet.
+> - **The one gap between "built" and "a PK tenant can self-serve": signup does not capture
+>   `billing_country`**, so every new tenant currently defaults to Stripe. See docs/25 §9 item 6.
 - **Spec:** [`docs/22-BILLING-STRIPE.md`](docs/22-BILLING-STRIPE.md) (Opus design pass + build,
   2026-07-27). Provider decided **with the user**: Stripe — tenant base is global/mixed and neither
   Stripe nor a local PK gateway had an existing account, so Stripe's international reach won.
-- **What shipped:** flat-fee subscriptions on the existing free/$29 starter/$79 pro tiers (NOT metered
+- **What shipped:** flat-fee subscriptions on the free/starter/growth/pro tiers (repriced 2026-08-06, see §4d.1a — NOT metered
   usage-based billing — a deliberate re-scope from doc-07's original sketch, see docs/22 §2.1). Hosted
   Stripe Checkout + Customer Portal only, zero custom card UI. The Stripe webhook
   (`api/webhooks/stripe/route.ts`) is the SOLE writer of `tenants.plan`/`plan_status` once live —
@@ -332,8 +446,8 @@ Resend domain. **Do 4b before QA (4g)** — most "bugs" at this stage are missin
 - **NOT verified — needs a real Stripe account:** actual checkout completion, real webhook delivery,
   portal access. None of that could be tested without Stripe credentials, which don't exist yet.
 - **Still needed from you:** create a Stripe account (test mode is enough to start), create the
-  Starter ($29/mo) and Pro ($79/mo) Products/Prices to match `PAYWALL_PLANS`, get
-  `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_STARTER`/`STRIPE_PRICE_PRO`, register the
+  Starter ($39/mo), Growth ($49/mo) and Pro ($79/mo) Products/Prices to match `PAYWALL_PLANS`, get
+  `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_STARTER`/**`STRIPE_PRICE_GROWTH`**/`STRIPE_PRICE_PRO`, register the
   webhook endpoint (`/api/webhooks/stripe`) in the Stripe dashboard. Per the Vercel marketplace note
   below, prefer a real provisioned Stripe integration over hand-rolled keys if that path is available.
 - **Don't confuse with customer payments:** taking a *customer's* money for an order (bank transfer +
@@ -429,7 +543,7 @@ yet, or the item changes a locked interface / money / auth / a novel external in
 | Item | Why Opus | What Opus must decide first |
 |---|---|---|
 | **4c — Web push** (net-new) | Novel client/runtime surface, no spec | Permission-prompt UX, subscription lifecycle (subscribe/renew/revoke), `push_subscriptions` schema, **which** events push vs. stay in-app/email, service-worker + VAPID approach. |
-| **4d — Payment / SaaS billing** | Money + irreversible external integration; **no code exists** | **Provider decision first** (Stripe subscriptions+metering vs. a local PK gateway like JazzCash/EasyPaisa — ask the owner). Then subscription vs. usage-metering model, webhook/idempotency, how `plan`/`plan_status` flip (still off-limits to Copilots). |
+| ~~**4d — Payment / SaaS billing**~~ | ✅ **RESOLVED — do NOT re-open.** This row is kept only so a future reader doesn't re-litigate it. | **Both provider decisions are made and BUILT.** Stripe for international tenants (docs/22, 2026-07-27); **Safepay for Pakistani tenants** (docs/25, 2026-08-06) — because Stripe cannot onboard PK merchants at all, which is a hard constraint, not a preference. Flat-fee subscriptions (not metering); webhook is the sole `plan`/`plan_status` writer on both sides, idempotent via `stripe_events`/`safepay_events`; billing stays off-limits to Copilots. Rejected and why: PayFast (no recurring API), direct JazzCash/EasyPaisa (per-transaction approve flows — wrong shape for subscriptions; Safepay reaches both wallets anyway). **What remains is ops, not design (§4d.1).** |
 | **4f — Phase 4 Voice AI + platform** | Biggest, least-defined; **no spec doc** | Its own design doc: STT/TTS provider, realtime turn-taking, latency budget, handoff interplay for `platform='voice'`. Also the marketplace / multi-agent "crew" / white-label sub-features — treat each as a designed unit, not one task. |
 | **Any change to a locked interface** | High blast radius | The forecast/schema/tool "locked" surfaces and RLS/Vault grants — any edit here is an Opus checkpoint (see §6 + docs `[OPUS]` markers). Off-limits Copilot fields (`llm_provider`, `llm_model`, `*_secret_id`, `plan`, `plan_status`, `free_monthly_cap_usd`, `daily_cost_alert_usd`, `is_active`, `message_retention_days`, channel ids, `slug`, billing) must stay tool-less and hard-rejected — never add a path to them without an Opus review. |
 
@@ -461,7 +575,8 @@ The prior owner must privately hand you the **secret values** (never in git/this
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | email notifications | ✅ Real values set in `.env.local` (domain `mail.kraftnest.co` verified, real send confirmed). Still need to land in **Vercel** env. |
 | `CRON_SECRET` | `/api/cron/maintenance`, `api/internal/process-message` (the §4e worker bridge), and future `/api/cron/follow-ups` | Set in Vercel env, **and** as an Edge Function secret (`npx supabase secrets set CRON_SECRET=...`) — must be the SAME value in both places. Mirror into **Supabase Vault** too if/when the pg_cron job (4a) is built. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | web push (docs/21) | ✅ Real keypair generated + set in `.env.local`, migration `0037` applied, verified against a real push service (410 pruning confirmed). Ready for manual browser testing. Still needs to land in **Vercel** env for prod. |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO` | billing (docs/22) | ⚠️ **No Stripe account exists yet** — none of these have real values. DB schema (`0038`) is applied and ready. Unlike Resend/push, billing has no safe "unconfigured" no-op mode; the checkout/portal actions will refuse with a clear error until these are real. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, **`STRIPE_PRICE_GROWTH`**, `STRIPE_PRICE_PRO` | billing (docs/22) | ⚠️ **No Stripe account exists yet** — none of these have real values. DB schema (`0038`) is applied and ready. Unlike Resend/push, billing has no safe "unconfigured" no-op mode; the checkout/portal actions will refuse with a clear error until these are real. |
+| `SAFEPAY_SECRET_KEY`, `SAFEPAY_WEBHOOK_SECRET`, `SAFEPAY_PLAN_STARTER`, **`SAFEPAY_PLAN_GROWTH`**, `SAFEPAY_PLAN_PRO`, `SAFEPAY_ENVIRONMENT`, `SAFEPAY_USD_TO_PKR` | Safepay billing for PK tenants (docs/25) | ⚠️ **No Safepay account exists yet.** Same fail-loud posture as Stripe. `SAFEPAY_PLAN_*` are Safepay **Plan ids** (`plan_…`) — the plan carries the amount, so repricing also means editing `pricePkr` in `services/demo/plans.ts`. `SAFEPAY_ENVIRONMENT` defaults to `sandbox` so a half-configured deploy can't take real money. |
 | `SENTRY_DSN` | error tracking (optional) | No-op until set. |
 | `NEXT_PUBLIC_APP_URL` | absolute links | Set to the prod URL in Vercel. |
 
@@ -570,13 +685,17 @@ just doesn't work" rather than an error):**
 
 | Var(s) | Behaviour |
 |---|---|
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO` | Checkout/portal refuse with a clear error instead of no-op-ing — a paywall that appears to work but never charges would be a worse failure. **No Stripe account exists yet**, so these have no real values. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, **`STRIPE_PRICE_GROWTH`**, `STRIPE_PRICE_PRO` | Checkout/portal refuse with a clear error instead of no-op-ing — a paywall that appears to work but never charges would be a worse failure. **No Stripe account exists yet**, so these have no real values. |
+| `SAFEPAY_SECRET_KEY`, `SAFEPAY_WEBHOOK_SECRET`, `SAFEPAY_PLAN_STARTER`, **`SAFEPAY_PLAN_GROWTH`**, `SAFEPAY_PLAN_PRO` | Same posture, for PK tenants (docs/25). **No Safepay account exists yet.** Note `getSafepayClient()` also refuses when only the *webhook* secret is missing — a subscription created with no verifiable webhook path would take money we could never confirm, leaving the tenant paid-but-not-upgraded. |
+| `SAFEPAY_ENVIRONMENT` | Defaults to `sandbox` — **deliberately**, so a half-configured deploy can never take real money. Must be set to `production` explicitly when going live. |
 
 **Gaps to be aware of (as of 2026-08-02):**
 - `.env.local` currently has **no `CRON_SECRET`** and **no `INBOUND_WORKER_SECRET`**. Both are needed for
   the Stage P worker path to function; `INBOUND_WORKER_SECRET` isn't in `env.ts` at all (it's read only by
   the Deno Edge Function), so nothing validates it — it will just 403 silently if missing/mismatched.
-- No `STRIPE_*` values anywhere, local or prod.
+- No `STRIPE_*` **or `SAFEPAY_*`** values anywhere, local or prod — billing (§4d) is ⏸️ on hold pending
+  both merchant accounts. `.env.example` now documents both blocks (it was missing the Stripe one
+  entirely until 2026-08-06).
 - `VERCEL_OIDC_TOKEN` in `.env.local` is injected tooling state, **not** something to copy into Vercel.
 
 ---
@@ -609,10 +728,11 @@ while leaving `git push` and CI working — full write-up in §5 item 2. Disrega
 **A-remaining. Still open:**
 5. **Web push** (docs/21): VAPID vars are now in Vercel, so this is testable for the first time — but a
    real end-to-end push has still never been confirmed. See B4.
-6. **Billing** (docs/22): once you also have a real Stripe account (independent of Vercel, see below),
-   land `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_STARTER`/`STRIPE_PRICE_PRO` in Vercel,
-   and register the webhook endpoint (`https://<your-domain>/api/webhooks/stripe`) in the Stripe
-   dashboard using the real deployed URL.
+6. **Billing** (docs/22 + docs/25) — **⏸️ ON HOLD, see §4d.** TWO providers now, both needing their own
+   account: Stripe for international tenants, **Safepay for Pakistani ones** (Stripe cannot onboard PK
+   merchants at all). Land the four `STRIPE_*` **and** the six `SAFEPAY_*` vars in Vercel, and register
+   **both** webhook endpoints (`/api/webhooks/stripe`, `/api/webhooks/safepay`) against the real
+   deployed URL. Full ordered checklist in §4d.1.
 7. **Redeploy the Edge Function worker** — `npx supabase functions deploy inbound-worker`. Message
    batching (docs/23) raised `VISIBILITY_TIMEOUT_SECONDS` 30 → 120 **inside the Deno worker**, which
    does NOT ship with the Vercel deploy. Until this is redeployed, a batched turn running past 30s has
@@ -659,8 +779,13 @@ while leaving `git push` and CI working — full write-up in §5 item 2. Disrega
     each case (`alternative_days`, `nearest_times`) but no customer has hit either.
 
 **C. Independent of both (can happen anytime, own timeline):**
-- Create a Stripe account (test mode is enough to start) + create the Starter ($29/mo) / Pro ($79/mo)
-  Products/Prices to match `PAYWALL_PLANS` (docs/22 §4).
+- **Billing accounts — the current blocker on 4d (⏸️ on hold).** BOTH are needed; they are separate
+  signups with separate verification:
+  - **Stripe** (international tenants) — test mode is enough to start + **three** Products/Prices
+    matching `PAYWALL_PLANS`: Starter $39/mo, Growth $49/mo, Pro $79/mo (docs/22 §4, repriced per §4d.1a).
+  - **Safepay** (Pakistani tenants) — merchant account + business verification (**the long pole, start
+    it first**) + **three** recurring plans at fixed PKR amounts matching `pricePkr` (docs/25 §9).
+  - Ordered step-by-step for both: **§4d.1**.
 - Meta App Review (only needed for real, non-test customer traffic beyond your own test accounts, §7).
 
 ---
