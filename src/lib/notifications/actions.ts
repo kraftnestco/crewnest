@@ -49,7 +49,29 @@ export async function listNotificationsAction(limit = 20, tenantId?: string | nu
  */
 export async function listNotificationClientsAction(): Promise<{ tenantId: string; businessName: string }[]> {
   const ctx = await getCallerContext();
-  if (!ctx?.isPlatformAdmin) return [];
+  if (!ctx) return [];
+
+  // A client who belongs to SEVERAL businesses gets the same filter the agency
+  // has. Their bell already mixes both businesses' notifications (RLS admits
+  // every tenant they're a member of), so without this there was no way to tell
+  // which business an item belonged to, let alone narrow to one — while the
+  // Orders page right next to it has exactly that control. Single-business
+  // members get an empty list, so the dropdown stays absent for them.
+  if (!ctx.isPlatformAdmin) {
+    if (ctx.memberships.length < 2) return [];
+    const supabase = await createSupabaseServerClient();
+    const { data: tenants, error } = await supabase
+      .from('tenants')
+      .select('id, business_name')
+      .in(
+        'id',
+        ctx.memberships.map((m) => m.tenantId),
+      );
+    if (error) throw new Error(error.message);
+    return (tenants ?? [])
+      .map((t) => ({ tenantId: t.id, businessName: t.business_name }))
+      .sort((a, b) => a.businessName.localeCompare(b.businessName));
+  }
 
   const supabase = await createSupabaseServerClient();
   const { data: rows, error } = await supabase

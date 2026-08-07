@@ -68,7 +68,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <TopbarHeadingProvider>
-      <div className="flex min-h-screen">
+      {/*
+        `h-dvh` + `overflow-hidden`, NOT `min-h-screen`.
+
+        `min-h-screen` is 100vh, and on mobile 100vh is the LARGE viewport —
+        the height with browser chrome HIDDEN. The inner column is `h-dvh`
+        (the height actually visible right now). Whenever the URL bar is
+        showing, the outer box was therefore taller than the screen by exactly
+        the bar's height, so the DOCUMENT itself became scrollable: scrolling
+        down slid the whole shell up, lifting the bottom tab bar off the
+        bottom edge and exposing empty space beneath it. Matching both to
+        `dvh` and clipping here means only <main> ever scrolls.
+      */}
+      <div className="flex h-dvh overflow-hidden">
         {/* Desktop sidebar — hidden below lg; phones use the bottom tab bar instead. */}
         <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
           <div className="flex items-center gap-3 p-4">
@@ -106,14 +118,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </form>
           </div>
         </aside>
-        {/*
-          `h-dvh`, not `h-screen`: 100vh on mobile is the viewport WITH browser
-          chrome hidden, so a 100vh column is taller than what's actually
-          visible — the bottom of every page (and the fixed tab bar) sat under
-          the URL bar, and the overflow made short pages scroll a little for no
-          reason. `dvh` tracks the live visible height instead.
-        */}
-        <div className="flex h-dvh min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <AppTopbar
             accountHref="/dashboard/account"
             accountTypeLabel={activeTenantName}
@@ -129,7 +134,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
               />
             }
           />
-          {/* pb-16 keeps content clear of the fixed mobile tab bar. */}
           {/*
             `overscroll-contain` stops a scroll that reaches this container's
             end from chaining up to the document and triggering the mobile

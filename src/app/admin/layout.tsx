@@ -39,7 +39,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <TopbarHeadingProvider>
-      <div className="flex min-h-screen">
+      {/* h-dvh + overflow-hidden, not min-h-screen — a 100vh outer box is
+          taller than the visible viewport while the URL bar shows, which made
+          the whole document scroll and lifted the tab bar. See the client
+          dashboard layout. */}
+      <div className="flex h-dvh overflow-hidden">
         {/* Desktop sidebar — hidden below lg; phones use the bottom tab bar instead. */}
         <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
           <div className="flex items-center gap-3 p-4">
@@ -67,10 +71,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </form>
           </div>
         </aside>
-        {/* h-dvh not h-screen — see the client dashboard layout for why. */}
-        <div className="flex h-dvh min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <AppTopbar accountHref="/admin/account" accountTypeLabel="Agency" accountKind="agency" />
-          {/* pb-16 keeps content clear of the fixed mobile tab bar. */}
           {/* See the client dashboard layout for why overscroll-contain /
               touch-pan-y are here — same fix for the same mobile scroll trap. */}
           {/* min-w-0 + overflow-x-hidden — see the client dashboard layout for

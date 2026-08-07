@@ -111,6 +111,7 @@ export async function AppTopbar({
           initialUnreadCount={unreadCount}
           realtimeAccessToken={session?.access_token ?? null}
           clients={notificationClients}
+          scopeKind={accountKind}
         />
         <AccountMenu fullName={ctx?.fullName ?? null} email={ctx?.email ?? null} accountHref={accountHref} />
       </div>

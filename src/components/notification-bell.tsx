@@ -57,14 +57,24 @@ export function NotificationBell({
   initialUnreadCount,
   realtimeAccessToken,
   clients = [],
+  scopeKind = 'agency',
 }: {
   initialNotifications: Notification[];
   initialUnreadCount: number;
   realtimeAccessToken: string | null;
-  /** Agency-only filter options (docs: admin notification grouping) — empty for a tenant-scoped caller, so the dropdown simply doesn't render (see below). */
+  /**
+   * Scope-filter options — one per client for the agency, or the caller's own
+   * businesses when they belong to more than one. Empty (so the dropdown is
+   * absent) for a single-business member, whose feed is one business already.
+   */
   clients?: { tenantId: string; businessName: string }[];
+  /** 'agency' phrases the filter as clients; 'client' as businesses. */
+  scopeKind?: 'agency' | 'client';
 }) {
   const router = useRouter();
+  // The agency filters across its CLIENTS; a multi-business owner filters across
+  // their own BUSINESSES. Same control, different noun.
+  const allLabel = scopeKind === 'agency' ? 'All clients' : 'All businesses';
   // The unfiltered "all clients" list — the one realtime inserts and mark-read
   // actually mutate, always. Kept separate from `filteredNotifications` below so
   // a live insert or a read-toggle never has to know which view is on screen.
@@ -212,22 +222,24 @@ export function NotificationBell({
             </button>
           )}
         </div>
-        {/* Agency-only client filter (docs: admin notification grouping). Absent
-            entirely for a tenant-scoped caller — `clients` is empty for them. */}
+        {/* Scope filter. Agency: one entry per client with notifications. Client
+            with several businesses: their own businesses, matching the control
+            the Orders page already offers. Absent for a single-business member,
+            whose feed is one business by definition — `clients` is empty then. */}
         {clients.length > 0 && (
           <div className="shrink-0 border-b p-2">
             <DropdownMenu>
               <DropdownMenuTrigger className="flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/60">
                 <span className="truncate">
                   {selectedTenantId === ALL_CLIENTS
-                    ? 'All clients'
-                    : (clients.find((c) => c.tenantId === selectedTenantId)?.businessName ?? 'All clients')}
+                    ? allLabel
+                    : (clients.find((c) => c.tenantId === selectedTenantId)?.businessName ?? allLabel)}
                 </span>
                 <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
               </DropdownMenuTrigger>
               <DropdownMenuContent className="max-h-72 w-(--anchor-width) min-w-56">
                 <DropdownMenuRadioGroup value={selectedTenantId} onValueChange={setSelectedTenantId}>
-                  <DropdownMenuRadioItem value={ALL_CLIENTS}>All clients</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value={ALL_CLIENTS}>{allLabel}</DropdownMenuRadioItem>
                   {clients.map((c) => (
                     <DropdownMenuRadioItem key={c.tenantId} value={c.tenantId}>
                       {c.businessName}
