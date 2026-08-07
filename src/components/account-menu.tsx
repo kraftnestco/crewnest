@@ -51,10 +51,30 @@ export function AccountMenu({
           Account
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onClick={() => void signOutAction()}>
-          <LogOut />
-          Sign out
-        </DropdownMenuItem>
+        {/*
+          Submitted as a form, not `void signOutAction()`. The action ends in
+          `redirect()`, which Next implements by THROWING a NEXT_REDIRECT
+          signal — calling it imperatively and discarding the promise left that
+          throw unhandled, so signing out tripped the global error boundary
+          ("Something went wrong") instead of navigating. Letting React own the
+          call means it recognises the signal and performs the navigation.
+          Same bug, same fix as the mobile business switcher.
+        */}
+        <form action={signOutAction}>
+          {/* `nativeButton` tells Base UI the rendered element really is a
+              <button> (MenuItem renders a <div> by default), so it doesn't add
+              the synthetic button semantics/keyboard handling a real one
+              already has — and Enter/Space submit the form natively. */}
+          <DropdownMenuItem
+            variant="destructive"
+            render={<button type="submit" />}
+            nativeButton
+            className="w-full"
+          >
+            <LogOut />
+            Sign out
+          </DropdownMenuItem>
+        </form>
       </DropdownMenuContent>
     </DropdownMenu>
   );

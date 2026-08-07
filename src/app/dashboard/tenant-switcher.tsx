@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, ChevronsUpDown } from 'lucide-react';
-import { useTransition } from 'react';
+import { useRef, useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,7 +66,10 @@ export function MobileTenantSwitcher({
   activeTenantId: string | undefined;
   activeTenantName: string;
 }) {
-  const [isPending, startTransition] = useTransition();
+  // Set on submit so the trigger disables immediately; the navigation that
+  // follows unmounts this component, so it never needs resetting.
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   if (tenants.length <= 1) {
     return (
@@ -76,21 +79,34 @@ export function MobileTenantSwitcher({
     );
   }
 
+  /**
+   * Submits through a real <form> rather than calling the action directly.
+   *
+   * `setActiveTenantAction` ends in `redirect()`, and Next implements that by
+   * THROWING a NEXT_REDIRECT signal. Calling the action imperatively (and
+   * discarding its promise with `void`) left that throw unhandled, so instead
+   * of navigating, the app tripped its global error boundary — the literal
+   * "Something went wrong" screen. A form submission lets React own the call,
+   * so it recognises the redirect signal and performs the navigation.
+   */
   function handleSelect(tenantId: string) {
     if (tenantId === activeTenantId) return;
-    const formData = new FormData();
-    formData.set('tenant_id', tenantId);
-    // The action redirects to /dashboard, which re-renders the whole shell with
-    // the newly-active tenant — no local state to keep in sync here.
-    startTransition(() => {
-      void setActiveTenantAction(formData);
-    });
+    const form = formRef.current;
+    if (!form) return;
+    const input = form.elements.namedItem('tenant_id') as HTMLInputElement | null;
+    if (!input) return;
+    input.value = tenantId;
+    setIsSubmitting(true);
+    form.requestSubmit();
   }
 
   return (
     <DropdownMenu>
+      <form ref={formRef} action={setActiveTenantAction} className="hidden">
+        <input type="hidden" name="tenant_id" defaultValue={activeTenantId ?? ''} />
+      </form>
       <DropdownMenuTrigger
-        disabled={isPending}
+        disabled={isSubmitting}
         aria-label={`Active business: ${activeTenantName}. Switch business`}
         className="flex min-w-0 items-center gap-1 rounded-full bg-muted px-2 py-1 text-[0.65rem] font-medium text-foreground transition-opacity disabled:opacity-60"
       >
