@@ -147,11 +147,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
             children now scroll inside their own container instead.
           */}
           {/*
-            Bottom padding must clear the FIXED tab bar, which is ~60px tall
-            PLUS the home-indicator safe area. A flat pb-16 ignored that inset,
-            so the last row sat under the bar on an iPhone; this adds the two.
+            No bottom padding. The tab bar below is a SIBLING in this flex
+            column (not an overlay), so it already reserves its own height —
+            `flex-1` stops this scroller exactly where the bar begins. The
+            padding that used to live here was compensating for a `fixed` bar
+            that no longer overlaps anything, so it just added ~60-85px of dead
+            space under the last row on every page.
           */}
-          <main className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:pb-0">
+          <main className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain">
             {children}
           </main>
           <DashboardTabBar showBusiness={showBusiness} showBookings={showBookings} />

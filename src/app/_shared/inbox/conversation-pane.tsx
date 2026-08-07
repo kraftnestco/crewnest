@@ -393,9 +393,16 @@ export function ConversationPane({
             <div ref={bottomRef} />
           </div>
         </ScrollArea>
-        <div className="shrink-0 border-t bg-background p-3">
+        {/*
+          `sticky bottom-0` pins the composer to the base of the thread so it
+          can't be swept upward while the message list scrolls — on a phone the
+          reply box drifting out of reach was the main thing that made the inbox
+          feel unusable. It stays a flex sibling (shrink-0), so it also reserves
+          its height rather than covering the last message.
+        */}
+        <div className="sticky bottom-0 z-10 shrink-0 border-t bg-background p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {!session.is_human_handoff && (
-            <p className="mb-1.5 text-xs text-muted-foreground">
+            <p className="mb-1.5 text-[11px] leading-snug text-muted-foreground">
               Sending a message here switches this chat to human takeover, so the bot stops replying.
             </p>
           )}
@@ -405,7 +412,9 @@ export function ConversationPane({
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Type a reply…"
               rows={1}
-              className="resize-none"
+              // Grows with the draft up to a cap instead of staying one line —
+              // a long reply was previously typed through a one-line slot.
+              className="max-h-32 min-h-10 flex-1 resize-none"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -413,7 +422,7 @@ export function ConversationPane({
                 }
               }}
             />
-            <Button onClick={handleSend} disabled={isPending || !draft.trim()}>
+            <Button onClick={handleSend} disabled={isPending || !draft.trim()} className="shrink-0">
               Send
             </Button>
           </div>

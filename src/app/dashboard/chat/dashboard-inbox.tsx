@@ -39,7 +39,16 @@ export function DashboardInbox({
   initialSelectedId?: string | null;
 }) {
   const [sessions, setSessions] = useState(initialSessions);
-  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? initialSessions[0]?.id ?? null);
+  // Nothing is auto-selected any more. Auto-selecting the first session made
+  // sense when both panes were always visible, but below `lg` they're mutually
+  // exclusive, so it dropped the user straight INTO a conversation and hid the
+  // list they came to see. Desktop shows a "Select a conversation" placeholder
+  // instead, which is honest and costs one tap. A deep link (?session=…) still
+  // opens its thread directly on both.
+  //
+  // Deliberately NOT branched on window.innerWidth: that would differ between
+  // the server render and the client, which is a hydration mismatch.
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null);
   const [platformFilter, setPlatformFilter] = useState('all');
   const [query, setQuery] = useState('');
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);

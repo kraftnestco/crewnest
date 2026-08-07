@@ -69,7 +69,17 @@ export function MobileTabBar({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+    /*
+     * A flex sibling of <main>, not `fixed`.
+     *
+     * As a fixed overlay it sat ON TOP of the scroll area, so <main> had to
+     * pad its own bottom by the bar's height to keep the last row visible —
+     * and that padding read as a block of empty space you could scroll into
+     * below the content. In the flex column it reserves its height naturally,
+     * <main> ends exactly where it begins, and there is nothing to compensate
+     * for. `shrink-0` keeps it from being squeezed by a tall page.
+     */
+    <nav className="z-40 flex shrink-0 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
       {items.slice(0, 5).map((item) => {
         const isActive = isActivePath(pathname, item);
         return (

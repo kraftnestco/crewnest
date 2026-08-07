@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
@@ -116,17 +117,26 @@ export function MobileTenantSwitcher({
         <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-52">
-        <DropdownMenuLabel>Switch business</DropdownMenuLabel>
-        {tenants.map((t) => (
-          <DropdownMenuItem
-            key={t.tenantId}
-            onClick={() => handleSelect(t.tenantId)}
-            className="flex items-center justify-between gap-2"
-          >
-            <span className="truncate">{t.name}</span>
-            {t.tenantId === activeTenantId && <Check className="h-3.5 w-3.5 shrink-0" />}
-          </DropdownMenuItem>
-        ))}
+        {/*
+          The label MUST be inside a Group. DropdownMenuLabel renders Base UI's
+          Menu.GroupLabel, which reads MenuGroupContext and THROWS when it isn't
+          under a <Menu.Group> ("MenuGroupContext is missing"). A bare label
+          therefore crashed the moment the menu opened — before any business was
+          picked — which is what put "Something went wrong" on screen.
+        */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Switch business</DropdownMenuLabel>
+          {tenants.map((t) => (
+            <DropdownMenuItem
+              key={t.tenantId}
+              onClick={() => handleSelect(t.tenantId)}
+              className="flex items-center justify-between gap-2"
+            >
+              <span className="truncate">{t.name}</span>
+              {t.tenantId === activeTenantId && <Check className="h-3.5 w-3.5 shrink-0" />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

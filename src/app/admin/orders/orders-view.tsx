@@ -407,6 +407,9 @@ export function OrdersView({
    */
   initialTenantId?: string | null;
 }) {
+  // Full column count (desktop). On mobile most columns are `hidden`, so a
+  // detail row spanning this many cells would still stretch the table; the
+  // expanded rows below use a span that can't exceed the visible count.
   const columnCount = showBusinessColumn ? 10 : 9;
   const [orders, setOrders] = useState(initialOrders);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>(initialStatus);
@@ -564,14 +567,14 @@ export function OrdersView({
           <TableHeader>
             <TableRow>
               <TableHead>Customer</TableHead>
-              {showBusinessColumn && <TableHead>Business</TableHead>}
-              <TableHead>Items</TableHead>
+              {showBusinessColumn && <TableHead className="hidden lg:table-cell">Business</TableHead>}
+              <TableHead className="hidden md:table-cell">Items</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Payment</TableHead>
-              <TableHead>Platform</TableHead>
-              <TableHead title="Whether the business owner was alerted about this order">Owner alert</TableHead>
-              <TableHead>Placed</TableHead>
-              <TableHead className="text-right">Chat</TableHead>
+              <TableHead className="hidden lg:table-cell">Payment</TableHead>
+              <TableHead className="hidden lg:table-cell">Platform</TableHead>
+              <TableHead className="hidden lg:table-cell" title="Whether the business owner was alerted about this order">Owner alert</TableHead>
+              <TableHead className="hidden md:table-cell">Placed</TableHead>
+              <TableHead className="hidden text-right lg:table-cell">Chat</TableHead>
               <TableHead className="text-right">Review</TableHead>
             </TableRow>
           </TableHeader>
@@ -590,29 +593,50 @@ export function OrdersView({
                     {o.customer_phone && (
                       <div className="text-xs font-normal text-muted-foreground">{o.customer_phone}</div>
                     )}
+                    {/*
+                      Mobile-only recap of the columns hidden below md/lg. The
+                      table had ten columns, so on a phone the useful fields sat
+                      off-screen behind a horizontal scroll that was awkward to
+                      reach. Rather than make staff drag sideways, the essentials
+                      ride here under the customer name, and the row stays
+                      expandable for the rest.
+                    */}
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal text-muted-foreground md:hidden">
+                      <span className="truncate">{itemsSummary(o.items)}</span>
+                      <span aria-hidden>·</span>
+                      <span>{new Date(o.created_at).toLocaleDateString()}</span>
+                      {o.platform && (
+                        <>
+                          <span aria-hidden>·</span>
+                          <span className="capitalize">{o.platform}</span>
+                        </>
+                      )}
+                    </div>
                   </TableCell>
-                  {showBusinessColumn && <TableCell>{tenantMap.get(o.tenant_id) ?? 'Unknown'}</TableCell>}
-                  <TableCell className="max-w-xs truncate">{itemsSummary(o.items)}</TableCell>
+                  {showBusinessColumn && (
+                    <TableCell className="hidden lg:table-cell">{tenantMap.get(o.tenant_id) ?? 'Unknown'}</TableCell>
+                  )}
+                  <TableCell className="hidden max-w-xs truncate md:table-cell">{itemsSummary(o.items)}</TableCell>
                   <TableCell>
                     <Badge variant={STATUS_BADGE[o.status]} className="capitalize">
                       {o.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden lg:table-cell">
                     <PaymentCell order={o} onDone={handleActionDone} />
                   </TableCell>
-                  <TableCell className="capitalize">{o.platform ?? '—'}</TableCell>
-                  <TableCell>
+                  <TableCell className="hidden capitalize lg:table-cell">{o.platform ?? '—'}</TableCell>
+                  <TableCell className="hidden lg:table-cell">
                     {o.owner_notified_at ? (
                       <Badge variant="secondary">Sent</Badge>
                     ) : (
                       <Badge variant="outline">Pending</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
+                  <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                     {new Date(o.created_at).toLocaleString()}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="hidden text-right lg:table-cell">
                     {o.session_id ? (
                       <Link
                         href={`${chatBasePath}?session=${o.session_id}`}

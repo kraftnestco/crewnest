@@ -174,3 +174,75 @@
     animation: none;
   }
 }
+/*
+ * Touch-target floor for coarse pointers (phones/tablets).
+ *
+ * The button scale is desktop-density by design (h-6 to h-9 = 24-36px), which
+ * is below the 44px minimum a finger needs — a Playwright sweep at 375/390/412
+ * found 3-14 undersized controls on every dashboard page. Rather than resize
+ * every button (which would wreck desktop density and the inbox header's tight
+ * layout), this expands only the HIT AREA, via a centred pseudo-element, on
+ * devices that actually point with a finger. Nothing moves visually; the
+ * tappable region just grows to 44px.
+ *
+ * `@media (pointer: coarse)` keeps desktop untouched. `position: relative` is
+ * applied alongside so the ::after can anchor, and z-index keeps the overlay
+ * from covering adjacent controls' own hit areas.
+ */
+@media (pointer: coarse) {
+  button,
+  a[role='button'],
+  [role='button'],
+  [data-slot='dropdown-menu-trigger'],
+  [data-slot='dropdown-menu-item'] {
+    position: relative;
+  }
+
+  button::after,
+  a[role='button']::after,
+  [role='button']::after,
+  [data-slot='dropdown-menu-trigger']::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    min-width: 44px;
+    min-height: 44px;
+    width: 100%;
+    height: 100%;
+    /* Purely a hit area — never paints, never blocks scrolling. */
+    pointer-events: auto;
+    z-index: 0;
+  }
+
+  /* The bottom tab bar's links are already full-height targets; an extra
+     overlay there would spill over neighbouring tabs. */
+  nav a::after {
+    content: none;
+  }
+}
+
+/*
+ * Don't let a scroll gesture select message text.
+ *
+ * Dragging to scroll the inbox thread highlighted every bubble it passed
+ * (confirmed in a touch emulation run), which looks broken and pops the
+ * copy/paste callout mid-scroll. Selection stays available on a long-press via
+ * the `user-select: text` opt-in below, so copying an order ref still works.
+ */
+@media (pointer: coarse) {
+  [data-slot='scroll-area-viewport'] {
+    -webkit-user-select: none;
+    user-select: none;
+    /* Keep the native long-press callout on the actual message text. */
+    -webkit-touch-callout: default;
+  }
+
+  /* Message bubbles opt back in — a long-press still selects an order ref. */
+  [data-slot='scroll-area-viewport'] p,
+  [data-slot='scroll-area-viewport'] span {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
