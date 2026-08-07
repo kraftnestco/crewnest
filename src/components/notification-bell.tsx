@@ -194,7 +194,10 @@ export function NotificationBell({
             it the list grows instead of scrolling.
           Plain `overflow-y-auto` rather than <ScrollArea>: that component sets
           its own height/overflow internally, which fought this flex chain. */}
-      <PopoverContent align="end" className="flex max-h-96 w-80 flex-col gap-0 p-0">
+      {/* `max-w-[calc(100vw-1rem)]` keeps the panel on-screen on a narrow
+          phone, where a flat 320px popup anchored to the right edge of a
+          ~375px viewport would otherwise run past the left edge. */}
+      <PopoverContent align="end" className="flex max-h-96 w-80 max-w-[calc(100vw-1rem)] flex-col gap-0 p-0">
         <div className="flex shrink-0 items-center justify-between border-b p-2.5">
           <p className="text-sm font-semibold">Notifications</p>
           {unreadCount > 0 && (

@@ -164,8 +164,14 @@ export function Inbox({
   }
 
   return (
-    <div className="flex h-full overflow-hidden bg-background text-foreground">
-      <div className="flex min-h-0 w-80 shrink-0 flex-col border-r bg-muted/20">
+    <div className="relative flex h-full min-h-0 overflow-hidden bg-background text-foreground">
+      {/* Master/detail below `lg`, side-by-side above — see the dashboard
+          inbox for why (three fixed-width panes don't fit a phone). */}
+      <div
+        className={`min-h-0 w-full shrink-0 flex-col border-r bg-muted/20 lg:flex lg:w-80 ${
+          selected ? 'hidden lg:flex' : 'flex'
+        }`}
+      >
         <div className="flex h-14 shrink-0 items-center border-b px-4">
           <div>
             <h2 className="font-heading text-sm font-semibold leading-none">Live Inbox</h2>
@@ -445,14 +451,16 @@ export function Inbox({
           tenant={selectedTenant}
           supabase={supabase}
           onTakeOverChange={handleTakeOverChange}
+          onBack={() => setSelectedId(null)}
           viewer="admin"
         />
       ) : (
+        // Desktop-only placeholder — on mobile the list already fills the screen.
         <>
-          <div className="flex min-w-0 flex-1 items-center justify-center text-sm text-muted-foreground">
+          <div className="hidden min-w-0 flex-1 items-center justify-center text-sm text-muted-foreground lg:flex">
             Select a conversation
           </div>
-          <div className="flex w-72 shrink-0 flex-col border-l bg-muted/20">
+          <div className="hidden w-72 shrink-0 flex-col border-l bg-muted/20 lg:flex">
             <div className="flex h-14 shrink-0 items-center border-b px-4">
               <h3 className="text-sm font-semibold leading-none">Details</h3>
             </div>

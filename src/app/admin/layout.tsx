@@ -67,10 +67,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </form>
           </div>
         </aside>
-        <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
-          <AppTopbar accountHref="/admin/account" accountTypeLabel="Agency" />
+        {/* h-dvh not h-screen — see the client dashboard layout for why. */}
+        <div className="flex h-dvh min-w-0 flex-1 flex-col overflow-hidden">
+          <AppTopbar accountHref="/admin/account" accountTypeLabel="Agency" accountKind="agency" />
           {/* pb-16 keeps content clear of the fixed mobile tab bar. */}
-          <main className="min-h-0 flex-1 overflow-y-auto pb-16 lg:pb-0">{children}</main>
+          {/* See the client dashboard layout for why overscroll-contain /
+              touch-pan-y are here — same fix for the same mobile scroll trap. */}
+          <main className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain pb-16 lg:pb-0">
+            {children}
+          </main>
           <AdminTabBar />
         </div>
       </div>

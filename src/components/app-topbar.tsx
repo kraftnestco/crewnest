@@ -23,6 +23,8 @@ import { TopbarHeadingSlot, TopbarActionsSlot } from '@/components/topbar-headin
 export async function AppTopbar({
   accountHref,
   accountTypeLabel,
+  accountKind,
+  switcher,
 }: {
   accountHref: string;
   /**
@@ -33,6 +35,19 @@ export async function AppTopbar({
    * active-tenant lookup) they already compute for their own sidebar badge.
    */
   accountTypeLabel: string;
+  /**
+   * Which PORTAL this is — the two shells are otherwise visually identical on a
+   * phone (same logo, same topbar, same tab bar). The business-name badge alone
+   * doesn't answer "am I in the agency view or a client view?", which is the
+   * actual question when one person has both.
+   */
+  accountKind: 'agency' | 'client';
+  /**
+   * Optional mobile business switcher, rendered in place of the plain badge.
+   * Supplied only by the client dashboard (the agency shell has no active
+   * tenant to switch), so this component stays agnostic about tenancy.
+   */
+  switcher?: React.ReactNode;
 }) {
   const [ctx, supabase] = await Promise.all([getCallerContext(), createSupabaseServerClient()]);
 
@@ -52,14 +67,35 @@ export async function AppTopbar({
   return (
     <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm lg:px-6">
       <div className="flex min-w-0 items-center gap-2.5">
-        {/* Brand + account-type badge show here on mobile only — the sidebar
+        {/* Brand + account badges show here on mobile only — the sidebar
             (which carries both on desktop) is hidden below lg. */}
-        <span className="flex min-w-0 items-center gap-2 lg:hidden">
-          <Logomark className="size-7 shrink-0" />
-          <span className="font-logo text-lg">CrewNest</span>
-          <span className="truncate rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-medium text-foreground">
-            {accountTypeLabel}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <Logomark className="size-7 shrink-0 lg:hidden" />
+          <span className="font-logo text-lg lg:hidden">CrewNest</span>
+          {/* Portal indicator: always says Agency or Client, so the two
+              near-identical shells are never confusable. Shown on desktop too —
+              the sidebar badge below `lg` carries the business name, but never
+              said which PORTAL you were in. */}
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[0.65rem] font-medium ${
+              accountKind === 'agency' ? 'bg-primary/15 text-primary' : 'bg-muted text-foreground'
+            }`}
+          >
+            {accountKind === 'agency' ? 'Agency' : 'Client'}
           </span>
+          {/* The business name / switcher — mobile only, since the desktop
+              sidebar already shows it above its own switcher. Skipped when it
+              would just repeat the portal badge (the agency shell passes
+              "Agency" as its label and has no business to name). */}
+          {(switcher || accountTypeLabel !== 'Agency') && (
+            <span className="flex min-w-0 items-center lg:hidden">
+              {switcher ?? (
+                <span className="max-w-[8rem] truncate rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-medium text-foreground">
+                  {accountTypeLabel}
+                </span>
+              )}
+            </span>
+          )}
         </span>
         <TopbarHeadingSlot />
       </div>

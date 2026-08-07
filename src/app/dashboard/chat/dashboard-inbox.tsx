@@ -113,8 +113,22 @@ export function DashboardInbox({
   }
 
   return (
-    <div className="flex h-full overflow-hidden bg-background text-foreground">
-      <div className="flex min-h-0 w-80 shrink-0 flex-col border-r bg-muted/20">
+    <div className="relative flex h-full min-h-0 overflow-hidden bg-background text-foreground">
+      {/*
+        Master/detail on mobile, side-by-side from `lg` up.
+
+        Below `lg` these two panes are mutually exclusive: the list fills the
+        screen until a conversation is picked, then the thread takes over (its
+        header carries a Back button). They used to render simultaneously at
+        fixed widths — a 320px list plus a 288px details rail on a ~390px
+        phone left the message thread about 30px wide, which rendered the
+        reply text one character per line.
+      */}
+      <div
+        className={`min-h-0 w-full shrink-0 flex-col border-r bg-muted/20 lg:flex lg:w-80 ${
+          selected ? 'hidden lg:flex' : 'flex'
+        }`}
+      >
         <div className="flex h-14 shrink-0 items-center justify-between border-b px-4">
           <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Conversations</h2>
           <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground tabular-nums">
@@ -226,14 +240,18 @@ export function DashboardInbox({
           tenant={tenant}
           supabase={supabase}
           onTakeOverChange={handleTakeOverChange}
+          onBack={() => setSelectedId(null)}
           viewer="client"
         />
       ) : (
+        // Desktop-only placeholder: on mobile the list above already fills the
+        // screen when nothing is selected, so a second "pick something" pane
+        // would just cover it.
         <>
-          <div className="flex min-w-0 flex-1 items-center justify-center text-sm text-muted-foreground">
+          <div className="hidden min-w-0 flex-1 items-center justify-center text-sm text-muted-foreground lg:flex">
             Select a conversation
           </div>
-          <div className="flex w-72 shrink-0 flex-col border-l bg-muted/20">
+          <div className="hidden w-72 shrink-0 flex-col border-l bg-muted/20 lg:flex">
             <div className="flex h-14 shrink-0 items-center border-b px-4">
               <h3 className="text-sm font-semibold leading-none">Details</h3>
             </div>

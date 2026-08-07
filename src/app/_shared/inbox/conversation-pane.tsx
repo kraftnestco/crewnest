@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { PanelRightClose, PanelRightOpen, Info, HelpCircle, AlertTriangle } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, Info, HelpCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
@@ -133,12 +133,19 @@ export function ConversationPane({
   tenant,
   supabase,
   onTakeOverChange,
+  onBack,
   viewer = 'admin',
 }: {
   session: SessionWithTenant;
   tenant: TenantRow | undefined;
   supabase: SupabaseClient<Database>;
   onTakeOverChange: (sessionId: string, next: boolean) => void;
+  /**
+   * Deselects the conversation, returning to the list. Only rendered below
+   * `lg`, where the list and this pane are mutually exclusive — on desktop
+   * both are visible at once and there is nothing to go "back" to.
+   */
+  onBack?: () => void;
   /** Clients get a plain-language summary — the raw system prompt/catalogue JSON is internal (docs/13 §9). */
   viewer?: 'admin' | 'client';
 }) {
@@ -248,9 +255,21 @@ export function ConversationPane({
 
   return (
     <>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="flex h-14 shrink-0 items-center justify-between border-b bg-background px-4">
-          <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col lg:w-auto">
+        <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-3 lg:px-4">
+          <div className="flex min-w-0 items-center gap-2 lg:gap-3">
+            {onBack && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onBack}
+                aria-label="Back to conversations"
+                className="-ml-1 shrink-0 lg:hidden"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
             <SessionAvatar name={customerLabel(session)} avatarUrl={session.customer_avatar_url} />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold leading-none">{customerLabel(session)}</p>
@@ -265,14 +284,21 @@ export function ConversationPane({
               </p>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 lg:gap-3">
             <OrderSummaryDialog
               sessionId={session.id}
               paymentMethods={tenant?.payments_enabled ? ((tenant.payment_methods as PaymentMethod[] | null) ?? []) : []}
             />
-            <div className="flex items-center gap-2" title={session.is_human_handoff ? 'The AI has stopped replying. You’re answering this chat yourself' : 'The AI is currently replying to this customer'}>
-              <span className="text-xs font-medium text-muted-foreground">Human takeover</span>
-              <Switch checked={session.is_human_handoff} onCheckedChange={handleTakeOver} disabled={isPending} />
+            <div className="flex items-center gap-1.5 lg:gap-2" title={session.is_human_handoff ? 'The AI has stopped replying. You’re answering this chat yourself' : 'The AI is currently replying to this customer'}>
+              {/* Full label needs the room; on phones the switch keeps an
+                  accessible name instead so the row can't overflow. */}
+              <span className="hidden text-xs font-medium text-muted-foreground lg:inline">Human takeover</span>
+              <Switch
+                checked={session.is_human_handoff}
+                onCheckedChange={handleTakeOver}
+                disabled={isPending}
+                aria-label="Human takeover"
+              />
             </div>
             <Button
               type="button"
@@ -358,7 +384,10 @@ export function ConversationPane({
       </div>
 
       {showDetails ? (
-        <div className="animate-in slide-in-from-right-4 flex min-h-0 w-72 shrink-0 flex-col border-l bg-muted/20 duration-200 motion-reduce:animate-none">
+        // Overlays the thread on mobile (there isn't room to sit beside it —
+        // as a 288px in-flow rail it was squeezing the messages to a sliver);
+        // from `lg` it returns to being a normal side rail.
+        <div className="animate-in slide-in-from-right-4 absolute inset-0 z-20 flex min-h-0 flex-col border-l bg-background duration-200 motion-reduce:animate-none lg:static lg:z-auto lg:w-72 lg:shrink-0 lg:bg-muted/20">
           <div className="flex h-14 shrink-0 items-center justify-between border-b px-4">
             <h3 className="text-sm font-semibold leading-none">Details</h3>
             <Button

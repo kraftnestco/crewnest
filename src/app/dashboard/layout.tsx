@@ -8,7 +8,7 @@ import { TopbarHeadingProvider } from '@/components/topbar-heading';
 import { signOutAction } from '@/app/admin/actions';
 import { Logomark } from '@/app/_landing/logomark';
 import { DashboardNav, DashboardTabBar } from './dashboard-nav';
-import { TenantSwitcher } from './tenant-switcher';
+import { MobileTenantSwitcher, TenantSwitcher } from './tenant-switcher';
 import { log } from '@/lib/log';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -106,10 +106,41 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </form>
           </div>
         </aside>
-        <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
-          <AppTopbar accountHref="/dashboard/account" accountTypeLabel={activeTenantName} />
+        {/*
+          `h-dvh`, not `h-screen`: 100vh on mobile is the viewport WITH browser
+          chrome hidden, so a 100vh column is taller than what's actually
+          visible — the bottom of every page (and the fixed tab bar) sat under
+          the URL bar, and the overflow made short pages scroll a little for no
+          reason. `dvh` tracks the live visible height instead.
+        */}
+        <div className="flex h-dvh min-w-0 flex-1 flex-col overflow-hidden">
+          <AppTopbar
+            accountHref="/dashboard/account"
+            accountTypeLabel={activeTenantName}
+            accountKind="client"
+            switcher={
+              <MobileTenantSwitcher
+                activeTenantId={activeTenantId}
+                activeTenantName={activeTenantName}
+                tenants={ctx.memberships.map((m) => ({
+                  tenantId: m.tenantId,
+                  name: tenantNameMap.get(m.tenantId) ?? m.tenantId,
+                }))}
+              />
+            }
+          />
           {/* pb-16 keeps content clear of the fixed mobile tab bar. */}
-          <main className="min-h-0 flex-1 overflow-y-auto pb-16 lg:pb-0">{children}</main>
+          {/*
+            `overscroll-contain` stops a scroll that reaches this container's
+            end from chaining up to the document and triggering the mobile
+            browser's pull-to-refresh / URL-bar show-hide, which is what made
+            scrolling feel like it "stuck" mid-gesture. `touch-pan-y` keeps
+            vertical panning on the compositor rather than waiting on a
+            main-thread listener to decide.
+          */}
+          <main className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain pb-16 lg:pb-0">
+            {children}
+          </main>
           <DashboardTabBar showBusiness={showBusiness} showBookings={showBookings} />
         </div>
       </div>
