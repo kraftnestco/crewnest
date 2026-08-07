@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { PanelRightClose, PanelRightOpen, Info, HelpCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
@@ -300,14 +300,51 @@ export function ConversationPane({
                 aria-label="Human takeover"
               />
             </div>
+            {/*
+              The ONLY details toggle. There used to be a second, identical one
+              in a 44px "collapsed rail" pinned to the right edge — two buttons
+              with the same icon and the same action, side by side, plus a strip
+              of dead space next to the thread on every screen size. The rail's
+              one real job was surfacing the alert / needs-input signals while
+              the panel was closed, so those move onto this button as a dot
+              badge: same information, no duplicate control, no strip.
+            */}
             <Button
               type="button"
               variant="ghost"
               size="icon"
               onClick={() => setShowDetails((v) => !v)}
-              aria-label={showDetails ? 'Hide details' : 'Show details'}
+              aria-label={
+                showDetails
+                  ? 'Hide details'
+                  : hasClarification
+                    ? 'Show details — needs your input'
+                    : hasAlert
+                      ? `Show details — ${alertSignalLabel(session.alert_signal!)}`
+                      : 'Show details'
+              }
+              title={
+                hasClarification
+                  ? 'Needs your input'
+                  : hasAlert
+                    ? alertSignalLabel(session.alert_signal!)
+                    : showDetails
+                      ? 'Hide details'
+                      : 'Show details'
+              }
+              className="relative"
             >
               {showDetails ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+              {/* Unread-style dot: amber for an open clarification (actionable),
+                  red for an alert signal. Hidden while the panel is open, since
+                  the detail itself is then on screen. */}
+              {!showDetails && (hasClarification || hasAlert) && (
+                <span
+                  className={`absolute top-1.5 right-1.5 size-1.5 rounded-full ${
+                    hasClarification ? 'bg-amber-500' : 'bg-destructive'
+                  }`}
+                />
+              )}
             </Button>
           </div>
         </div>
@@ -471,59 +508,7 @@ export function ConversationPane({
             </div>
           </ScrollArea>
         </div>
-      ) : (
-        /* Collapsed rail — the important signals peek from the side; click to open. */
-        <div className="flex w-11 shrink-0 flex-col items-center gap-1.5 border-l bg-muted/20 py-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowDetails(true)}
-            aria-label="Show details"
-            title="Show details"
-          >
-            <PanelRightOpen className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowDetails(true)}
-            aria-label="Conversation info"
-            title="Conversation info"
-          >
-            <Info className="h-4 w-4 text-muted-foreground" />
-          </Button>
-          {hasClarification && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowDetails(true)}
-              aria-label="Needs your input"
-              title="Needs your input"
-              className="relative"
-            >
-              <HelpCircle className="h-4 w-4 text-amber-500" />
-              <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-amber-500" />
-            </Button>
-          )}
-          {hasAlert && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowDetails(true)}
-              aria-label={alertSignalLabel(session.alert_signal!)}
-              title={alertSignalLabel(session.alert_signal!)}
-              className="relative"
-            >
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-              <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-destructive" />
-            </Button>
-          )}
-        </div>
-      )}
+      ) : null}
     </>
   );
 }
