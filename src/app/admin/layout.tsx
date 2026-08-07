@@ -73,7 +73,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {/* pb-16 keeps content clear of the fixed mobile tab bar. */}
           {/* See the client dashboard layout for why overscroll-contain /
               touch-pan-y are here — same fix for the same mobile scroll trap. */}
-          <main className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain pb-16 lg:pb-0">
+          {/* min-w-0 + overflow-x-hidden — see the client dashboard layout for
+              why (a wide table must not widen the page itself). */}
+          {/* Bottom padding clears the fixed tab bar + safe-area inset — see
+              the client dashboard layout. */}
+          <main className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:pb-0">
             {children}
           </main>
           <AdminTabBar />

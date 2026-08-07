@@ -54,7 +54,7 @@ export default async function SystemHealthPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div>
           <h2 className="mb-2 font-heading text-sm font-semibold">Recent failed messages</h2>
-          <div className="rounded-xl bg-card ring-1 ring-foreground/10">
+          <div className="rounded-xl bg-card ring-1 ring-foreground/10 overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -89,7 +89,7 @@ export default async function SystemHealthPage() {
 
         <div>
           <h2 className="mb-2 font-heading text-sm font-semibold">Recent cost alerts</h2>
-          <div className="rounded-xl bg-card ring-1 ring-foreground/10">
+          <div className="rounded-xl bg-card ring-1 ring-foreground/10 overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>

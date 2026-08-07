@@ -53,7 +53,7 @@ export default async function SettingsPage() {
           <code className="rounded bg-muted px-1 py-0.5">is_platform_admin = true</code> on their
           profile row).
         </p>
-        <div className="rounded-xl bg-card ring-1 ring-foreground/10">
+        <div className="rounded-xl bg-card ring-1 ring-foreground/10 overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>

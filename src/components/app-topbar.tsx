@@ -71,7 +71,11 @@ export async function AppTopbar({
             (which carries both on desktop) is hidden below lg. */}
         <span className="flex min-w-0 items-center gap-1.5">
           <Logomark className="size-7 shrink-0 lg:hidden" />
-          <span className="font-logo text-lg lg:hidden">CrewNest</span>
+          {/* The wordmark is redundant next to the logomark and was the single
+              biggest consumer of a phone topbar's width — with it there, the
+              business name in the switcher crushed to "Kraf…". Hidden on the
+              narrowest screens; the mark alone still carries the brand. */}
+          <span className="hidden font-logo text-lg min-[420px]:inline lg:hidden">CrewNest</span>
           {/* Portal indicator: always says Agency or Client, so the two
               near-identical shells are never confusable. Shown on desktop too —
               the sidebar badge below `lg` carries the business name, but never

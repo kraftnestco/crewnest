@@ -106,7 +106,7 @@ export default async function OverviewPage() {
 
       <div>
         <h2 className="mb-2 font-heading text-sm font-semibold">Recent usage</h2>
-        <div className="rounded-xl bg-card ring-1 ring-foreground/10">
+        <div className="rounded-xl bg-card ring-1 ring-foreground/10 overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>

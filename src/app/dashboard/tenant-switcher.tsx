@@ -92,9 +92,11 @@ export function MobileTenantSwitcher({
       <DropdownMenuTrigger
         disabled={isPending}
         aria-label={`Active business: ${activeTenantName}. Switch business`}
-        className="flex min-w-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-medium text-foreground transition-opacity disabled:opacity-60"
+        className="flex min-w-0 items-center gap-1 rounded-full bg-muted px-2 py-1 text-[0.65rem] font-medium text-foreground transition-opacity disabled:opacity-60"
       >
-        <span className="max-w-[7rem] truncate">{activeTenantName}</span>
+        {/* Grows with the space the topbar actually has rather than a fixed
+            7rem cap, which truncated even short business names to "Kraf…". */}
+        <span className="min-w-0 truncate">{activeTenantName}</span>
         <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-52">

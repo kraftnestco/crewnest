@@ -8,7 +8,21 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      /*
+       * `min-w-0` is load-bearing, not decoration. This container is almost
+       * always a flex/grid child, and those default to min-width:auto — meaning
+       * they refuse to shrink below their content. A wide table (every cell is
+       * whitespace-nowrap) therefore stretched its ancestors instead of
+       * scrolling inside this box, which pushed the whole PAGE wider than the
+       * viewport: the page scrolled sideways, revealing empty background past
+       * the layout, and the fixed-width shell chrome no longer lined up.
+       * With min-w-0 the container can shrink, so overflow-x-auto actually
+       * takes effect and the scrolling stays in the table where it belongs.
+       *
+       * `overscroll-x-contain` keeps a horizontal swipe that reaches the end of
+       * the table from chaining out to the page/browser back-gesture.
+       */
+      className="relative w-full min-w-0 overflow-x-auto overscroll-x-contain rounded-[inherit]"
     >
       <table
         data-slot="table"

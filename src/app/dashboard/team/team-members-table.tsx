@@ -63,7 +63,7 @@ export function TeamMembersTable({
 
   return (
     <>
-      <div className="rounded-xl ring-1 ring-foreground/10">
+      <div className="rounded-xl ring-1 ring-foreground/10 overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
