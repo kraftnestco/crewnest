@@ -43,6 +43,9 @@ export function LegalPage({
         <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-3 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:justify-between">
           <p>© {new Date().getFullYear()} CrewNest</p>
           <div className="flex gap-4">
+            <Link href="/security" className="hover:text-foreground">
+              Security
+            </Link>
             <Link href="/privacy" className="hover:text-foreground">
               Privacy policy
             </Link>

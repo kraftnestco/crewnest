@@ -371,9 +371,22 @@ export function HeroVisual({ className }: { className?: string }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1.25fr_1fr]">
+      {/*
+        `sm:h-[360px]` locks the WHOLE two-card row to one constant height.
+        `items-start` on the page-level grid (page.tsx) only pins content to
+        the top of a track — it doesn't stop a row-spanning item from
+        growing the track itself. The dashboard panel's height was already
+        pinned with reserved slots below, but the chat card only had a
+        `min-h` on its message area, so long wrapped lines / the typing
+        bubble / the handoff banner could still grow it, which grew this
+        component's total height, which grew the grid rows it spans, which
+        pushed the H1 in column 1 down. Fixing both cards to `h-full` inside
+        a fixed-height row removes the growth at the source instead of
+        chasing it downstream.
+      */}
+      <div className="grid grid-cols-1 gap-3 sm:h-[360px] sm:grid-cols-[1.25fr_1fr]">
         {/* ── Customer chat (skinned per channel) ───────────────────── */}
-        <div className="flex flex-col overflow-hidden rounded-2xl bg-card shadow-xl ring-1 ring-foreground/10">
+        <div className="flex flex-col overflow-hidden rounded-2xl bg-card shadow-xl ring-1 ring-foreground/10 sm:h-full">
           {/* App-style header */}
           <div className={cn('flex items-center gap-2.5 px-3 py-2.5', skin.header)}>
             <ChevronLeft className="size-5 shrink-0 opacity-70" />
@@ -391,8 +404,12 @@ export function HeroVisual({ className }: { className?: string }) {
             <Phone className="size-4 shrink-0 opacity-70" />
           </div>
 
-          {/* Conversation area */}
-          <div className={cn('relative flex min-h-[236px] flex-col justify-end gap-1.5 px-3 py-3', skin.area)}>
+          {/* Conversation area — flex-1 fills whatever the now-fixed card
+              height leaves after the header/input bars, and overflow-hidden
+              is the backstop: if a frame's content is ever taller than that
+              (a wrapped long line, the typing dots, the handoff banner), it
+              clips at the top instead of growing the box. */}
+          <div className={cn('relative flex flex-1 flex-col justify-end gap-1.5 overflow-hidden px-3 py-3', skin.area)}>
             {skin.doodle && <ChatBackdrop />}
 
             <div className="relative flex flex-col gap-1.5">
@@ -476,7 +493,7 @@ export function HeroVisual({ className }: { className?: string }) {
           panel is the part the page's message actually depends on; this is
           secondary proof, not lost, just not competing for the fold.
         */}
-        <div className="hidden flex-col gap-2.5 rounded-2xl bg-card p-3.5 shadow-xl ring-1 ring-foreground/10 sm:flex">
+        <div className="hidden flex-col gap-2.5 rounded-2xl bg-card p-3.5 shadow-xl ring-1 ring-foreground/10 sm:flex sm:h-full">
           <div className="flex items-center justify-between border-b border-border pb-2.5">
             <span className="text-xs font-semibold text-foreground">Your dashboard</span>
             <span className="flex items-center gap-1 text-[11px] text-muted-foreground">

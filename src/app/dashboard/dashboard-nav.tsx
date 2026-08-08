@@ -32,11 +32,11 @@ function buildItems(showBusiness: boolean, showBookings: boolean): NavItem[] {
     ...(showBusiness ? [{ href: '/dashboard/business', label: 'My Business', shortLabel: 'Business', icon: Store }] : []),
     // Ordered daily-driver-first: whatever falls past MobileTabBar's 4-visible
     // cap collapses into its "More" menu, not off the nav entirely (docs/27
-    // §7A D-08) — Inventory/Team/Billing are the ones expected to land there
+    // §7A D-08) — My Stock/Team/Billing are the ones expected to land there
     // for a tenant_admin, but nothing is actually unreachable any more. The
-    // low-stock notification still deep-links straight into Inventory on
+    // low-stock notification still deep-links straight into My Stock on
     // phones regardless of which tab it's currently under (docs/19 I1).
-    ...(showBusiness ? [{ href: '/dashboard/inventory', label: 'Inventory', shortLabel: 'Stock', icon: Boxes }] : []),
+    ...(showBusiness ? [{ href: '/dashboard/inventory', label: 'My Stock', shortLabel: 'Stock', icon: Boxes }] : []),
     ...(showBusiness ? [{ href: '/dashboard/team', label: 'My Team', shortLabel: 'Team', icon: Users }] : []),
     ...(showBusiness ? [{ href: '/dashboard/billing', label: 'Billing', icon: CreditCard }] : []),
   ];

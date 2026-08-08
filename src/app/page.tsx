@@ -6,7 +6,6 @@ import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { PAYWALL_PLANS } from '@/services/demo/plans';
 import { Logomark } from './_landing/logomark';
-import { TiltCard } from './_landing/tilt-card';
 import { BeforeAfterGainCard } from './_landing/scroll-reveal';
 import { SiteHeader } from './_landing/site-header';
 import { SECTION_LINKS } from './_landing/section-links';
@@ -284,20 +283,34 @@ export default function Home() {
                 One inbox, grounded answers, captured orders, and a human always one tap away.
               </p>
             </div>
-            <div className="mt-10 grid gap-4 sm:grid-cols-2">
-              {FEATURES.map((feature) => (
-                <TiltCard key={feature.title} max={5}>
-                  <Card className="h-full">
-                    <CardHeader>
-                      <span className="inline-flex size-9 items-center justify-center rounded-xl bg-foreground text-background shadow-sm">
-                        <feature.icon className="size-4" />
-                      </span>
-                      <CardTitle className={cn(displayFont.className, 'mt-2 font-semibold')}>{feature.title}</CardTitle>
-                      <CardDescription>{feature.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent />
-                  </Card>
-                </TiltCard>
+            {/*
+              A roster, not a card grid. Four white rounded-2xl cards with a
+              black icon chip is the same feature-grid every AI-SaaS template
+              ships with. This is an "AI employee" product, so the features
+              read as a staff list instead: numbered rows on hairline
+              dividers, an outlined (not filled) icon mark, title inline with
+              the description. No card surface, no shadow, nothing floating
+              off the stage-warm ground — the section IS the container.
+            */}
+            <div className="mt-10 divide-y divide-stage-warm-fg/15 border-y border-stage-warm-fg/15">
+              {FEATURES.map((feature, i) => (
+                <div key={feature.title} className="group flex flex-col gap-3 py-6 sm:flex-row sm:items-center sm:gap-8">
+                  <div className="flex items-center gap-4 sm:w-72 sm:shrink-0">
+                    <span
+                      className={cn(
+                        displayFont.className,
+                        'text-sm font-semibold text-stage-warm-fg/35',
+                      )}
+                    >
+                      {(i + 1).toString().padStart(2, '0')}
+                    </span>
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-full border border-stage-warm-fg/25 text-stage-warm-fg transition-colors group-hover:border-stage-warm-fg/50 group-hover:bg-stage-warm-fg/5">
+                      <feature.icon className="size-5" />
+                    </span>
+                    <span className={cn(displayFont.className, 'font-semibold text-balance')}>{feature.title}</span>
+                  </div>
+                  <p className="text-stage-warm-fg/75 sm:flex-1">{feature.description}</p>
+                </div>
               ))}
             </div>
           </div>

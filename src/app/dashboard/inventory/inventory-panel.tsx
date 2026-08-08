@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { StatusPill } from '@/components/status-pill';
 import { cn } from '@/lib/utils';
 import { LOW_STOCK_THRESHOLD, type InventoryItem } from '@/services/inventory';
 import {
@@ -34,11 +35,7 @@ function StockBadge({ stock }: { stock: number | null }) {
   if (state === 'untracked') return <Badge variant="outline">Not tracked</Badge>;
   if (state === 'out') return <Badge variant="destructive">Out of stock</Badge>;
   if (state === 'low') {
-    return (
-      <Badge className="bg-amber-500/10 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400">
-        Low · {stock} left
-      </Badge>
-    );
+    return <StatusPill tone="pending">Low · {stock} left</StatusPill>;
   }
   return <Badge variant="secondary">{stock} in stock</Badge>;
 }
@@ -110,7 +107,7 @@ export function InventoryPanel({
           {low > 0 && (
             <>
               <span aria-hidden>·</span>
-              <span className="text-amber-600 dark:text-amber-400">{low} low</span>
+              <span className="text-pending-text">{low} low</span>
             </>
           )}
           {out > 0 && (

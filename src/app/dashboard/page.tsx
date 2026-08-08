@@ -1,24 +1,17 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Rocket } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Rocket } from 'lucide-react';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { getTenantNeedsAttention } from '@/services/overview';
+import { getTenantAttentionItems } from '@/services/overview';
 import { countSessionsToday } from '@/services/sessions';
 import { entitlementsFor, isLimited } from '@/lib/entitlements';
 import { PAYWALL_PLANS } from '@/services/demo/plans';
 import { PageHeader } from '@/components/page-header';
 import { EmptyState } from '@/components/empty-state';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BusinessCopilot, type CopilotOverview } from '@/components/copilot/business-copilot';
-
-const NEEDS_ATTENTION_CARDS = [
-  { key: 'ordersToApprove', label: 'Pending orders', href: '/dashboard/orders?status=pending' },
-  { key: 'paymentsToVerify', label: 'Payments to verify', href: '/dashboard/orders' },
-  { key: 'liveHandoffs', label: 'Live handoffs', href: '/dashboard/chat' },
-  { key: 'flaggedChats', label: 'Flagged chats', href: '/dashboard/chat' },
-] as const;
+import { BusinessCopilot } from '@/components/copilot/business-copilot';
 
 const CHANNEL_LABELS: Record<string, string> = {
   whatsapp: 'WhatsApp',
@@ -27,10 +20,21 @@ const CHANNEL_LABELS: Record<string, string> = {
   web: 'Website chat',
 };
 
+/** docs/27 §7.2 — rows only carry a clock, never a raw timestamp. */
+function formatRelativeTime(iso: string, now: number): string {
+  const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
 /**
- * Client home (docs/14 §6). Was a bare redirect to /dashboard/chat — now a real
- * landing page: needs-attention (shared with the agency Overview, §5.2), a light
- * value teaser, and a getting-started state for a tenant with no activity yet.
+ * Client home (docs/14 §6, reshaped by docs/27 §7.1). One Home for every plan
+ * and role: needs-attention is always visible (never folded into the copilot
+ * or hidden behind a paywall), the copilot sits below it as a section rather
+ * than replacing the page, and the activity numbers close it out.
  */
 export default async function DashboardHomePage() {
   const ctx = await getCallerContext(); // layout already gated; re-derive (React cache dedupes)
@@ -53,18 +57,19 @@ export default async function DashboardHomePage() {
   const monthStart = new Date(new Date(now).getFullYear(), new Date(now).getMonth(), 1).toISOString();
 
   const [
-    needsAttention,
+    attentionItems,
     { data: tenant },
     { count: conversationsHandled30d },
     { count: activeConversations },
     { count: ordersThisMonth },
+    { count: appointmentsThisMonth },
     conversationsToday,
     { data: ratingRows },
   ] = await Promise.all([
-    getTenantNeedsAttention(activeTenantId),
+    getTenantAttentionItems(activeTenantId, 5),
     supabase
       .from('tenants')
-      .select('business_name, whatsapp_phone_number_id, meta_page_id, instagram_id, widget_public_key, plan')
+      .select('business_name, whatsapp_phone_number_id, meta_page_id, instagram_id, widget_public_key, plan, business_type, booking_enabled')
       .eq('id', activeTenantId)
       .single(),
     supabase
@@ -81,6 +86,12 @@ export default async function DashboardHomePage() {
       .from('orders')
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', activeTenantId)
+      .gte('created_at', monthStart),
+    supabase
+      .from('appointments')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', activeTenantId)
+      .neq('status', 'cancelled')
       .gte('created_at', monthStart),
     countSessionsToday(activeTenantId),
     supabase.from('orders').select('review_rating').eq('tenant_id', activeTenantId).not('review_rating', 'is', null),
@@ -111,29 +122,20 @@ export default async function DashboardHomePage() {
     .filter(([, connected]) => connected)
     .map(([key]) => CHANNEL_LABELS[key]);
 
-  const teaser = [
-    { label: 'Conversations handled (30d)', value: conversationsHandled30d ?? 0 },
-    { label: 'Active conversations (24h)', value: activeConversations ?? 0 },
-    { label: 'Orders this month', value: ordersThisMonth ?? 0 },
+  // docs/27 §7.4 — the hero metric is whichever number proves the AI is doing
+  // the job: appointments for a service business that has booking on, orders
+  // for everyone else.
+  const showBookings = tenant?.business_type === 'service' && Boolean(tenant?.booking_enabled);
+  const heroStat = showBookings
+    ? { label: 'Appointments booked this month', value: appointmentsThisMonth ?? 0 }
+    : { label: 'Orders this month', value: ordersThisMonth ?? 0 };
+  const secondaryStats = [
+    { label: 'Customers answered this month', value: conversationsHandled30d ?? 0 },
+    { label: 'Chats happening today', value: activeConversations ?? 0 },
   ];
-  const hasActivity = teaser.some((t) => t.value > 0);
-  const attentionTotal = NEEDS_ATTENTION_CARDS.reduce((sum, c) => sum + needsAttention[c.key], 0);
+  const hasActivity = heroStat.value > 0 || secondaryStats.some((s) => s.value > 0);
 
-  // Feeds the copilot's folded-in overview panel (tenant_admin only — see below).
-  // Kept as a plain object built from the same queries above rather than a new
-  // fetch, so the two surfaces can never disagree.
-  const overview: CopilotOverview = {
-    hasActivity,
-    connectedChannels,
-    needsAttention: NEEDS_ATTENTION_CARDS.map((c) => ({
-      key: c.key,
-      label: c.label,
-      count: needsAttention[c.key],
-      href: c.href,
-    })),
-    stats: teaser,
-    avgRating: avgRating !== null ? { value: avgRating, count: ratings.length } : null,
-  };
+  const attentionOverflow = attentionItems.total - attentionItems.items.length;
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -160,6 +162,51 @@ export default async function DashboardHomePage() {
         </div>
       )}
 
+      {/* docs/27 §7.1/§7.2 — the needs-attention queue, always visible regardless
+          of plan or role, one human sentence + one action per row. */}
+      <div>
+        <h2 className="mb-2 font-heading text-sm font-semibold">Needs attention</h2>
+        {attentionItems.items.length === 0 ? (
+          <div className="flex items-center gap-2 rounded-xl bg-card p-4 text-sm text-muted-foreground ring-1 ring-foreground/10">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+            Nothing needs you right now.
+          </div>
+        ) : (
+          <>
+            <Card>
+              <CardContent className="divide-y p-0">
+                {attentionItems.items.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className="flex items-center justify-between gap-3 p-4 transition-colors hover:bg-muted/40"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">{item.sentence}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{formatRelativeTime(item.timestamp, now)}</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+            {attentionOverflow > 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                +{attentionOverflow} more waiting — see{' '}
+                <Link href="/dashboard/orders" className="underline underline-offset-2">
+                  My Orders
+                </Link>{' '}
+                and{' '}
+                <Link href="/dashboard/chat" className="underline underline-offset-2">
+                  My Inbox
+                </Link>
+                .
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Owners below Growth see what the AI assistant is, rather than nothing
           where the Copilot would be — the upgrade path is the point of the tier. */}
       {canEditBusiness && !hasCopilot && (
@@ -178,85 +225,70 @@ export default async function DashboardHomePage() {
         </div>
       )}
 
-      {canEditBusiness && hasCopilot ? (
-        // Owners on Growth+ get the copilot as the home surface — needs-attention/
-        // activity stats live inside it as an overview instead of as separate cards.
-        <BusinessCopilot tenantId={activeTenantId} businessName={tenant?.business_name ?? 'your business'} overview={overview} />
-      ) : !hasActivity ? (
-        // Staff (tenant_agent) can't edit the business, so they keep the plain
-        // stat view — no copilot, nothing to fold it into.
-        <EmptyState
-          icon={Rocket}
-          title={
-            connectedChannels.length > 0
-              ? `Your AI assistant is live on ${connectedChannels.join(', ')}`
-              : 'Your AI assistant is almost ready'
-          }
-          hint="This is where your customer chats and orders will show up once conversations start coming in."
-        />
-      ) : (
-        <>
-          <div>
-            <h2 className="mb-2 font-heading text-sm font-semibold">Needs attention</h2>
-            {attentionTotal === 0 ? (
-              <div className="rounded-xl bg-card p-4 text-sm text-muted-foreground ring-1 ring-foreground/10">
-                All clear ✓
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {NEEDS_ATTENTION_CARDS.map((c) => {
-                  const count = needsAttention[c.key];
-                  return (
-                    <Link
-                      key={c.key}
-                      href={c.href}
-                      className={`rounded-xl p-4 ring-1 transition-colors ${
-                        count > 0
-                          ? 'bg-card ring-foreground/10 hover:ring-foreground/20'
-                          : 'bg-card/40 text-muted-foreground ring-foreground/5'
-                      }`}
-                    >
-                      <p className={`text-2xl font-semibold ${count === 0 ? 'text-muted-foreground' : ''}`}>{count}</p>
-                      <p className="mt-1 text-xs">{c.label}</p>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {teaser.map((t) => (
-              <Card key={t.label}>
-                <CardHeader>
-                  <CardTitle className="text-sm font-normal text-muted-foreground">{t.label}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-semibold">{t.value}</p>
-                </CardContent>
-              </Card>
-            ))}
-            {avgRating !== null && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm font-normal text-muted-foreground">
-                    Average rating ({ratings.length} review{ratings.length === 1 ? '' : 's'})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-semibold">
-                    {avgRating.toFixed(1)}/5{' '}
-                    <span className="text-base text-amber-500">
-                      {'★'.repeat(Math.round(avgRating))}
-                      {'☆'.repeat(5 - Math.round(avgRating))}
-                    </span>
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </>
+      {/* Owners on Growth+ get the copilot as a section of Home, not the whole
+          page — needs-attention and activity numbers now live above it, so it
+          no longer folds its own overview panel in. */}
+      {canEditBusiness && hasCopilot && (
+        <BusinessCopilot tenantId={activeTenantId} businessName={tenant?.business_name ?? 'your business'} />
       )}
+
+      {/* docs/27 §7.4 — one hero-sized number that proves the assistant is
+          working, plus the supporting activity stats. */}
+      <div>
+        <h2 className="mb-2 font-heading text-sm font-semibold">Last 30 days</h2>
+        {!hasActivity ? (
+          <EmptyState
+            icon={Rocket}
+            title={
+              connectedChannels.length > 0
+                ? `Your AI assistant is live on ${connectedChannels.join(', ')}`
+                : 'Your AI assistant is almost ready'
+            }
+            hint="This is where your customer chats and orders will show up once conversations start coming in."
+          />
+        ) : (
+          <div className="flex flex-col gap-4">
+            <Card className="bg-primary/5 ring-1 ring-primary/15">
+              <CardHeader>
+                <CardTitle className="text-sm font-normal text-muted-foreground">{heroStat.label}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-4xl font-semibold tabular-nums">{heroStat.value}</p>
+              </CardContent>
+            </Card>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {secondaryStats.map((t) => (
+                <Card key={t.label}>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-normal text-muted-foreground">{t.label}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold tabular-nums">{t.value}</p>
+                  </CardContent>
+                </Card>
+              ))}
+              {avgRating !== null && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-normal text-muted-foreground">
+                      Average rating ({ratings.length} review{ratings.length === 1 ? '' : 's'})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold">
+                      {avgRating.toFixed(1)}/5{' '}
+                      <span className="text-base text-amber-500">
+                        {'★'.repeat(Math.round(avgRating))}
+                        {'☆'.repeat(5 - Math.round(avgRating))}
+                      </span>
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
