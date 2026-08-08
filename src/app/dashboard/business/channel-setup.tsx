@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Check, CheckCircle2, CircleDashed, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -121,6 +122,64 @@ const CHANNELS: ChannelInfo[] = [
   },
 ];
 
+/**
+ * docs/27 §5 C2 — one OAuth grant covers both Messenger and Instagram (a
+ * Page's linked IG account comes back in the same callback), so this is a
+ * single button rather than one per channel. Opens the initiate route in a
+ * popup; the callback route posts the result back via `window.postMessage`
+ * and closes itself, which is why this listens on `message` rather than
+ * awaiting the `window.open` call directly.
+ */
+function MetaConnectButton({ tenantId }: { tenantId: string }) {
+  const router = useRouter();
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (!event.data || event.data.type !== 'meta-connected') return;
+      setIsConnecting(false);
+      if (event.data.ok) {
+        toast.success('Facebook & Instagram connected.');
+        router.refresh();
+      } else {
+        toast.error(event.data.error ?? 'Connection failed.');
+      }
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [router]);
+
+  function connect() {
+    setIsConnecting(true);
+    const popup = window.open(
+      `/api/meta/connect?tenantId=${encodeURIComponent(tenantId)}`,
+      'meta-connect',
+      'width=600,height=700',
+    );
+    if (!popup) {
+      setIsConnecting(false);
+      toast.error('Please allow popups to connect Facebook & Instagram.');
+      return;
+    }
+    // No message ever arrives if the owner just closes the popup without
+    // finishing (declining is the only case Meta itself round-trips to us) —
+    // this is what un-sticks the button in that case.
+    const poll = window.setInterval(() => {
+      if (popup.closed) {
+        window.clearInterval(poll);
+        setIsConnecting(false);
+      }
+    }, 500);
+  }
+
+  return (
+    <Button type="button" size="sm" variant="outline" onClick={connect} disabled={isConnecting}>
+      {isConnecting ? 'Connecting…' : 'Connect with Facebook'}
+    </Button>
+  );
+}
+
 export function ChannelSetup({
   tenantId,
   connections,
@@ -140,6 +199,16 @@ export function ChannelSetup({
   const [notes, setNotes] = useState('');
 
   const notConnected = useMemo(() => CHANNELS.filter((c) => !connections[c.value]), [connections]);
+  // Messenger/Instagram self-serve via OAuth (docs/27 §5 C2) now; only
+  // WhatsApp and Website chat still go through the concierge request form.
+  const oauthChannels = useMemo(
+    () => notConnected.filter((c) => c.value === 'facebook' || c.value === 'instagram'),
+    [notConnected],
+  );
+  const conciergeChannels = useMemo(
+    () => notConnected.filter((c) => c.value !== 'facebook' && c.value !== 'instagram'),
+    [notConnected],
+  );
   const pendingSet = useMemo(() => new Set(requestedPlatforms), [requestedPlatforms]);
 
   useEffect(() => {
@@ -176,8 +245,9 @@ export function ChannelSetup({
               You never need to share passwords or API keys with us.
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              For WhatsApp, Messenger, and Instagram, you add us as a Partner on your own Meta Business
-              Manager — a permission you grant and can revoke, not a login.{' '}
+              For WhatsApp, you add us as a Partner on your own Meta Business Manager. For Messenger
+              and Instagram, you connect directly through Meta&apos;s own login. Both are permissions
+              you grant and can revoke — never a password shared with us.{' '}
               <Link href="/security" className="text-primary underline underline-offset-2">
                 See exactly what we can and can&apos;t see
               </Link>
@@ -225,19 +295,30 @@ export function ChannelSetup({
           })}
         </div>
 
-        {notConnected.length > 0 && (
+        {oauthChannels.length > 0 && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-input px-3 py-2.5">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Connect Facebook &amp; Instagram</p>
+              <p className="text-xs text-muted-foreground">One click, via Meta — no Partner request needed.</p>
+            </div>
+            <MetaConnectButton tenantId={tenantId} />
+          </div>
+        )}
+
+        {conciergeChannels.length > 0 && (
           <form action={formAction} className="space-y-3 border-t border-border pt-4">
             <div>
               <p className="text-sm font-medium">Request a new channel</p>
               <p className="text-xs text-muted-foreground">
-                For WhatsApp, Messenger, and Instagram we&apos;ll ask you to add us as a Partner on your
-                Meta Business Manager, then send exact steps once you request setup below.
+                {conciergeChannels.some((c) => c.value === 'whatsapp')
+                  ? "For WhatsApp we'll ask you to add us as a Partner on your Meta Business Manager, then send exact steps once you request setup below."
+                  : "Send us what we need and we'll get it connected."}
                 {platformSetupNotes ? ` Last note: "${platformSetupNotes}"` : ''}
               </p>
             </div>
 
             <div className="flex flex-col gap-2">
-              {notConnected.map((c) => (
+              {conciergeChannels.map((c) => (
                 <label
                   key={c.value}
                   className={`flex cursor-pointer flex-col gap-0.5 rounded-lg border px-3 py-2 text-left transition-colors ${

@@ -19,6 +19,11 @@ const schema = z.object({
   META_VERIFY_TOKEN: z.string().min(1),
   META_APP_SECRET: z.string().min(1),
   META_GRAPH_VERSION: z.string().default('v21.0'),
+  // Optional — Facebook Login for Business (docs/27 §5 C2). Unset ⇒ the
+  // Connect button's initiate route refuses loudly (same fail-loud posture
+  // as Stripe/Safepay above), same as before this shipped: Messenger/
+  // Instagram just stay on the C1 concierge request path.
+  META_APP_ID: z.string().optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().default('http://localhost:3000'),
   // Optional — email fan-out (docs/14 §3.4, Stage O7) is a no-op until this is set.
   RESEND_API_KEY: z.string().optional(),
