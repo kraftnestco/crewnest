@@ -249,8 +249,21 @@
   animation: float 5s ease-in-out infinite;
 }
 
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+.animate-dash {
+  animation: dash-flow 1.4s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-float {
+    animation: none;
+  }
+  .animate-dash {
     animation: none;
   }
 }

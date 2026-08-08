@@ -13,6 +13,19 @@ const STOPS: { id: PlatformId; customer: string; ai: string }[] = [
 ];
 
 /**
+ * One representative brand hex per channel, driving the ambient backdrop
+ * glow below — separate from SKIN's Tailwind classes (two of which are
+ * gradients, not a single colour) because a radial-gradient glow needs one
+ * concrete hex to fade from.
+ */
+const GLOW: Record<PlatformId, string> = {
+  whatsapp: '#25D366',
+  instagram: '#d62976',
+  messenger: '#0084ff',
+  web: '#737373',
+};
+
+/**
  * Motion item 4 (docs/27 §6.2 / §9 Phase 10) — the "biggest single wow".
  * `position: sticky` pins the phone while a tall driver track scrolls past
  * it; the active index (which channel skin is showing) is derived from
@@ -83,7 +96,14 @@ export function ChannelReskin() {
     return (
       <div className="mx-auto grid max-w-4xl gap-4 sm:grid-cols-3">
         {STOPS.map((stop) => (
-          <ChannelCard key={stop.id} stop={stop} />
+          <div key={stop.id} className="relative">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -inset-6 -z-10 rounded-[2.5rem] opacity-40 blur-2xl"
+              style={{ background: `radial-gradient(circle, ${GLOW[stop.id]}, transparent 70%)` }}
+            />
+            <ChannelCard stop={stop} />
+          </div>
         ))}
       </div>
     );
@@ -92,6 +112,21 @@ export function ChannelReskin() {
   return (
     <div ref={driverRef} className="relative h-[240vh]">
       <div className="sticky top-28 mx-auto w-full max-w-sm">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -inset-x-24 -inset-y-32 -z-10 sm:-inset-x-40"
+        >
+          {STOPS.map((stop, i) => (
+            <div
+              key={stop.id}
+              className="absolute inset-0 rounded-full blur-3xl transition-opacity duration-700 ease-out"
+              style={{
+                background: `radial-gradient(ellipse 55% 45% at 50% 45%, ${GLOW[stop.id]}, transparent 70%)`,
+                opacity: i === active ? 0.35 : 0,
+              }}
+            />
+          ))}
+        </div>
         <div className="relative h-[320px]">
           {STOPS.map((stop, i) => (
             <div

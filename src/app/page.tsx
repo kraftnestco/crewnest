@@ -1,5 +1,20 @@
 import Link from 'next/link';
-import { MessagesSquare, Sparkles, PackageCheck, UserCheck, ClipboardList, Cable, Rocket, Check, X, ChevronDown } from 'lucide-react';
+import {
+  MessagesSquare,
+  Sparkles,
+  PackageCheck,
+  UserCheck,
+  ClipboardList,
+  Cable,
+  Rocket,
+  Check,
+  X,
+  ChevronDown,
+  Inbox,
+  ArrowRight,
+  CheckSquare,
+  Bot,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
@@ -11,6 +26,7 @@ import { ChannelReskin } from './_landing/channel-reskin';
 import { SiteHeader } from './_landing/site-header';
 import { SECTION_LINKS } from './_landing/section-links';
 import { HeroSection } from './_landing/hero-section';
+import { HeroNetworkBackground } from './_landing/hero-network-bg';
 import { displayFont } from './_landing/fonts';
 import { PLATFORMS, PlatformBadge, type PlatformId } from './_landing/platform-icons';
 
@@ -58,6 +74,72 @@ const FEATURES = [
     title: 'Human handoff, anytime',
     description: 'Step into any conversation the moment it needs a human touch, then hand it back.',
   },
+];
+
+/**
+ * One tiny live visual per FEATURES row (same index order) — "show, don't
+ * tell" for a list that used to be four lines of description and nothing
+ * else. Every animation here is a Tailwind utility (animate-ping/bounce/
+ * pulse) with a staggered inline animationDelay, so there's no bespoke
+ * keyframe to maintain per feature; each one carries its own
+ * `motion-reduce:animate-none` since — unlike .animate-float/.animate-dash
+ * in globals.css — Tailwind's built-in animate-* utilities don't fold under
+ * prefers-reduced-motion on their own.
+ */
+const FEATURE_PREVIEWS = [
+  <div key="inbox" className="flex items-center gap-1.5">
+    {CHANNELS.map((id, idx) => (
+      <span key={id} className="relative">
+        <PlatformBadge platform={id} className="size-6 shadow-none" iconClassName="size-3" />
+        <span
+          className="absolute -top-0.5 -right-0.5 size-1.5 animate-ping rounded-full bg-primary motion-reduce:animate-none"
+          style={{ animationDelay: `${idx * 0.4}s`, animationDuration: '1.6s' }}
+        />
+      </span>
+    ))}
+    <ArrowRight className="size-3.5 shrink-0 text-stage-warm-fg/30" />
+    <span className="relative flex size-7 shrink-0 items-center justify-center rounded-lg bg-stage-warm-fg/10 text-stage-warm-fg">
+      <Inbox className="size-3.5" />
+      <span
+        className="absolute -top-1 -right-1 flex size-3.5 animate-bounce items-center justify-center rounded-full bg-primary text-[8px] font-bold text-primary-foreground motion-reduce:animate-none"
+        style={{ animationDuration: '1.8s' }}
+      >
+        4
+      </span>
+    </span>
+  </div>,
+  <div key="catalogue" className="flex w-32 flex-col gap-1 rounded-lg border border-stage-warm-fg/15 bg-stage-warm-fg/5 p-2 text-[10px]">
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-stage-warm-fg/60">Sea Green kurta</span>
+      <Check className="size-3 shrink-0 animate-pulse text-primary motion-reduce:animate-none" />
+    </div>
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-stage-warm-fg/60">Rs. 2,500 · M</span>
+      <Check
+        className="size-3 shrink-0 animate-pulse text-primary motion-reduce:animate-none"
+        style={{ animationDelay: '0.5s' }}
+      />
+    </div>
+  </div>,
+  <div key="order" className="flex w-32 items-center gap-2 rounded-lg border border-stage-warm-fg/15 bg-stage-warm-fg/5 p-2 text-[10px]">
+    <div className="flex flex-1 flex-col gap-0.5">
+      <span className="text-stage-warm-fg/60">2× Kurta</span>
+      <span className="font-semibold text-stage-warm-fg">Rs. 5,000</span>
+    </div>
+    <CheckSquare
+      className="size-4 shrink-0 animate-bounce text-primary motion-reduce:animate-none"
+      style={{ animationDuration: '1.8s' }}
+    />
+  </div>,
+  <div key="handoff" className="flex items-center gap-1.5 text-[10px]">
+    <span className="flex items-center gap-1 rounded-full bg-stage-warm-fg/10 px-2 py-1 text-stage-warm-fg/70">
+      <Bot className="size-3" /> AI
+    </span>
+    <ArrowRight className="size-3.5 shrink-0 animate-pulse text-stage-warm-fg/30 motion-reduce:animate-none" />
+    <span className="flex items-center gap-1 rounded-full bg-primary/15 px-2 py-1 text-primary">
+      <UserCheck className="size-3" /> You
+    </span>
+  </div>,
 ];
 
 const FAQS = [
@@ -129,6 +211,7 @@ export default function Home() {
               WebkitMaskImage: 'radial-gradient(ellipse 60% 50% at 50% 0%, black 40%, transparent 80%)',
             }}
           />
+          <HeroNetworkBackground />
 
           {/*
             One DOM, two orders (docs/27 §3 M2, D-05). Mobile order is plain
@@ -255,6 +338,7 @@ export default function Home() {
                     <span className={cn(displayFont.className, 'font-semibold text-balance')}>{feature.title}</span>
                   </div>
                   <p className="text-stage-warm-fg/75 sm:flex-1">{feature.description}</p>
+                  <div className="sm:shrink-0">{FEATURE_PREVIEWS[i]}</div>
                 </div>
               ))}
             </div>
