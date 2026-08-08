@@ -56,6 +56,8 @@
   --color-stage-deep-fg: var(--stage-deep-fg);
   --color-stage-warm: var(--stage-warm);
   --color-stage-warm-fg: var(--stage-warm-fg);
+  --color-stage-primary: var(--stage-primary);
+  --color-stage-primary-foreground: var(--stage-primary-foreground);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -128,6 +130,17 @@
   --stage-deep-fg: oklch(0.98 0.005 165);
   --stage-warm: oklch(0.95 0.045 85);
   --stage-warm-fg: oklch(0.25 0.03 80);
+
+  /*
+   * CTA colour for content sitting on a FIXED-dark stage (stage-ink/-deep).
+   * docs/27 §5 M5: --primary at its LIGHT value (oklch(0.52 ...)) is too dark
+   * to pop against stage-ink, so a themed CTA there could look muddy in light
+   * mode even though the stage itself never changes with the toggle. Pinned
+   * to .dark's own --primary value (the bright variant) — same "near-identical
+   * between themes" reasoning as the stage-* grounds themselves.
+   */
+  --stage-primary: oklch(0.72 0.14 163);
+  --stage-primary-foreground: oklch(0.16 0.025 170);
 }
 
 .dark {
@@ -183,6 +196,8 @@
   --stage-deep-fg: oklch(0.98 0.005 165);
   --stage-warm: oklch(0.95 0.045 85);
   --stage-warm-fg: oklch(0.25 0.03 80);
+  --stage-primary: oklch(0.72 0.14 163);
+  --stage-primary-foreground: oklch(0.16 0.025 170);
 }
 
 @layer base {

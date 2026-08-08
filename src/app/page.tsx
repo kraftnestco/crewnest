@@ -253,12 +253,20 @@ export default function Home() {
         </section>
 
         {/* Channel strip — honest social proof until real customer logos exist. */}
-        <section className="border-y border-border bg-card">
+        {/*
+          Stage 1 of the colour-blocked sequence (docs/27 §3 M5, D-04) — the
+          page previously alternated between two grounds 1.2% apart in
+          lightness (--background and --card), which measured out to the
+          entire "flat, no variation" problem. stage-ink is a real, fixed-dark
+          ground independent of the light/dark theme toggle, since these
+          sections are a committed visual sequence, not a themed surface.
+        */}
+        <section className="border-y border-border bg-stage-ink text-stage-ink-fg">
           <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-4 px-6 py-8 sm:flex-row sm:justify-between">
-            <p className="text-sm font-medium text-muted-foreground">Works where your customers already are</p>
+            <p className="text-sm font-medium text-stage-ink-fg/70">Works where your customers already are</p>
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
               {CHANNELS.map((id) => (
-                <span key={id} className="flex items-center gap-2 text-sm font-medium text-foreground/80">
+                <span key={id} className="flex items-center gap-2 text-sm font-medium text-stage-ink-fg/90">
                   <PlatformBadge platform={id} className="size-7 rounded-lg" iconClassName="size-3.5" />
                   {PLATFORMS[id].label}
                 </span>
@@ -297,37 +305,50 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="features" className="mx-auto w-full max-w-7xl scroll-mt-20 px-6 pb-20">
-          {/*
-            Previously four cards with no section title at all — heading order
-            on the page was H1, H2, H2, H2, H2 (this section had none), and it
-            was absent from every nav list (docs/27 §4 M4, D-02). Matches the
-            exact heading block shape every other section already uses.
-          */}
-          <div className="mx-auto max-w-2xl text-center">
-            <Badge variant="secondary">Features</Badge>
-            <h2 className={cn(displayFont.className, 'mt-4 text-3xl tracking-tight text-balance')}>
-              Everything runs in one place.
-            </h2>
-            <p className="mt-3 text-muted-foreground text-balance">
-              One inbox, grounded answers, captured orders, and a human always one tap away.
-            </p>
-          </div>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2">
-            {FEATURES.map((feature) => (
-              <TiltCard key={feature.title} max={5}>
-                <Card className="h-full">
-                  <CardHeader>
-                    <span className="inline-flex size-9 items-center justify-center rounded-xl bg-foreground text-background shadow-sm">
-                      <feature.icon className="size-4" />
-                    </span>
-                    <CardTitle className={cn(displayFont.className, 'mt-2 font-semibold')}>{feature.title}</CardTitle>
-                    <CardDescription>{feature.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent />
-                </Card>
-              </TiltCard>
-            ))}
+        {/*
+          Stage 2 (docs/27 §3 M5). Two-level wrapper (outer full-bleed +
+          inner max-w-7xl), matching Pricing's own shape below — previously a
+          single constrained <section>, which can't carry a full-bleed
+          background on its own. id/scroll-mt-20 stay on the OUTER element,
+          same as Pricing, so the header's #features link still lands here.
+          The feature cards themselves keep bg-card (unchanged) — the point is
+          THEM popping off a tinted section, not recolouring the cards.
+        */}
+        <section id="features" className="scroll-mt-20 bg-stage-warm text-stage-warm-fg">
+          <div className="mx-auto w-full max-w-7xl px-6 py-20">
+            {/*
+              Previously four cards with no section title at all — heading order
+              on the page was H1, H2, H2, H2, H2 (this section had none), and it
+              was absent from every nav list (docs/27 §4 M4, D-02). Matches the
+              exact heading block shape every other section already uses.
+            */}
+            <div className="mx-auto max-w-2xl text-center">
+              <Badge variant="secondary" className="border-transparent bg-stage-warm-fg/10 text-stage-warm-fg">
+                Features
+              </Badge>
+              <h2 className={cn(displayFont.className, 'mt-4 text-3xl tracking-tight text-balance')}>
+                Everything runs in one place.
+              </h2>
+              <p className="mt-3 text-stage-warm-fg/75 text-balance">
+                One inbox, grounded answers, captured orders, and a human always one tap away.
+              </p>
+            </div>
+            <div className="mt-10 grid gap-4 sm:grid-cols-2">
+              {FEATURES.map((feature) => (
+                <TiltCard key={feature.title} max={5}>
+                  <Card className="h-full">
+                    <CardHeader>
+                      <span className="inline-flex size-9 items-center justify-center rounded-xl bg-foreground text-background shadow-sm">
+                        <feature.icon className="size-4" />
+                      </span>
+                      <CardTitle className={cn(displayFont.className, 'mt-2 font-semibold')}>{feature.title}</CardTitle>
+                      <CardDescription>{feature.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent />
+                  </Card>
+                </TiltCard>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -413,15 +434,26 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="border-t border-border bg-card">
+        {/*
+          Final stage (docs/27 §3 M5) — bookends the Channel strip's stage-ink,
+          so the page opens and closes on the same committed dark ground.
+          The CTA uses --stage-primary, not the theme's own --primary: at its
+          LIGHT value --primary is too dark to pop against stage-ink, and
+          since this stage stays fixed-dark regardless of the app's own theme
+          toggle, the button needs a fixed bright value too, not a themed one.
+        */}
+        <section className="border-t border-border bg-stage-ink text-stage-ink-fg">
           <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-5 px-6 py-16 text-center">
             <h2 className={cn(displayFont.className, 'text-3xl tracking-tight text-balance')}>
               Hire your first AI employee today.
             </h2>
-            <p className="max-w-xl text-muted-foreground text-balance">
+            <p className="max-w-xl text-stage-ink-fg/75 text-balance">
               See it answering questions about your own business in minutes, before you pay anything.
             </p>
-            <Link href="/try" className={cn(buttonVariants({ size: 'lg' }))}>
+            <Link
+              href="/try"
+              className={cn(buttonVariants({ size: 'lg' }), 'bg-stage-primary text-stage-primary-foreground hover:bg-stage-primary/90')}
+            >
               Try it free for your business
             </Link>
           </div>
