@@ -620,7 +620,14 @@ export function HeroVisual({ className, variant = 'products' }: { className?: st
 
               {visibleMessages.map((m) => (
                 <div
-                  key={m.id}
+                  // `variant` in the key, not just `m.id` — both doors' scripts
+                  // reuse the same numeric ids for their analogous beats (each
+                  // door's own id=1 is its opening line, id=2 the first AI
+                  // reply, etc). Keying on id alone meant switching doors kept
+                  // the SAME DOM node for id=1, so TypedText below (which only
+                  // types out once per mount) never remounted and kept showing
+                  // the old door's opening line forever after the first switch.
+                  key={`${variant}-${m.id}`}
                   className={cn(
                     'flex motion-reduce:animate-none',
                     // Customer bubble just fades in — the typed text below does the

@@ -335,7 +335,11 @@ function PaymentCell({
           <OrderAttachmentPreview orderId={order.id} attachment={proof} />
         </div>
       )}
-      <div className="flex flex-wrap gap-1 pt-0.5">
+      {/* Stacked, not side-by-side (docs: orders row width) — two buttons on one
+          line (Verify + Reject) was the widest thing in any row, forcing the
+          whole table wider than the viewport. A column can only ever be as
+          wide as its widest single button once they're stacked. */}
+      <div className="flex flex-col items-start gap-1 pt-0.5">
         {order.payment_status === 'unpaid' && (
           <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={handleMarkPaid} disabled={isActing}>
             Mark paid
@@ -633,8 +637,15 @@ export function OrdersView({
                       <Badge variant="outline">Pending</Badge>
                     )}
                   </TableCell>
+                  {/* Two lines, not one long "8/7/2026, 12:43:09 AM" string —
+                      that single line was another of the widest cells in the
+                      row (docs: orders row width). Stacking date over time
+                      trades width for height, which is what a table wants. */}
                   <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
-                    {new Date(o.created_at).toLocaleString()}
+                    {new Date(o.created_at).toLocaleDateString()}
+                    <div className="text-[11px]">
+                      {new Date(o.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                    </div>
                   </TableCell>
                   <TableCell className="hidden text-right lg:table-cell">
                     {o.session_id ? (

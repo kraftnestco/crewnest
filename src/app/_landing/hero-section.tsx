@@ -36,7 +36,7 @@ export function HeroSection({ channels }: { channels: PlatformId[] }) {
           'text-4xl tracking-tight text-balance sm:text-5xl lg:col-start-1 lg:row-start-2',
         )}
       >
-        Your business, answered instantly.
+        Your business, answered <span className="text-primary">instantly</span>.
       </h1>
       {/*
         mt-8 on mobile only: HeroVisual's own floating "Runs your

@@ -76,17 +76,16 @@ export async function AppTopbar({
               business name in the switcher crushed to "Kraf…". Hidden on the
               narrowest screens; the mark alone still carries the brand. */}
           <span className="hidden font-logo text-lg min-[420px]:inline lg:hidden">CrewNest</span>
-          {/* Portal indicator: always says Agency or Client, so the two
-              near-identical shells are never confusable. Shown on desktop too —
-              the sidebar badge below `lg` carries the business name, but never
-              said which PORTAL you were in. */}
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[0.65rem] font-medium ${
-              accountKind === 'agency' ? 'bg-primary/15 text-primary' : 'bg-muted text-foreground'
-            }`}
-          >
-            {accountKind === 'agency' ? 'Agency' : 'Client'}
-          </span>
+          {/* Portal indicator: only shown on the agency side. The client
+              dashboard IS the business's own shell (not "the client view" of
+              something else to the owner using it), and a business name
+              already sits right next to this (the switcher/label below), so
+              a literal "Client" pill was redundant chrome, not information. */}
+          {accountKind === 'agency' && (
+            <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] font-medium text-primary">
+              Agency
+            </span>
+          )}
           {/* The business name / switcher — mobile only, since the desktop
               sidebar already shows it above its own switcher. Skipped when it
               would just repeat the portal badge (the agency shell passes
