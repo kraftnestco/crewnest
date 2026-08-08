@@ -49,7 +49,15 @@ export const ENTITLEMENTS: Record<PlanId, PlanEntitlements> = {
     hasCopilot: false,
   },
   starter: {
-    dailyConversations: 5,
+    // Was 5 — identical to Free, so the $39 upgrade had no visible reason to
+    // exist beyond message length/channel count (docs/27 §3 M9, D-07; user
+    // decision: raise Starter's own cap rather than leave the tiers tied).
+    // 15, not the doc's example of 50 — Growth ($49, one tier up) caps at 20,
+    // and 50 would have made the CHEAPER tier out-volume the pricier one.
+    // Kept below Growth so the existing "daily cap never decreases going up
+    // the ladder" invariant (entitlements.test.ts) holds without also having
+    // to reprice Growth, which wasn't part of this decision.
+    dailyConversations: 15,
     maxMessagesPerConversation: Infinity,
     maxChannels: Infinity,
     hasCopilot: false,

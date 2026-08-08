@@ -25,8 +25,8 @@ describe('plan entitlements — the advertised limits', () => {
     expect(ENTITLEMENTS.free.hasCopilot).toBe(false);
   });
 
-  it('starter ($39): still 5/day, but unlimited length and ALL channels', () => {
-    expect(ENTITLEMENTS.starter.dailyConversations).toBe(5);
+  it('starter ($39): 15/day (a real step up from Free\'s 5, and below Growth\'s 20), unlimited length and ALL channels', () => {
+    expect(ENTITLEMENTS.starter.dailyConversations).toBe(15);
     expect(isLimited(ENTITLEMENTS.starter.maxMessagesPerConversation)).toBe(false);
     expect(isLimited(ENTITLEMENTS.starter.maxChannels)).toBe(false);
   });
@@ -51,6 +51,20 @@ describe('plan entitlements — the advertised limits', () => {
     const caps = PLAN_IDS.map((p) => ENTITLEMENTS[p].dailyConversations);
     for (let i = 1; i < caps.length; i++) {
       expect(caps[i]).toBeGreaterThanOrEqual(caps[i - 1]);
+    }
+  });
+
+  it('no paid tier advertises the exact same headline conversation cap as the tier below it (D-07)', () => {
+    // The bug this guards: Free and Starter both being 5/day meant Starter's
+    // $39 had no visible reason to exist over staying on Free — a real
+    // commercial defect, not just a display nit. "Never decreases" above
+    // would have let two EQUAL caps through silently; this asserts they
+    // actually differ (unlimited, i.e. Infinity !== a finite number, always
+    // counts as differing here).
+    for (let i = 1; i < PLAN_IDS.length; i++) {
+      const lower = ENTITLEMENTS[PLAN_IDS[i - 1]].dailyConversations;
+      const higher = ENTITLEMENTS[PLAN_IDS[i]].dailyConversations;
+      expect(higher, `${PLAN_IDS[i]} must not repeat ${PLAN_IDS[i - 1]}'s exact cap`).not.toBe(lower);
     }
   });
 
