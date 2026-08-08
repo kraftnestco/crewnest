@@ -7,7 +7,124 @@ and is **not** available to you — so this repo's docs are the only source of t
 as you close items out.
 
 > **First Claude session:** "Read `handoff.md`, then tell me the next unstarted item and start it." The
-> ordered backlog in §4 is designed to be picked up top-down.
+> ordered backlog in §4 is designed to be picked up top-down. **Exception right now: there is an ACTIVE,
+> mid-stream piece of work — see §0 below — pick that up first, before falling through to §4.**
+
+---
+
+## 0. 🔴 ACTIVE — UI Revamp in progress, resume here first
+
+**Spec:** [`docs/27-UI-REVAMP.md`](docs/27-UI-REVAMP.md) — self-contained, has its own verified defect
+register (D-01..D-15), token spec, motion spec, and an explicit stage-by-stage build order (§9 of that
+doc). This section is a progress marker against that build order, not a replacement for it — **read
+27-UI-REVAMP.md itself before continuing**, this is just "where we stopped."
+
+**To resume:** *"Read `docs/27-UI-REVAMP.md` and `handoff.md` §0, then continue the UI revamp from Stage
+5 (M6 and M8) forward."*
+
+### What's done (commits `6a69f69`..`40648e0`, all on `main`, all pushed — nothing sitting local/unpushed)
+
+Every item below was verified against the **real live app** before being marked done — typecheck +
+`npm run build` + the full `vitest` suite every time, and for anything visual, an actual headless-browser
+pass (Playwright, installed as a devDependency — `npm ls playwright` to confirm it's still there) with
+real screenshots and/or measured pixel values, not eyeballed. Playwright scratch scripts were written to
+the repo root, run, then deleted — none are committed; if you see a stray `pw-*.cjs` at the repo root,
+it's leftover from a session that didn't clean up and is safe to delete.
+
+- **Pre-revamp QA pass** (`6a69f69`, `befaa23`, `67bb5e7`, `13f8c33`, `1fa5d70`, `de2e5f4`, `ca8a93a`) —
+  a full security + mobile-UX audit done *before* `docs/27-UI-REVAMP.md` existed, which is what surfaced
+  the need for it. Fixed: a rate-limit bucket-key collision, missing security headers, 10 dependency
+  CVEs, the inbox being unusable on a phone (fixed-position panes, broken scroll), a duplicate details
+  toggle, tables forcing horizontal page scroll, a Base UI crash in the business switcher (`Menu.
+  GroupLabel` used outside `Menu.Group`), `Something went wrong` on sign-out (calling a `redirect()`-
+  ending server action outside a `<form>` swallows the thrown `NEXT_REDIRECT`), the mobile tab bar
+  overlapping content, and a missing per-business filter on the notifications bell.
+- **Stage 0 — Field bugs** (`a4f1d96`) — D-13 (inbox thread panning sideways on an unbreakable token:
+  `break-words`+`min-w-0` on the bubble), D-14 (client dashboard's Orders page had a business dropdown
+  that lied — read "All clients" while already filtered to one; `showBusinessColumn` forced `false` on
+  the client shell, agency side at `/admin/orders` untouched and still correct), D-15 (the free plan's
+  20-message cap looked like a broken AI with no explanation and only a destructive recovery path —
+  added a `chat_sessions.length_limit_reset_at` column, migration `0047`, a banner explaining what
+  happened, a real non-destructive "Let the AI continue this chat" action, and disabled the Human
+  takeover switch while that specific handoff is active so it stops silently lying).
+  ⚠️ **Migration `0047` was applied by connecting directly to Postgres** (`pg` npm package, installed
+  then removed — it isn't a real dependency of the app), **not** via `supabase db push` — that command's
+  `--dry-run` showed it would try to replay all 46 prior migrations from scratch, because the CLI's own
+  remote-tracking table doesn't know they're already applied (they were applied by hand, same as every
+  migration in this project — see §5 item 1). **Do not run a bare `supabase db push` in this repo** until
+  someone reconciles that tracking table; it's a landmine, not something this session fixed.
+- **D-08 — mobile tab bar** (`f9f3873`) — was silently `.slice(0, 5)`-ing the nav list with no overflow;
+  a tenant_admin (8 destinations) or the agency (9) lost real pages with zero way to reach them. Now
+  shows 4 + a "More" menu (reuses the existing `DropdownMenu` primitive) for the rest.
+- **Stage 3 — Tokens** (`b167047`) — `--success`/`--pending`/`--danger` (+`-text`/`-tint` pairs) and the
+  marketing `--stage-ink`/`--stage-deep`/`--stage-warm` (+`-fg` pairs) grounds, both themes. The doc's own
+  starting oklch values were flagged as unmeasured — measured for real (canvas-resolve method, since
+  computed style resolves to `lab()`/`oklch()` and reading those components as raw RGB gives wrong
+  ratios) and `--pending-text` on `--pending-tint` in light mode genuinely failed at 4.48 against the 4.5
+  floor; darkened it (lightness only) and re-measured at 5.49.
+- **Stage 1 — Marketing critical** (`1dff268`) — M1 (hamburger menu below `md`, reusing `DropdownMenu`),
+  M2 (hero demo reordered above the fold on mobile — flattened DOM, grid-placement for desktop, hid
+  HeroVisual's secondary "Live dashboard" panel below `sm` since it alone was ~580px tall stacked;
+  verified a real message bubble renders inside a 664px viewport with zero scrolling), M3 (44px
+  touch-target rule extended to plain `<a>`/`<summary>`, previously buttons-only; the tab-bar exclusion
+  narrowed from "every `<nav>`" to just the tab bar via `data-slot="tab-bar"`), M4 (`#features` had no
+  heading and wasn't in any nav list — fixed, and a single `SECTION_LINKS` array now drives the desktop
+  nav + hamburger + footer so they can't drift apart again).
+- **Stage 2 — Dashboard nav** = D-08 above (they're the same fix, doc lists it as its own stage).
+- **Stage 4 — Auth** (`7e9ecd7`) — A1 (login's `<h1>` was literally `CrewNest` — the exact grammar of a
+  phishing page; now states the page's purpose), A2 (new shared `AuthShell`, real split-screen on `lg+`
+  with a static non-animated proof panel — not a stock illustration — form-only below `lg`), A3 ("what
+  happens next" line + a real support address, promoted a duplicated literal in privacy/terms pages to
+  `lib/constants.ts SUPPORT_EMAIL` while there), A4 (one line explaining the typed-code-not-a-link
+  decision, on both verify screens), A5 (`h-11` on every auth input/submit button — they measured ~32px).
+- **Stage 5, partial:**
+  - **M5 — colour-blocked sections** (`f023a92`) — the page alternated between two grounds 1.2% apart in
+    lightness (`--background` vs `--card`), which is the measured entirety of the "flat, samey" problem.
+    Applied the doc's stage sequence; Features needed restructuring (was a single constrained `<section>`,
+    can't carry a full-bleed background) into the same two-level wrapper Pricing already used. Added
+    `--stage-primary` (not in the doc's original §2 token list — needed because `--primary` at its
+    light-theme value is too dark to read well against the fixed-dark `--stage-ink`, and the stage
+    doesn't shift with the theme toggle the way `--primary` does).
+  - **M9 / D-07 — pricing** (`40648e0`) — Free and Starter ($39) both advertised the *identical* headline
+    "Up to 5 customer conversations/day," so Starter had no visible reason to exist. **This needed a
+    real decision, asked of and answered by the founder** (not guessed): raise Starter's own cap. Landed
+    on **15/day**, not the doc's example of 50 — Growth ($49, one tier up) caps at 20/day, and 50 would
+    have made the *cheaper* tier out-volume the pricier one, which the existing "cap never decreases
+    going up the ladder" test would have caught. Added a second test asserting each tier's cap actually
+    *differs* from the one below it (the old test alone would pass even with two tiers tied).
+
+### What's next — pick up here
+
+Still inside **Stage 5**, both doable with zero blockers, per the doc's own explicit fallback for exactly
+this situation:
+- **M8 — trust row.** The doc is explicit: **do not invent social proof.** If no honest number exists
+  yet for "businesses live" / "messages handled" / etc. (it doesn't, as of this session), ship the
+  channel logos (`_landing/platform-icons.tsx` already has them) + a "no card required" line only.
+- **M6 — before/after section.** New section between Features and Pricing, on `--stage-deep`. The doc
+  says to draw the four pain points from the FAQ copy already in `page.tsx` so the voice matches — that
+  copy exists and is real, so this isn't inventing new claims from nothing, just restructuring existing
+  ones. Motion spec for this section's reveal is docs/27 §6.2 item 2.
+
+Then continue down the doc's own build-order table (§9 of `docs/27-UI-REVAMP.md`): **Stage 6 (motion,
+needs M6 to exist)** → **Stage 7 (channel connection C1 — no backend needed, ships the trust story
+immediately)** → **Stage 8 (dashboard: the settled-Home-shape rework, needs-attention as a queue not a
+KPI grid, copy substitutions, status pills using the Stage-3 tokens — the single largest remaining
+chunk)** → **Stage 9 (two-door hero, "your crew" strip)** → **Stage 10 (the scroll-pinned channel
+re-skin — highest effort, purely additive, do it last)**.
+
+**Stage 11 (C2 — Facebook Login for Business / embedded OAuth for Instagram+Messenger) needs YOU, not
+just Claude:** an actual Meta App Review submission (screencast, privacy policy already exists at
+`/privacy`), a data-deletion callback endpoint, a Meta test user. The *architecture* (OAuth popup →
+server-side code exchange → Vault, client never sees a token) is stable and can be built ahead of the
+review being approved, but going live needs the review itself. Doc's own advice: **start that paperwork
+now, in parallel** — it's the long pole and nothing else in the doc depends on it.
+
+**Two things flagged in the doc but not yet reproduced/investigated this session** (§1 of
+`docs/27-UI-REVAMP.md`, "verify before designing around it"):
+- Orders "Owner alert" column possibly always reads *Pending* regardless of real status — if real, it's
+  a data bug in the orders query, not a UI task.
+- Instagram contact avatars possibly render as a broken-image icon in the inbox.
+Neither blocks anything above; just don't assume they're fine.
 
 ---
 
