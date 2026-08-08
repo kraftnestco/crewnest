@@ -2,8 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 /**
  * Shared navigation primitives (docs/19, Phase U2) — one item list drives both
@@ -62,11 +69,23 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
 }
 
 /**
- * Mobile bottom tab bar — first five items, visible below `lg`. Layouts pad
- * their scroll area (`pb-16 lg:pb-0`) so content never hides behind it.
+ * Mobile bottom tab bar — visible below `lg`. Layouts pad their scroll area
+ * (`pb-16 lg:pb-0`) so content never hides behind it.
+ *
+ * Used to silently `.slice(0, 5)` and drop everything past the fifth item —
+ * for a tenant_admin with booking on, that dropped My Business, Inventory, My
+ * Team and Billing off the bar entirely, with NO overflow escape anywhere in
+ * the mobile UI (docs/27 §7A D-08/§7.6). Now: up to five items show directly;
+ * a sixth-and-beyond set collapses the FIRST FOUR plus a "More" tab that opens
+ * every remaining destination in a menu anchored above the bar. Every nav
+ * destination stays reachable — at most one extra tap, never zero taps.
  */
 export function MobileTabBar({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
+  const overflowing = items.length > 5;
+  const visibleItems = overflowing ? items.slice(0, 4) : items;
+  const overflowItems = overflowing ? items.slice(4) : [];
+  const overflowActive = overflowItems.some((item) => isActivePath(pathname, item));
 
   return (
     /*
@@ -79,8 +98,8 @@ export function MobileTabBar({ items }: { items: NavItem[] }) {
      * <main> ends exactly where it begins, and there is nothing to compensate
      * for. `shrink-0` keeps it from being squeezed by a tall page.
      */
-    <nav className="z-40 flex shrink-0 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-      {items.slice(0, 5).map((item) => {
+    <nav data-slot="tab-bar" className="z-40 flex shrink-0 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+      {visibleItems.map((item) => {
         const isActive = isActivePath(pathname, item);
         return (
           <Link
@@ -96,6 +115,30 @@ export function MobileTabBar({ items }: { items: NavItem[] }) {
           </Link>
         );
       })}
+      {overflowing && (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className={cn(
+              'flex min-w-0 flex-1 flex-col items-center gap-1 py-2 text-[10px] font-medium transition-colors',
+              overflowActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <MoreHorizontal className="h-5 w-5" />
+            <span className="truncate">More</span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="end" className="mb-1 min-w-48">
+            {overflowItems.map((item) => {
+              const isActive = isActivePath(pathname, item);
+              return (
+                <DropdownMenuItem key={item.href} render={<Link href={item.href} />} className={isActive ? 'text-primary' : undefined}>
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </nav>
   );
 }

@@ -30,9 +30,12 @@ function buildItems(showBusiness: boolean, showBookings: boolean): NavItem[] {
       : []),
     { href: '/dashboard/analytics', label: 'Analytics', icon: ChartNoAxesColumn },
     ...(showBusiness ? [{ href: '/dashboard/business', label: 'My Business', shortLabel: 'Business', icon: Store }] : []),
-    // Inventory + Team sit past the mobile five-tab cap on purpose — both are
-    // tenant-admin management pages, not daily drivers; the low-stock
-    // notification deep-links straight into Inventory on phones (docs/19 I1).
+    // Ordered daily-driver-first: whatever falls past MobileTabBar's 4-visible
+    // cap collapses into its "More" menu, not off the nav entirely (docs/27
+    // §7A D-08) — Inventory/Team/Billing are the ones expected to land there
+    // for a tenant_admin, but nothing is actually unreachable any more. The
+    // low-stock notification still deep-links straight into Inventory on
+    // phones regardless of which tab it's currently under (docs/19 I1).
     ...(showBusiness ? [{ href: '/dashboard/inventory', label: 'Inventory', shortLabel: 'Stock', icon: Boxes }] : []),
     ...(showBusiness ? [{ href: '/dashboard/team', label: 'My Team', shortLabel: 'Team', icon: Users }] : []),
     ...(showBusiness ? [{ href: '/dashboard/billing', label: 'Billing', icon: CreditCard }] : []),
@@ -44,9 +47,10 @@ export function DashboardNav({ showBusiness, showBookings = false }: { showBusin
 }
 
 /**
- * Mobile tabs cap at five, so for tenant admins the daily-driver set is
- * Home/Inbox/Orders/Analytics/Business — Team (rare, setup-time) stays
- * desktop-only rather than crowding the bar.
+ * `MobileTabBar` shows the first four directly and collapses everything past
+ * that into a "More" menu (docs/27 §7A D-08) — every item in `buildItems` is
+ * reachable on a phone regardless of role/booking flags, never silently
+ * dropped.
  */
 export function DashboardTabBar({ showBusiness, showBookings = false }: { showBusiness: boolean; showBookings?: boolean }) {
   return <MobileTabBar items={buildItems(showBusiness, showBookings)} />;
