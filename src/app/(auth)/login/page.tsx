@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { getCallerContext } from '@/lib/auth/context';
 import { AuthShell } from '../auth-shell';
 import { LoginForm } from './login-form';
@@ -37,6 +38,20 @@ export default async function LoginPage({
             : 'Sign in to the agency dashboard.'
       }
       whatNext="Use the email your CrewNest setup was sent to."
+      footer={
+        // Agency admin accounts are invited, never self-serve — only offer the
+        // signup link when this sign-in is headed for the client dashboard
+        // (the same audience signup.tsx targets), mirroring its own reciprocal
+        // "Already have an account? Sign in" link.
+        !redirectTo?.startsWith('/admin') ? (
+          <>
+            Don&apos;t have an account?{' '}
+            <Link href="/signup" className="text-foreground underline underline-offset-2">
+              Sign up
+            </Link>
+          </>
+        ) : undefined
+      }
     >
       <LoginForm redirectTo={redirectTo ?? ''} />
     </AuthShell>

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { Sparkles } from 'lucide-react';
 import { Logomark } from '@/app/_landing/logomark';
 import { SUPPORT_EMAIL } from '@/lib/constants';
+import { AuthMarketingPanel } from './auth-marketing-panel';
 
 /**
  * Shared shell for /login and /signup (docs/27 §4 A1-A3).
@@ -59,11 +59,12 @@ export function AuthShell({
       </div>
 
       {/*
-        Hidden below `lg` — form only on a phone, per the doc. The one
-        concrete proof: a short, static (non-animated, no client JS needed
-        here) two-message exchange echoing the marketing hero's visual
-        language without importing its stateful animation logic into a
-        secondary screen.
+        Hidden below `lg` — form only on a phone, per the doc. The live proof
+        (AuthMarketingPanel) carries the marketing hero's motion language
+        into a secondary screen; this shell just owns the static chrome
+        around it — the dot-grid texture and two ambient glow orbs, both
+        cheap CSS-only animation so this file itself stays a server
+        component.
       */}
       <div className="relative hidden flex-1 items-center justify-center overflow-hidden bg-stage-deep p-12 text-stage-deep-fg lg:flex">
         <div
@@ -74,27 +75,18 @@ export function AuthShell({
             backgroundSize: '28px 28px',
           }}
         />
-        <div className="relative mx-auto max-w-sm">
-          <h2 className="font-hero-display text-3xl tracking-tight text-balance">
-            Every customer message, answered instantly.
-          </h2>
-          <p className="mt-3 text-stage-deep-fg/80">
-            Grounded in your actual catalogue — never a generic script, never a made-up price.
-          </p>
-
-          <div className="mt-8 flex flex-col gap-2.5">
-            <div className="flex justify-start">
-              <div className="max-w-[80%] rounded-2xl rounded-bl-md bg-white/10 px-3.5 py-2 text-sm">
-                Do you have the Sea Green kurta in medium?
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <div className="flex max-w-[80%] items-start gap-1.5 rounded-2xl rounded-br-md bg-white/95 px-3.5 py-2 text-sm text-stage-deep">
-                <Sparkles className="mt-0.5 size-3.5 shrink-0 opacity-70" />
-                Yes — medium is in stock, Rs. 2,500. Want me to place the order?
-              </div>
-            </div>
-          </div>
+        <div
+          aria-hidden
+          className="animate-float pointer-events-none absolute -top-24 -left-16 size-72 rounded-full bg-primary/25 blur-3xl"
+          style={{ animationDuration: '9s' }}
+        />
+        <div
+          aria-hidden
+          className="animate-float pointer-events-none absolute -right-20 -bottom-24 size-80 rounded-full bg-primary/15 blur-3xl"
+          style={{ animationDuration: '11s', animationDelay: '-4s' }}
+        />
+        <div className="relative">
+          <AuthMarketingPanel />
         </div>
       </div>
     </div>
