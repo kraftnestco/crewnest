@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import { LegalPage } from '@/app/_landing/legal-page';
+import { SUPPORT_EMAIL } from '@/lib/constants';
 
 export const metadata: Metadata = {
   title: 'Terms of Service — CrewNest',
   description: 'The terms that govern use of CrewNest.',
 };
 
-const CONTACT_EMAIL = 'kraftnestco@gmail.com';
 
 export default function TermsPage() {
   return (
@@ -61,8 +61,8 @@ export default function TermsPage() {
       <p>
         We may update these terms; material changes will be reflected on this page with a revised date.
         Questions? Contact{' '}
-        <a className="underline hover:text-foreground" href={`mailto:${CONTACT_EMAIL}`}>
-          {CONTACT_EMAIL}
+        <a className="underline hover:text-foreground" href={`mailto:${SUPPORT_EMAIL}`}>
+          {SUPPORT_EMAIL}
         </a>
         .
       </p>

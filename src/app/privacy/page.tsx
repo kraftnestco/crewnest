@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import { LegalPage } from '@/app/_landing/legal-page';
+import { SUPPORT_EMAIL } from '@/lib/constants';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy — CrewNest',
   description: 'How CrewNest collects, uses, and protects data for businesses and their customers.',
 };
 
-const CONTACT_EMAIL = 'kraftnestco@gmail.com';
 
 export default function PrivacyPage() {
   return (
@@ -64,8 +64,8 @@ export default function PrivacyPage() {
         Conversation and order data is retained so clients can serve their customers and keep business records.
         Clients can erase an individual customer&apos;s conversation data from their dashboard. To request
         deletion of your data — as a client or as a customer of a business using CrewNest — contact us at{' '}
-        <a className="underline hover:text-foreground" href={`mailto:${CONTACT_EMAIL}`}>
-          {CONTACT_EMAIL}
+        <a className="underline hover:text-foreground" href={`mailto:${SUPPORT_EMAIL}`}>
+          {SUPPORT_EMAIL}
         </a>{' '}
         and we will process the request within 30 days.
       </p>
@@ -80,8 +80,8 @@ export default function PrivacyPage() {
       <p>
         If this policy changes materially, we will update this page and revise the date above. Questions? Reach
         us at{' '}
-        <a className="underline hover:text-foreground" href={`mailto:${CONTACT_EMAIL}`}>
-          {CONTACT_EMAIL}
+        <a className="underline hover:text-foreground" href={`mailto:${SUPPORT_EMAIL}`}>
+          {SUPPORT_EMAIL}
         </a>
         .
       </p>

@@ -95,6 +95,7 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
             type="email"
             autoComplete="email"
             required
+            className="h-11"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
@@ -106,6 +107,7 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
             type="password"
             autoComplete="new-password"
             required
+            className="h-11"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -117,6 +119,7 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
             type="password"
             autoComplete="new-password"
             required
+            className="h-11"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
           />
@@ -124,7 +127,7 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <Button type="submit" disabled={pending} className="mt-2">
+        <Button type="submit" disabled={pending} className="mt-2 h-11">
           {pending ? 'Creating account…' : 'Create account'}
         </Button>
       </form>
@@ -135,7 +138,7 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
         <div className="h-px flex-1 bg-border" />
       </div>
 
-      <Button type="button" variant="outline" onClick={handleGoogle} disabled={googlePending}>
+      <Button type="button" variant="outline" onClick={handleGoogle} disabled={googlePending} className="h-11">
         {googlePending ? 'Redirecting…' : 'Continue with Google'}
       </Button>
     </div>

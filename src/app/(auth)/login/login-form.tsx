@@ -49,12 +49,13 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
             type="email"
             autoComplete="email"
             required
+            className="h-11"
             value={forgotEmail}
             onChange={(e) => setForgotEmail(e.target.value)}
           />
         </div>
         {forgotState.error && <p className="text-sm text-destructive">{forgotState.error}</p>}
-        <Button type="submit" disabled={forgotPending} className="mt-2">
+        <Button type="submit" disabled={forgotPending} className="mt-2 h-11">
           {forgotPending ? 'Sending…' : 'Send code'}
         </Button>
 
@@ -81,17 +82,17 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="email">Email</Label>
-        <Input id="email" name="email" type="email" autoComplete="email" required />
+        <Input id="email" name="email" type="email" autoComplete="email" required className="h-11" />
       </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="password">Password</Label>
-        <Input id="password" name="password" type="password" autoComplete="current-password" required />
+        <Input id="password" name="password" type="password" autoComplete="current-password" required className="h-11" />
       </div>
 
       {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 
-      <Button type="submit" disabled={isPending} className="mt-2">
+      <Button type="submit" disabled={isPending} className="mt-2 h-11">
         {isPending ? 'Signing in…' : 'Sign in'}
       </Button>
 

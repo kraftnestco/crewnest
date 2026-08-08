@@ -47,11 +47,17 @@ export function SignupVerifyForm({ email, onBack }: { email: string; onBack: () 
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="signup-verify-code">Code from your email</Label>
+        {/* A4 — same typed-code-not-a-link explanation as verify-code-form.tsx. */}
+        <p className="text-xs text-muted-foreground">
+          We send a code to type here, not a link — that way a security scanner
+          opening the email can&apos;t use it up before you do.
+        </p>
         <Input
           id="signup-verify-code"
           inputMode="numeric"
           autoComplete="one-time-code"
           required
+          className="h-11"
           value={code}
           onChange={(e) => setCode(e.target.value)}
         />
@@ -59,7 +65,7 @@ export function SignupVerifyForm({ email, onBack }: { email: string; onBack: () 
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <Button type="submit" disabled={pending} className="mt-2">
+      <Button type="submit" disabled={pending} className="mt-2 h-11">
         {pending ? 'Verifying…' : 'Verify & continue'}
       </Button>
 

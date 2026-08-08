@@ -82,6 +82,7 @@ export function VerifyCodeForm({
           type="email"
           autoComplete="email"
           required
+          className="h-11"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
@@ -89,11 +90,19 @@ export function VerifyCodeForm({
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="verify-code">Code from your email</Label>
+        {/* A4 — the typed-code decision (never a clickable link, so an inbox
+            security scanner can't burn it before the real user does) reads as
+            friction unless it's explained. */}
+        <p className="text-xs text-muted-foreground">
+          We send a code to type here, not a link — that way a security scanner
+          opening the email can&apos;t use it up before you do.
+        </p>
         <Input
           id="verify-code"
           inputMode="numeric"
           autoComplete="one-time-code"
           required
+          className="h-11"
           value={code}
           onChange={(e) => setCode(e.target.value)}
         />
@@ -106,6 +115,7 @@ export function VerifyCodeForm({
           type="password"
           autoComplete="new-password"
           required
+          className="h-11"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
@@ -118,6 +128,7 @@ export function VerifyCodeForm({
           type="password"
           autoComplete="new-password"
           required
+          className="h-11"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
         />
@@ -125,7 +136,7 @@ export function VerifyCodeForm({
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <Button type="submit" disabled={pending} className="mt-2">
+      <Button type="submit" disabled={pending} className="mt-2 h-11">
         {pending ? 'Verifying…' : 'Set password & continue'}
       </Button>
 

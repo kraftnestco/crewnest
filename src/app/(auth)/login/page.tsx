@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getCallerContext } from '@/lib/auth/context';
+import { AuthShell } from '../auth-shell';
 import { LoginForm } from './login-form';
 
 export default async function LoginPage({
@@ -26,20 +27,18 @@ export default async function LoginPage({
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <div className="w-full max-w-sm rounded-xl bg-card p-6 ring-1 ring-foreground/10">
-        <div className="mb-6">
-          <h1 className="font-logo text-lg">CrewNest</h1>
-          <p className="text-sm text-muted-foreground">
-            {existingAccountEmail
-              ? `Currently signed in as ${existingAccountEmail}. Sign in below to switch accounts.`
-              : redirectTo?.startsWith('/dashboard')
-                ? 'Sign in to your business dashboard.'
-                : 'Sign in to the agency dashboard.'}
-          </p>
-        </div>
-        <LoginForm redirectTo={redirectTo ?? ''} />
-      </div>
-    </div>
+    <AuthShell
+      title="Sign in to CrewNest"
+      description={
+        existingAccountEmail
+          ? `Currently signed in as ${existingAccountEmail}. Sign in below to switch accounts.`
+          : redirectTo?.startsWith('/dashboard')
+            ? 'Sign in to your business dashboard.'
+            : 'Sign in to the agency dashboard.'
+      }
+      whatNext="Use the email your CrewNest setup was sent to."
+    >
+      <LoginForm redirectTo={redirectTo ?? ''} />
+    </AuthShell>
   );
 }
