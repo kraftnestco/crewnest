@@ -9,10 +9,19 @@ import {
   Rocket,
   Check,
   ChevronDown,
+  Menu,
+  LogIn,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { PAYWALL_PLANS } from '@/services/demo/plans';
 import { Logomark } from './_landing/logomark';
@@ -22,6 +31,19 @@ import { displayFont } from './_landing/fonts';
 import { PLATFORMS, PlatformBadge, type PlatformId } from './_landing/platform-icons';
 
 const CHANNELS: PlatformId[] = ['whatsapp', 'instagram', 'messenger', 'web'];
+
+/**
+ * Single source for every in-page section link — the header's desktop nav,
+ * its mobile hamburger menu, and the footer's Product column all render from
+ * this instead of three independent literal lists that could silently drift
+ * (docs/27 §3 M1/§4 M4 — Features had no nav entry at all before this).
+ */
+const SECTION_LINKS = [
+  { href: '#how-it-works', label: 'How it works' },
+  { href: '#features', label: 'Features' },
+  { href: '#pricing', label: 'Pricing' },
+  { href: '#faq', label: 'FAQ' },
+] as const;
 
 const STEPS = [
   {
@@ -104,21 +126,55 @@ export default function Home() {
             <Logomark />
             <div className="min-w-0">
               <p className="font-logo text-2xl leading-none">CrewNest</p>
-              <p className="mt-1 truncate text-[0.7rem] text-muted-foreground">By KraftNest Automations</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">By KraftNest Automations</p>
             </div>
           </div>
           <nav className="flex items-center gap-1.5 sm:gap-2">
+            {/* Desktop only — unchanged. Below `md` this whole group was
+                simply absent with no replacement: How it works/Features/
+                Pricing/FAQ were unreachable on a phone (docs/27 §3 M1, D-01). */}
             <div className="mr-2 hidden items-center gap-1 md:flex">
-              <a href="#how-it-works" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
-                How it works
-              </a>
-              <a href="#pricing" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
-                Pricing
-              </a>
-              <a href="#faq" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
-                FAQ
-              </a>
+              {SECTION_LINKS.map((link) => (
+                <a key={link.href} href={link.href} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
+                  {link.label}
+                </a>
+              ))}
             </div>
+            {/*
+              Mobile hamburger, below `md`. Reuses the same DropdownMenu
+              primitive already proven for the dashboard's mobile "More" tab
+              and business switcher — no Sheet component exists in this repo
+              and the doc explicitly says not to add a dependency for this.
+              Carries the four section anchors plus Try it free / Sign in, so
+              every header destination is reachable even though the two CTA
+              buttons also stay directly visible (removing an always-visible
+              "Try it free" button to bury it in a menu would cost conversions
+              for no benefit — the menu adds reach, it doesn't replace them).
+            */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                aria-label="Menu"
+                className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'md:hidden')}
+              >
+                <Menu className="size-5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-48">
+                {SECTION_LINKS.map((link) => (
+                  <DropdownMenuItem key={link.href} render={<a href={link.href} />}>
+                    {link.label}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem render={<Link href="/try" />}>
+                  <Sparkles className="size-4" />
+                  Try it free
+                </DropdownMenuItem>
+                <DropdownMenuItem render={<Link href="/login?redirect=/dashboard" />}>
+                  <LogIn className="size-4" />
+                  Sign in
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Link href="/try" className={cn(buttonVariants({ size: 'sm' }))}>
               Try it free
             </Link>
@@ -143,32 +199,56 @@ export default function Home() {
             }}
           />
 
-          {/* items-start (not center) so the growing chat demo doesn't push the
-              headline/CTA column down as messages type into the taller visual. */}
-          <div className="mx-auto grid w-full max-w-7xl items-start gap-12 px-6 py-20 lg:grid-cols-[1fr_1.2fr] lg:py-28">
-            <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
-              <Badge variant="secondary">Multi-channel AI employee</Badge>
-              <h1 className={cn('font-hero-display', 'mt-4 text-4xl tracking-tight text-balance sm:text-5xl')}>
-                Your business, answered instantly.
-              </h1>
-              <p className="mt-4 max-w-xl text-lg text-muted-foreground text-balance">
-                CrewNest gives your business an AI employee that answers customers across WhatsApp, Facebook,
-                Instagram, and your website. Every answer is grounded in your catalogue, with a human one tap away.
-              </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link href="/try" className={cn(buttonVariants({ size: 'lg' }), 'w-full sm:w-auto')}>
-                  Try it free for your business
-                </Link>
-                <Link
-                  href="/signup"
-                  className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'w-full sm:w-auto')}
-                >
-                  Sign up
-                </Link>
-              </div>
+          {/*
+            One DOM, two orders (docs/27 §3 M2, D-05). Mobile order is plain
+            DOM/flex order — badge, H1, HeroVisual, subhead, CTAs — so the
+            demo (the page's only actual proof) sits right under the headline
+            instead of after two more paragraphs of text plus a button row.
+            Desktop keeps its original two-column arrangement via explicit
+            grid placement: HeroVisual spans all four rows in column 2 while
+            the other four pieces stack in column 1 in their original order.
+            `items-start` (not center) on the grid so the growing chat demo
+            can't push the headline/CTA column down as messages type in.
+          */}
+          <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-6 px-6 py-10 text-center lg:grid lg:grid-cols-[1fr_1.2fr] lg:items-start lg:gap-x-12 lg:gap-y-5 lg:py-28 lg:text-left">
+            <Badge variant="secondary" className="lg:col-start-1 lg:row-start-1">
+              Multi-channel AI employee
+            </Badge>
+            <h1
+              className={cn(
+                'font-hero-display',
+                'text-4xl tracking-tight text-balance sm:text-5xl lg:col-start-1 lg:row-start-2',
+              )}
+            >
+              Your business, answered instantly.
+            </h1>
+            {/*
+              mt-8 on mobile only: HeroVisual's own floating "Runs your
+              business…" badge sits at `-top-8` (32px) ABOVE its root's own
+              top edge. On desktop that's fine — the badge floats above empty
+              space in column 2. On mobile, HeroVisual sits directly under H1
+              in normal flow, so that same -32px pull reached straight into
+              the heading text (confirmed in a screenshot — the badge sat
+              overlapping "answered instantly"). This margin exactly cancels
+              the badge's own upward offset, landing it where the un-badged
+              gap would have put HeroVisual's top edge in the first place.
+            */}
+            <HeroVisual className="mt-8 lg:col-start-2 lg:row-start-1 lg:row-span-4 lg:mt-0" />
+            <p className="max-w-xl text-lg text-muted-foreground text-balance lg:col-start-1 lg:row-start-3">
+              CrewNest gives your business an AI employee that answers customers across WhatsApp, Facebook,
+              Instagram, and your website. Every answer is grounded in your catalogue, with a human one tap away.
+            </p>
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row lg:col-start-1 lg:row-start-4">
+              <Link href="/try" className={cn(buttonVariants({ size: 'lg' }), 'w-full sm:w-auto')}>
+                Try it free for your business
+              </Link>
+              <Link
+                href="/signup"
+                className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'w-full sm:w-auto')}
+              >
+                Sign up
+              </Link>
             </div>
-
-            <HeroVisual />
           </div>
         </section>
 
@@ -218,7 +298,22 @@ export default function Home() {
         </section>
 
         <section id="features" className="mx-auto w-full max-w-7xl scroll-mt-20 px-6 pb-20">
-          <div className="grid gap-4 sm:grid-cols-2">
+          {/*
+            Previously four cards with no section title at all — heading order
+            on the page was H1, H2, H2, H2, H2 (this section had none), and it
+            was absent from every nav list (docs/27 §4 M4, D-02). Matches the
+            exact heading block shape every other section already uses.
+          */}
+          <div className="mx-auto max-w-2xl text-center">
+            <Badge variant="secondary">Features</Badge>
+            <h2 className={cn(displayFont.className, 'mt-4 text-3xl tracking-tight text-balance')}>
+              Everything runs in one place.
+            </h2>
+            <p className="mt-3 text-muted-foreground text-balance">
+              One inbox, grounded answers, captured orders, and a human always one tap away.
+            </p>
+          </div>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2">
             {FEATURES.map((feature) => (
               <TiltCard key={feature.title} max={5}>
                 <Card className="h-full">
@@ -345,20 +440,27 @@ export default function Home() {
                 AI employees that answer your customers, take orders, and never miss a message.
               </p>
             </div>
+            {/*
+              gap-6 (24px), not gap-2.5 (10px), on all three link columns
+              below — the touch-target expansion added in this same change
+              (docs/27 §3 M3) gives every <a> a 44px-tall invisible hit area
+              centred on it, and pseudo-elements from adjacent DOM siblings
+              paint in DOM order, so at 10px apart the lower link's expanded
+              zone consistently won taps meant for the one above it (measured:
+              a tap at the exact midpoint between two 10px-apart links landed
+              on the SECOND one every time, not neither). 24px gives each
+              44px zone room to not touch its neighbour's at all.
+            */}
             <div className="grid grid-cols-2 gap-8 text-sm sm:grid-cols-3">
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-6">
                 <p className="font-medium text-foreground">Product</p>
-                <a href="#how-it-works" className="text-muted-foreground hover:text-foreground">
-                  How it works
-                </a>
-                <a href="#pricing" className="text-muted-foreground hover:text-foreground">
-                  Pricing
-                </a>
-                <a href="#faq" className="text-muted-foreground hover:text-foreground">
-                  FAQ
-                </a>
+                {SECTION_LINKS.map((link) => (
+                  <a key={link.href} href={link.href} className="text-muted-foreground hover:text-foreground">
+                    {link.label}
+                  </a>
+                ))}
               </div>
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-6">
                 <p className="font-medium text-foreground">Get started</p>
                 <Link href="/try" className="text-muted-foreground hover:text-foreground">
                   Try it free
@@ -367,7 +469,7 @@ export default function Home() {
                   Client login
                 </Link>
               </div>
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-6">
                 <p className="font-medium text-foreground">Legal</p>
                 <Link href="/privacy" className="text-muted-foreground hover:text-foreground">
                   Privacy policy

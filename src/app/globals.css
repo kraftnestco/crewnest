@@ -251,7 +251,8 @@
  */
 @media (pointer: coarse) {
   button,
-  a[role='button'],
+  a,
+  summary,
   [role='button'],
   [data-slot='dropdown-menu-trigger'],
   [data-slot='dropdown-menu-item'] {
@@ -259,7 +260,8 @@
   }
 
   button::after,
-  a[role='button']::after,
+  a::after,
+  summary::after,
   [role='button']::after,
   [data-slot='dropdown-menu-trigger']::after {
     content: '';
@@ -276,9 +278,17 @@
     z-index: 0;
   }
 
-  /* The bottom tab bar's links are already full-height targets; an extra
-     overlay there would spill over neighbouring tabs. */
-  nav a::after {
+  /*
+   * The bottom tab bar's links are already full-height targets; an extra
+   * overlay there would spill over neighbouring tabs. Scoped to the tab bar
+   * specifically via its data-slot (docs/27 §3 M3) — this used to be a bare
+   * `nav a::after`, which killed the expansion for every anchor inside ANY
+   * <nav>, including the marketing page's header nav, leaving its How it
+   * works / Pricing / FAQ links (and, previously, plain <a> tags everywhere
+   * else — footer links, FAQ <summary> rows — with no expansion rule to even
+   * disable) at their raw ~20px size.
+   */
+  nav[data-slot='tab-bar'] a::after {
     content: none;
   }
 }

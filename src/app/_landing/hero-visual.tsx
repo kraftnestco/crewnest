@@ -294,7 +294,7 @@ function reducer(_s: DemoState, step: (s: DemoState) => DemoState): DemoState {
   return step(_s);
 }
 
-export function HeroVisual() {
+export function HeroVisual({ className }: { className?: string }) {
   const [state, dispatch] = useReducer(reducer, START);
 
   useEffect(() => {
@@ -322,7 +322,7 @@ export function HeroVisual() {
 
   return (
     <div
-      className="relative isolate mx-auto w-full max-w-xl"
+      className={cn('relative isolate mx-auto w-full max-w-xl', className)}
       onPointerMove={(e) => {
         if (e.pointerType !== 'mouse') return;
         const rect = e.currentTarget.getBoundingClientRect();
@@ -433,8 +433,18 @@ export function HeroVisual() {
           </div>
         </div>
 
-        {/* ── Live dashboard ────────────────────────────────────────── */}
-        <div className="flex flex-col gap-2.5 rounded-2xl bg-card p-3.5 shadow-xl ring-1 ring-foreground/10">
+        {/*
+          ── Live dashboard ──────────────────────────────────────────
+          Hidden below `sm` (the same breakpoint this component's own grid
+          already uses to decide side-by-side vs stacked): below that width
+          this panel stacked BENEATH the chat panel instead of beside it,
+          adding ~200px+ its own height on the narrowest phones — on top of
+          the chat panel's own ~330px+, that alone pushed every message
+          bubble below the fold at 664px (docs/27 §3 M2, D-05). The chat
+          panel is the part the page's message actually depends on; this is
+          secondary proof, not lost, just not competing for the fold.
+        */}
+        <div className="hidden flex-col gap-2.5 rounded-2xl bg-card p-3.5 shadow-xl ring-1 ring-foreground/10 sm:flex">
           <div className="flex items-center justify-between border-b border-border pb-2.5">
             <span className="text-xs font-semibold text-foreground">Your dashboard</span>
             <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
