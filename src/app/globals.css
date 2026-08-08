@@ -123,13 +123,18 @@
   --danger-text: oklch(0.5 0.2 27);
   --danger-tint: oklch(0.95 0.03 27);
 
-  /* Marketing stage grounds (docs/27 §2/M5). */
+  /* Marketing stage grounds (docs/27 §2/M5). --stage-deep pushed off the
+     generic mint-teal toward true forest green, and --stage-warm off the
+     flat cream-paper cliché toward a saturated honey/brass, so the two read
+     as a deliberate forest+brass pairing instead of the default AI-template
+     dark/cream/mint recipe. --stage-primary stays untouched — it's pinned to
+     the app's live --primary accent (see below), not free to recolor alone. */
   --stage-ink: oklch(0.2 0.02 172);
   --stage-ink-fg: oklch(0.96 0.005 165);
-  --stage-deep: oklch(0.42 0.09 165);
-  --stage-deep-fg: oklch(0.98 0.005 165);
-  --stage-warm: oklch(0.95 0.045 85);
-  --stage-warm-fg: oklch(0.25 0.03 80);
+  --stage-deep: oklch(0.34 0.1 150);
+  --stage-deep-fg: oklch(0.97 0.008 150);
+  --stage-warm: oklch(0.88 0.07 78);
+  --stage-warm-fg: oklch(0.22 0.045 55);
 
   /*
    * CTA colour for content sitting on a FIXED-dark stage (stage-ink/-deep).
@@ -192,10 +197,10 @@
      themed surface. The intervening light sections carry the theme instead. */
   --stage-ink: oklch(0.2 0.02 172);
   --stage-ink-fg: oklch(0.96 0.005 165);
-  --stage-deep: oklch(0.42 0.09 165);
-  --stage-deep-fg: oklch(0.98 0.005 165);
-  --stage-warm: oklch(0.95 0.045 85);
-  --stage-warm-fg: oklch(0.25 0.03 80);
+  --stage-deep: oklch(0.34 0.1 150);
+  --stage-deep-fg: oklch(0.97 0.008 150);
+  --stage-warm: oklch(0.88 0.07 78);
+  --stage-warm-fg: oklch(0.22 0.045 55);
   --stage-primary: oklch(0.72 0.14 163);
   --stage-primary-foreground: oklch(0.16 0.025 170);
 }

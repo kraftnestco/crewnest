@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useReducer } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import {
   CheckCheck,
   Sparkles,
@@ -290,6 +290,35 @@ function ChatBackdrop() {
 
 const clock = (id: number) => `11:${(20 + id).toString().padStart(2, '0')}`;
 
+/**
+ * Reveals `text` a character at a time (docs/27 §6.2 item 1). Keyed by the
+ * caller on the message id, so it types out once on first mount and then
+ * sits still — a later reducer patch that just re-renders the same message
+ * doesn't restart it.
+ */
+function TypedText({ text }: { text: string }) {
+  const [shown, setShown] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? text : '',
+  );
+
+  useEffect(() => {
+    if (shown === text) return;
+    let i = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const step = () => {
+      i += 1;
+      setShown(text.slice(0, i));
+      if (i < text.length) timer = setTimeout(step, 18 + Math.random() * 22);
+    };
+    timer = setTimeout(step, 18);
+    return () => clearTimeout(timer);
+    // Runs once on mount only — see doc comment above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return <>{shown}</>;
+}
+
 function reducer(_s: DemoState, step: (s: DemoState) => DemoState): DemoState {
   return step(_s);
 }
@@ -378,9 +407,12 @@ export function HeroVisual({ className }: { className?: string }) {
                   key={m.id}
                   className={cn(
                     'flex motion-reduce:animate-none',
+                    // Customer bubble just fades in — the typed text below does the
+                    // reveal. The AI reply lands as a landed object (scale + opacity,
+                    // no slide) per docs/27 §6.2 item 1.
                     m.role === 'customer'
-                      ? 'animate-in fade-in slide-in-from-left-2 justify-start duration-300'
-                      : 'animate-in fade-in slide-in-from-right-2 justify-end duration-300',
+                      ? 'animate-in fade-in justify-start duration-150'
+                      : 'animate-in zoom-in-95 fade-in justify-end duration-[180ms]',
                   )}
                 >
                   <div
@@ -389,7 +421,7 @@ export function HeroVisual({ className }: { className?: string }) {
                       m.role === 'customer' ? skin.incoming : skin.outgoing,
                     )}
                   >
-                    <span>{m.text}</span>
+                    <span>{m.role === 'customer' ? <TypedText text={m.text} /> : m.text}</span>
                     <span className="mt-0.5 flex items-center justify-end gap-1 text-[10px] opacity-70">
                       {m.role === 'ai' && <Sparkles className="size-2.5" />}
                       {clock(m.id)}
@@ -473,50 +505,72 @@ export function HeroVisual({ className }: { className?: string }) {
             </div>
           </div>
 
-          {/* Order card */}
-          {state.orderStatus !== 'none' && (
-            <div className="animate-in fade-in slide-in-from-right-2 rounded-xl border border-border bg-background/60 p-2.5 duration-300 motion-reduce:animate-none">
-              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                <span className="text-[11px] font-medium text-muted-foreground">Order #1042</span>
-                <span
-                  className={cn(
-                    'rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset transition-colors duration-300',
-                    STATUS_META[state.orderStatus].cls,
-                  )}
-                >
-                  {STATUS_META[state.orderStatus].label}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <span className="truncate text-xs text-foreground">2 × {PRODUCT}</span>
-                <span className="shrink-0 text-xs font-semibold text-foreground">Rs. 5,000</span>
-              </div>
-            </div>
-          )}
-
-          {/* Inventory row */}
-          {state.stockVisible && (
-            <div className="animate-in fade-in slide-in-from-right-2 flex items-center justify-between gap-2 rounded-xl border border-border bg-background/60 px-2.5 py-2 duration-300 motion-reduce:animate-none">
-              <span className="truncate text-xs text-foreground">
-                {PRODUCT} · <span className="text-muted-foreground">M</span>
-              </span>
+          {/*
+            Order card, inventory row, and the alert feed below are all kept
+            permanently mounted and toggled with `invisible` (reserves the
+            box, hides the paint) rather than conditionally rendered. This
+            panel sits beside the customer chat inside a shared-height grid,
+            and that grid is itself spanned by this whole component in the
+            page's hero (docs/27 §6 motion note). Mounting/unmounting these
+            let the panel's height grow across the ~14s script loop, which
+            grew this component's own height and, through the outer grid's
+            row-span on it, visibly pushed the hero H1 down mid-loop. Fixed
+            slots keep the panel's height constant from first paint.
+          */}
+          <div
+            className={cn(
+              'rounded-xl border border-border bg-background/60 p-2.5 transition-opacity duration-300',
+              state.orderStatus === 'none'
+                ? 'invisible'
+                : 'animate-in fade-in slide-in-from-right-2 motion-reduce:animate-none',
+            )}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+              <span className="text-[11px] font-medium text-muted-foreground">Order #1042</span>
               <span
                 className={cn(
-                  'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset transition-colors duration-300',
-                  state.stock === 0
-                    ? 'bg-red-500/10 text-red-600 ring-red-500/20 dark:text-red-400'
-                    : 'bg-amber-500/10 text-amber-600 ring-amber-500/20 dark:text-amber-400',
+                  'rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset transition-colors duration-300',
+                  STATUS_META[state.orderStatus === 'none' ? 'new' : state.orderStatus].cls,
                 )}
               >
-                {state.stock === 0 ? 'Out of stock' : `${state.stock} left`}
+                {STATUS_META[state.orderStatus === 'none' ? 'new' : state.orderStatus].label}
               </span>
             </div>
-          )}
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <span className="truncate text-xs text-foreground">2 × {PRODUCT}</span>
+              <span className="shrink-0 text-xs font-semibold text-foreground">Rs. 5,000</span>
+            </div>
+          </div>
 
-          {/* Alerts feed */}
-          {hasActivity ? (
-            <div className="flex flex-col gap-1.5">
-              {feed.map((a) => {
+          {/* Inventory row */}
+          <div
+            className={cn(
+              'flex items-center justify-between gap-2 rounded-xl border border-border bg-background/60 px-2.5 py-2 transition-opacity duration-300',
+              state.stockVisible
+                ? 'animate-in fade-in slide-in-from-right-2 motion-reduce:animate-none'
+                : 'invisible',
+            )}
+          >
+            <span className="truncate text-xs text-foreground">
+              {PRODUCT} · <span className="text-muted-foreground">M</span>
+            </span>
+            <span
+              className={cn(
+                'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset transition-colors duration-300',
+                state.stock === 0
+                  ? 'bg-red-500/10 text-red-600 ring-red-500/20 dark:text-red-400'
+                  : 'bg-amber-500/10 text-amber-600 ring-amber-500/20 dark:text-amber-400',
+              )}
+            >
+              {state.stock === 0 ? 'Out of stock' : `${state.stock} left`}
+            </span>
+          </div>
+
+          {/* Alerts feed — always 3 slots so the list can't grow the panel as entries accumulate. */}
+          <div className="flex flex-col gap-1.5">
+            {[0, 1, 2].map((slot) => {
+              const a = feed[slot];
+              if (a) {
                 const Icon = ALERT_META[a.kind].icon;
                 return (
                   <div
@@ -527,11 +581,17 @@ export function HeroVisual({ className }: { className?: string }) {
                     <span className="truncate">{a.text}</span>
                   </div>
                 );
-              })}
-            </div>
-          ) : (
-            <div className="text-[11px] text-muted-foreground">Watching your channels…</div>
-          )}
+              }
+              if (slot === 0 && !hasActivity) {
+                return (
+                  <div key="placeholder" className="text-[11px] text-muted-foreground">
+                    Watching your channels…
+                  </div>
+                );
+              }
+              return <div key={`empty-${slot}`} aria-hidden className="h-[17px]" />;
+            })}
+          </div>
         </div>
       </div>
     </div>

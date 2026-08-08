@@ -1,50 +1,20 @@
 import Link from 'next/link';
-import {
-  MessagesSquare,
-  Sparkles,
-  PackageCheck,
-  UserCheck,
-  ClipboardList,
-  Cable,
-  Rocket,
-  Check,
-  X,
-  ChevronDown,
-  Menu,
-  LogIn,
-} from 'lucide-react';
+import { MessagesSquare, Sparkles, PackageCheck, UserCheck, ClipboardList, Cable, Rocket, Check, X, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { PAYWALL_PLANS } from '@/services/demo/plans';
 import { Logomark } from './_landing/logomark';
 import { TiltCard } from './_landing/tilt-card';
+import { BeforeAfterGainCard } from './_landing/scroll-reveal';
+import { SiteHeader } from './_landing/site-header';
+import { SECTION_LINKS } from './_landing/section-links';
 import { HeroVisual } from './_landing/hero-visual';
 import { displayFont } from './_landing/fonts';
 import { PLATFORMS, PlatformBadge, type PlatformId } from './_landing/platform-icons';
 
 const CHANNELS: PlatformId[] = ['whatsapp', 'instagram', 'messenger', 'web'];
-
-/**
- * Single source for every in-page section link — the header's desktop nav,
- * its mobile hamburger menu, and the footer's Product column all render from
- * this instead of three independent literal lists that could silently drift
- * (docs/27 §3 M1/§4 M4 — Features had no nav entry at all before this).
- */
-const SECTION_LINKS = [
-  { href: '#how-it-works', label: 'How it works' },
-  { href: '#features', label: 'Features' },
-  { href: '#pricing', label: 'Pricing' },
-  { href: '#faq', label: 'FAQ' },
-] as const;
 
 const STEPS = [
   {
@@ -145,72 +115,7 @@ const BEFORE_AFTER = [
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          {/* Matches the dashboard sidebar lockup exactly (mark + wordmark + subtext). */}
-          <div className="flex items-center gap-3">
-            <Logomark />
-            <div className="min-w-0">
-              <p className="font-logo text-2xl leading-none">CrewNest</p>
-              <p className="mt-1 truncate text-xs text-muted-foreground">By KraftNest Automations</p>
-            </div>
-          </div>
-          <nav className="flex items-center gap-1.5 sm:gap-2">
-            {/* Desktop only — unchanged. Below `md` this whole group was
-                simply absent with no replacement: How it works/Features/
-                Pricing/FAQ were unreachable on a phone (docs/27 §3 M1, D-01). */}
-            <div className="mr-2 hidden items-center gap-1 md:flex">
-              {SECTION_LINKS.map((link) => (
-                <a key={link.href} href={link.href} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
-                  {link.label}
-                </a>
-              ))}
-            </div>
-            {/*
-              Mobile hamburger, below `md`. Reuses the same DropdownMenu
-              primitive already proven for the dashboard's mobile "More" tab
-              and business switcher — no Sheet component exists in this repo
-              and the doc explicitly says not to add a dependency for this.
-              Carries the four section anchors plus Try it free / Sign in, so
-              every header destination is reachable even though the two CTA
-              buttons also stay directly visible (removing an always-visible
-              "Try it free" button to bury it in a menu would cost conversions
-              for no benefit — the menu adds reach, it doesn't replace them).
-            */}
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                aria-label="Menu"
-                className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'md:hidden')}
-              >
-                <Menu className="size-5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-48">
-                {SECTION_LINKS.map((link) => (
-                  <DropdownMenuItem key={link.href} render={<a href={link.href} />}>
-                    {link.label}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem render={<Link href="/try" />}>
-                  <Sparkles className="size-4" />
-                  Try it free
-                </DropdownMenuItem>
-                <DropdownMenuItem render={<Link href="/login?redirect=/dashboard" />}>
-                  <LogIn className="size-4" />
-                  Sign in
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Link href="/try" className={cn(buttonVariants({ size: 'sm' }))}>
-              Try it free
-            </Link>
-            <Link href="/login?redirect=/dashboard" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
-              <span className="sm:hidden">Sign in</span>
-              <span className="hidden sm:inline">Client login</span>
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main className="flex-1">
         <section className="relative isolate overflow-hidden">
@@ -404,8 +309,9 @@ export default function Home() {
           converting pattern for a non-technical audience. Left card stays
           muted (the pains); right card carries the stage-primary accent (the
           gains) so the two read as a clear before/after, not two equal
-          lists. Reveal animation is Stage 6 (§6 motion item 2) — this ships
-          the static structure only.
+          lists. Right card scroll-reveals per §6 motion item 2 — left stays
+          static, since it's the unremarkable status quo the reveal is
+          selling against.
         */}
         <section className="bg-stage-deep text-stage-deep-fg">
           <div className="mx-auto w-full max-w-7xl px-6 py-20">
@@ -429,17 +335,10 @@ export default function Home() {
                   ))}
                 </ul>
               </div>
-              <div className="rounded-xl bg-stage-deep-fg/10 p-6 ring-1 ring-stage-primary/40">
-                <p className="text-sm font-medium text-stage-primary">With CrewNest</p>
-                <ul className="mt-4 space-y-4">
-                  {BEFORE_AFTER.map((pair) => (
-                    <li key={pair.gain} className="flex items-start gap-3">
-                      <Check className="mt-0.5 size-4 shrink-0 text-stage-primary" />
-                      <span className="font-medium">{pair.gain}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <BeforeAfterGainCard
+                className="rounded-xl bg-stage-deep-fg/10 p-6 ring-1 ring-stage-primary/40"
+                items={BEFORE_AFTER.map((pair) => pair.gain)}
+              />
             </div>
           </div>
         </section>
@@ -466,7 +365,12 @@ export default function Home() {
                   // Badge lives on a wrapper — Card itself is overflow-hidden and would clip it.
                   <div key={plan.id} className="relative h-full">
                     {highlighted && (
-                      <Badge className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2">Most popular</Badge>
+                      // M9 (docs/27 §3): --pending tone, not the primary CTA's own
+                      // color — this badge is guidance toward a card, not a second
+                      // button, and needs to read as a distinct signal from it.
+                      <Badge className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2 border-transparent bg-pending-tint text-pending-text">
+                        Most popular
+                      </Badge>
                     )}
                     <Card className={cn('h-full', highlighted && 'shadow-lg ring-primary/40')}>
                     <CardHeader>
