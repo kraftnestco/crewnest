@@ -50,6 +50,10 @@ interface AlertItem {
   text: string;
 }
 interface DemoState {
+  // Which door this frame belongs to — carried IN the reducer state (not
+  // read from the live `variant` prop) so a render can never mix one door's
+  // labels with another door's messages. See `door` below.
+  variant: HeroVisualVariant;
   channel: PlatformId;
   messages: Msg[];
   typing: boolean;
@@ -64,6 +68,7 @@ const PRODUCT = 'Sea Green Kurta';
 const CUSTOMER = 'Ayesha Khan';
 
 const START: DemoState = {
+  variant: 'products',
   channel: 'whatsapp',
   messages: [{ id: 1, role: 'customer', text: 'Do you have the Sea Green kurta in medium?' }],
   typing: false,
@@ -76,6 +81,7 @@ const START: DemoState = {
 
 // A representative "everything's happened" frame for reduced-motion users.
 const REDUCED: DemoState = {
+  variant: 'products',
   channel: 'whatsapp',
   messages: [
     { id: 5, role: 'customer', text: 'EasyPaisa please' },
@@ -189,6 +195,7 @@ const SERVICE = 'Haircut & Beard Trim';
 const CLIENT = 'Bilal Ahmed';
 
 const START_BOOKING: DemoState = {
+  variant: 'bookings',
   channel: 'whatsapp',
   messages: [{ id: 1, role: 'customer', text: 'Hi, do you have a slot for a haircut today?' }],
   typing: false,
@@ -200,6 +207,7 @@ const START_BOOKING: DemoState = {
 };
 
 const REDUCED_BOOKING: DemoState = {
+  variant: 'bookings',
   channel: 'whatsapp',
   messages: [
     { id: 5, role: 'customer', text: 'Bilal Ahmed' },
@@ -492,8 +500,15 @@ function reducer(_s: DemoState, step: (s: DemoState) => DemoState): DemoState {
 }
 
 export function HeroVisual({ className, variant = 'products' }: { className?: string; variant?: HeroVisualVariant }) {
-  const door = DOORS[variant];
-  const [state, dispatch] = useReducer(reducer, door.start);
+  const [state, dispatch] = useReducer(reducer, DOORS[variant].start);
+  // Derived from the REDUCER state's own `variant` field, never the live prop
+  // directly. The prop flips the instant the toggle is clicked, but the
+  // reducer only catches up once the effect below dispatches a reset — for
+  // however briefly that gap lasts, reading labels off the prop let one
+  // door's customerName/orderLabel render next to the OTHER door's still-old
+  // `state.messages`. Keying both off `state.variant` makes them change in
+  // the same dispatch, so they can never disagree.
+  const door = DOORS[state.variant];
   // Cross-fade between doors (docs/27 §6.2 item 6, 200ms — not a slide). `false`
   // while the old script's content is swapped for the new one underneath.
   const [doorVisible, setDoorVisible] = useState(true);
@@ -620,14 +635,22 @@ export function HeroVisual({ className, variant = 'products' }: { className?: st
 
               {visibleMessages.map((m) => (
                 <div
-                  // `variant` in the key, not just `m.id` — both doors' scripts
-                  // reuse the same numeric ids for their analogous beats (each
-                  // door's own id=1 is its opening line, id=2 the first AI
-                  // reply, etc). Keying on id alone meant switching doors kept
-                  // the SAME DOM node for id=1, so TypedText below (which only
-                  // types out once per mount) never remounted and kept showing
-                  // the old door's opening line forever after the first switch.
-                  key={`${variant}-${m.id}`}
+                  // `state.variant` in the key (not the live `variant` prop,
+                  // and not just `m.id`) — both doors' scripts reuse the same
+                  // numeric ids for their analogous beats (each door's own
+                  // id=1 is its opening line, id=2 the first AI reply, etc).
+                  // Keying on id alone meant switching doors kept the SAME DOM
+                  // node for id=1, so TypedText below (which only types out
+                  // once per mount) never remounted and kept showing the old
+                  // door's opening line forever after the first switch. Keying
+                  // on the live prop instead of state.variant would flip the
+                  // key the instant the toggle is clicked, one render before
+                  // `m` itself (from state.messages) has actually changed —
+                  // remounting TypedText for a beat with the OLD text under a
+                  // NEW-looking key. state.variant only changes in the same
+                  // dispatch as state.messages, so key and content always move
+                  // together.
+                  key={`${state.variant}-${m.id}`}
                   className={cn(
                     'flex motion-reduce:animate-none',
                     // Customer bubble just fades in — the typed text below does the

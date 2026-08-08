@@ -36,7 +36,7 @@ export function HeroSection({ channels }: { channels: PlatformId[] }) {
           'text-4xl tracking-tight text-balance sm:text-5xl lg:col-start-1 lg:row-start-2',
         )}
       >
-        Your business, answered <span className="text-primary">instantly</span>.
+        Your business, answered <span className="text-primary">instantly.</span>
       </h1>
       {/*
         mt-8 on mobile only: HeroVisual's own floating "Runs your
@@ -53,8 +53,8 @@ export function HeroSection({ channels }: { channels: PlatformId[] }) {
       */}
       <HeroVisual variant={variant} className="mt-8 lg:col-start-2 lg:row-start-1 lg:row-span-5 lg:mt-0" />
       <p className="max-w-xl text-lg text-muted-foreground text-balance lg:col-start-1 lg:row-start-3">
-        CrewNest gives your business an AI employee that answers customers across WhatsApp, Facebook,
-        Instagram, and your website. Every answer is grounded in your catalogue, with a human one tap away.
+        An AI employee that answers WhatsApp, Facebook, Instagram, and web chat — takes orders and
+        bookings, grounded in your catalogue, with a human one tap away.
       </p>
       <div
         role="radiogroup"
