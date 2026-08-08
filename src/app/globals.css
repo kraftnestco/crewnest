@@ -39,6 +39,23 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  /* Semantic status (docs/27 §2) — never decorative, only ever a real state. */
+  --color-success: var(--success);
+  --color-success-text: var(--success-text);
+  --color-success-tint: var(--success-tint);
+  --color-pending: var(--pending);
+  --color-pending-text: var(--pending-text);
+  --color-pending-tint: var(--pending-tint);
+  --color-danger-text: var(--danger-text);
+  --color-danger-tint: var(--danger-tint);
+  /* Marketing page-section grounds (docs/27 §2/M5) — a committed sequence, not
+     a themed surface; see the near-identical .dark values below for why. */
+  --color-stage-ink: var(--stage-ink);
+  --color-stage-ink-fg: var(--stage-ink-fg);
+  --color-stage-deep: var(--stage-deep);
+  --color-stage-deep-fg: var(--stage-deep-fg);
+  --color-stage-warm: var(--stage-warm);
+  --color-stage-warm-fg: var(--stage-warm-fg);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -89,6 +106,28 @@
   --sidebar-accent-foreground: oklch(0.28 0.045 170);
   --sidebar-border: oklch(0.905 0.01 165);
   --sidebar-ring: oklch(0.65 0.1 165);
+
+  /* Semantic status (docs/27 §2). *-text variants are darkened to clear
+     4.5:1 against their own *-tint — verified via the canvas method in §10,
+     not assumed from the raw values. --danger reuses --destructive as its
+     base (this app already has one), only adding the tint/text pair success
+     and pending get natively, so all three read as one family. */
+  --success: oklch(0.52 0.12 165);
+  --success-text: oklch(0.45 0.11 165);
+  --success-tint: oklch(0.95 0.03 165);
+  --pending: oklch(0.7 0.15 70);
+  --pending-text: oklch(0.5 0.13 65);
+  --pending-tint: oklch(0.96 0.05 90);
+  --danger-text: oklch(0.5 0.2 27);
+  --danger-tint: oklch(0.95 0.03 27);
+
+  /* Marketing stage grounds (docs/27 §2/M5). */
+  --stage-ink: oklch(0.2 0.02 172);
+  --stage-ink-fg: oklch(0.96 0.005 165);
+  --stage-deep: oklch(0.42 0.09 165);
+  --stage-deep-fg: oklch(0.98 0.005 165);
+  --stage-warm: oklch(0.95 0.045 85);
+  --stage-warm-fg: oklch(0.25 0.03 80);
 }
 
 .dark {
@@ -123,6 +162,27 @@
   --sidebar-accent-foreground: oklch(0.95 0.01 165);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.6 0.1 165);
+
+  /* Semantic status, dark. --success mirrors --primary's dark value
+     deliberately — same hue family as light mode, per the file's own DNA. */
+  --success: oklch(0.72 0.14 163);
+  --success-text: oklch(0.8 0.13 163);
+  --success-tint: oklch(0.27 0.04 165);
+  --pending: oklch(0.78 0.14 75);
+  --pending-text: oklch(0.85 0.12 80);
+  --pending-tint: oklch(0.28 0.05 75);
+  --danger-text: oklch(0.78 0.15 25);
+  --danger-tint: oklch(0.28 0.06 25);
+
+  /* Marketing stage grounds, dark — deliberately near-identical to :root's:
+     these are a committed visual sequence for the marketing page, not a
+     themed surface. The intervening light sections carry the theme instead. */
+  --stage-ink: oklch(0.2 0.02 172);
+  --stage-ink-fg: oklch(0.96 0.005 165);
+  --stage-deep: oklch(0.42 0.09 165);
+  --stage-deep-fg: oklch(0.98 0.005 165);
+  --stage-warm: oklch(0.95 0.045 85);
+  --stage-warm-fg: oklch(0.25 0.03 80);
 }
 
 @layer base {
