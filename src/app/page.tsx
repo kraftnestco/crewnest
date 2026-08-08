@@ -9,7 +9,7 @@ import { Logomark } from './_landing/logomark';
 import { BeforeAfterGainCard } from './_landing/scroll-reveal';
 import { SiteHeader } from './_landing/site-header';
 import { SECTION_LINKS } from './_landing/section-links';
-import { HeroVisual } from './_landing/hero-visual';
+import { HeroSection } from './_landing/hero-section';
 import { displayFont } from './_landing/fonts';
 import { PLATFORMS, PlatformBadge, type PlatformId } from './_landing/platform-icons';
 
@@ -131,75 +131,19 @@ export default function Home() {
 
           {/*
             One DOM, two orders (docs/27 §3 M2, D-05). Mobile order is plain
-            DOM/flex order — badge, H1, HeroVisual, subhead, CTAs — so the
-            demo (the page's only actual proof) sits right under the headline
-            instead of after two more paragraphs of text plus a button row.
-            Desktop keeps its original two-column arrangement via explicit
-            grid placement: HeroVisual spans all four rows in column 2 while
-            the other four pieces stack in column 1 in their original order.
-            `items-start` (not center) on the grid so the growing chat demo
-            can't push the headline/CTA column down as messages type in.
+            DOM/flex order — badge, H1, HeroVisual, subhead, door switch,
+            CTAs, trust — so the demo (the page's only actual proof) sits
+            right under the headline instead of after two more paragraphs of
+            text plus a button row. Desktop keeps its original two-column
+            arrangement via explicit grid placement: HeroVisual spans column
+            2 down to the CTA row while the other pieces stack in column 1 in
+            source order. `items-start` (not center) on the grid so the
+            growing chat demo can't push the headline/CTA column down as
+            messages type in. All of it (plus the M7 door-switch state) lives
+            in `HeroSection` — a client component, since the switch needs
+            `useState` and both it and `HeroVisual` need the same value.
           */}
-          <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-6 px-6 py-10 text-center lg:grid lg:grid-cols-[1fr_1.2fr] lg:items-start lg:gap-x-12 lg:gap-y-5 lg:py-28 lg:text-left">
-            <Badge variant="secondary" className="lg:col-start-1 lg:row-start-1">
-              Multi-channel AI employee
-            </Badge>
-            <h1
-              className={cn(
-                'font-hero-display',
-                'text-4xl tracking-tight text-balance sm:text-5xl lg:col-start-1 lg:row-start-2',
-              )}
-            >
-              Your business, answered instantly.
-            </h1>
-            {/*
-              mt-8 on mobile only: HeroVisual's own floating "Runs your
-              business…" badge sits at `-top-8` (32px) ABOVE its root's own
-              top edge. On desktop that's fine — the badge floats above empty
-              space in column 2. On mobile, HeroVisual sits directly under H1
-              in normal flow, so that same -32px pull reached straight into
-              the heading text (confirmed in a screenshot — the badge sat
-              overlapping "answered instantly"). This margin exactly cancels
-              the badge's own upward offset, landing it where the un-badged
-              gap would have put HeroVisual's top edge in the first place.
-            */}
-            <HeroVisual className="mt-8 lg:col-start-2 lg:row-start-1 lg:row-span-4 lg:mt-0" />
-            <p className="max-w-xl text-lg text-muted-foreground text-balance lg:col-start-1 lg:row-start-3">
-              CrewNest gives your business an AI employee that answers customers across WhatsApp, Facebook,
-              Instagram, and your website. Every answer is grounded in your catalogue, with a human one tap away.
-            </p>
-            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row lg:col-start-1 lg:row-start-4">
-              <Link href="/try" className={cn(buttonVariants({ size: 'lg' }), 'w-full sm:w-auto')}>
-                Try it free for your business
-              </Link>
-              <Link
-                href="/signup"
-                className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'w-full sm:w-auto')}
-              >
-                Sign up
-              </Link>
-            </div>
-            {/*
-              M8 (docs/27 §3) — trust row directly under the hero CTAs, above
-              the fold on desktop. No verified usage numbers exist yet, so
-              per the spec ("do not invent social proof") this ships channel
-              logos plus the no-card line only; count-up motion for real
-              numbers is Stage 6, once there's something honest to count.
-            */}
-            <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground sm:flex-row lg:col-start-1 lg:row-start-5 lg:items-center lg:justify-start">
-              <div className="flex items-center -space-x-2">
-                {CHANNELS.map((id) => (
-                  <PlatformBadge
-                    key={id}
-                    platform={id}
-                    className="size-7 rounded-full ring-2 ring-background"
-                    iconClassName="size-3"
-                  />
-                ))}
-              </div>
-              <span>No card required to try it.</span>
-            </div>
-          </div>
+          <HeroSection channels={CHANNELS} />
         </section>
 
         {/* Channel strip — honest social proof until real customer logos exist. */}

@@ -4,14 +4,16 @@ import Link from 'next/link';
 import { CheckCircle2, ChevronRight, Rocket } from 'lucide-react';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { getTenantAttentionItems } from '@/services/overview';
+import { getTenantAttentionItems, getCrewCards } from '@/services/overview';
 import { countSessionsToday } from '@/services/sessions';
 import { entitlementsFor, isLimited } from '@/lib/entitlements';
 import { PAYWALL_PLANS } from '@/services/demo/plans';
+import { formatRelativeTime } from '@/lib/relative-time';
 import { PageHeader } from '@/components/page-header';
 import { EmptyState } from '@/components/empty-state';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BusinessCopilot } from '@/components/copilot/business-copilot';
+import { CrewStrip } from './crew-strip';
 
 const CHANNEL_LABELS: Record<string, string> = {
   whatsapp: 'WhatsApp',
@@ -19,16 +21,6 @@ const CHANNEL_LABELS: Record<string, string> = {
   instagram: 'Instagram',
   web: 'Website chat',
 };
-
-/** docs/27 §7.2 — rows only carry a clock, never a raw timestamp. */
-function formatRelativeTime(iso: string, now: number): string {
-  const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
-}
 
 /**
  * Client home (docs/14 §6, reshaped by docs/27 §7.1). One Home for every plan
@@ -137,6 +129,13 @@ export default async function DashboardHomePage() {
 
   const attentionOverflow = attentionItems.total - attentionItems.items.length;
 
+  // docs/27 §7.5 — needs `showBookings`/`connectedChannels`, both only known
+  // once the tenant row is back, so this can't join the query batch above.
+  const crewCards = await getCrewCards(activeTenantId, {
+    hasChannels: connectedChannels.length > 0,
+    showBookings,
+  });
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <PageHeader
@@ -206,6 +205,9 @@ export default async function DashboardHomePage() {
           </>
         )}
       </div>
+
+      {/* docs/27 §7.5 — one card per capability actually switched on, below the queue. */}
+      <CrewStrip cards={crewCards} now={now} />
 
       {/* Owners below Growth see what the AI assistant is, rather than nothing
           where the Copilot would be — the upgrade path is the point of the tier. */}

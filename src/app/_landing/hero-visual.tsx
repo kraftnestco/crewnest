@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useReducer, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import {
   CheckCheck,
   Sparkles,
@@ -15,6 +15,8 @@ import {
   Plus,
   Smile,
   Mic,
+  CalendarCheck,
+  BellRing,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PLATFORMS, PlatformBadge, type PlatformId } from './platform-icons';
@@ -32,7 +34,10 @@ import { PLATFORMS, PlatformBadge, type PlatformId } from './platform-icons';
  */
 
 type OrderStatus = 'none' | 'new' | 'awaiting' | 'paid' | 'confirmed';
-type AlertKind = 'order' | 'payment' | 'stock' | 'handoff';
+type AlertKind = 'order' | 'payment' | 'stock' | 'handoff' | 'booking' | 'reminder';
+
+/** M7 (docs/27 §7 / §9) — the two-door hero switch. `products` is the default door. */
+export type HeroVisualVariant = 'products' | 'bookings';
 
 interface Msg {
   id: number;
@@ -177,13 +182,169 @@ const SCRIPT: { delay: number; step: (s: DemoState) => DemoState }[] = [
   },
 ];
 
+// Second door (M7, docs/27 §9) — a service business taking a booking instead
+// of an order. Same shape, same beats (ask → confirm → lock it in → handoff),
+// so the two scripts read as siblings rather than a bolted-on variant.
+const SERVICE = 'Haircut & Beard Trim';
+const CLIENT = 'Bilal Ahmed';
+
+const START_BOOKING: DemoState = {
+  channel: 'whatsapp',
+  messages: [{ id: 1, role: 'customer', text: 'Hi, do you have a slot for a haircut today?' }],
+  typing: false,
+  orderStatus: 'none',
+  stock: 3,
+  stockVisible: false,
+  handoff: false,
+  alerts: [],
+};
+
+const REDUCED_BOOKING: DemoState = {
+  channel: 'whatsapp',
+  messages: [
+    { id: 5, role: 'customer', text: 'Bilal Ahmed' },
+    { id: 6, role: 'ai', text: 'Thanks Bilal — holding that slot now, one sec ✅' },
+    { id: 7, role: 'ai', text: 'You’re all set — booked for 4:00 PM today. See you then! 🎉' },
+  ],
+  typing: false,
+  orderStatus: 'confirmed',
+  stock: 2,
+  stockVisible: true,
+  handoff: false,
+  alerts: [
+    { id: 11, kind: 'booking', text: 'New booking request · 4:00 PM' },
+    { id: 12, kind: 'reminder', text: 'Reminder scheduled · 3:30 PM' },
+  ],
+};
+
+const SCRIPT_BOOKING: { delay: number; step: (s: DemoState) => DemoState }[] = [
+  { delay: 2800, step: () => START_BOOKING },
+  { delay: 1600, step: (s) => ({ ...s, typing: true }) },
+  {
+    delay: 1300,
+    step: (s) => ({
+      ...s,
+      typing: false,
+      stockVisible: true,
+      messages: [...s.messages, { id: 2, role: 'ai', text: 'We do! I have 4:00 PM or 5:30 PM open today — which works?' }],
+    }),
+  },
+  { delay: 1700, step: (s) => ({ ...s, messages: [...s.messages, { id: 3, role: 'customer', text: '4:00 PM works great' }] }) },
+  { delay: 900, step: (s) => ({ ...s, typing: true }) },
+  {
+    delay: 1500,
+    step: (s) => ({
+      ...s,
+      typing: false,
+      orderStatus: 'new',
+      alerts: [...s.alerts, { id: 11, kind: 'booking', text: 'New booking request · 4:00 PM' }],
+      messages: [...s.messages, { id: 4, role: 'ai', text: `Booking that in for a ${SERVICE}. Can I get your name?` }],
+    }),
+  },
+  { delay: 1800, step: (s) => ({ ...s, messages: [...s.messages, { id: 5, role: 'customer', text: CLIENT }] }) },
+  { delay: 900, step: (s) => ({ ...s, typing: true }) },
+  {
+    delay: 1300,
+    step: (s) => ({
+      ...s,
+      typing: false,
+      orderStatus: 'awaiting',
+      messages: [...s.messages, { id: 6, role: 'ai', text: 'Thanks Bilal — holding that slot now, one sec ✅' }],
+    }),
+  },
+  {
+    delay: 1300,
+    step: (s) => ({
+      ...s,
+      orderStatus: 'paid',
+      stock: 2,
+      alerts: [...s.alerts, { id: 12, kind: 'reminder', text: 'Reminder scheduled · 3:30 PM' }],
+    }),
+  },
+  { delay: 1100, step: (s) => ({ ...s, typing: true }) },
+  {
+    delay: 1300,
+    step: (s) => ({
+      ...s,
+      typing: false,
+      orderStatus: 'confirmed',
+      messages: [...s.messages, { id: 7, role: 'ai', text: 'You’re all set — booked for 4:00 PM today. See you then! 🎉' }],
+    }),
+  },
+  {
+    delay: 2400,
+    step: (s) => ({
+      ...s,
+      channel: 'instagram',
+      typing: false,
+      handoff: false,
+      stockVisible: false,
+      orderStatus: 'none',
+      messages: [{ id: 8, role: 'customer', text: 'Hey, can I move my 4:00 to tomorrow instead?' }],
+    }),
+  },
+  { delay: 900, step: (s) => ({ ...s, typing: true }) },
+  {
+    delay: 1500,
+    step: (s) => ({
+      ...s,
+      typing: false,
+      handoff: true,
+      alerts: [...s.alerts, { id: 13, kind: 'handoff', text: 'Handoff → owner · Instagram' }],
+      messages: [...s.messages, { id: 9, role: 'ai', text: 'Of course — let me get the owner to confirm a new time for you 🙏' }],
+    }),
+  },
+];
+
+/** Per-door script + copy — everything the render below needs to stop hardcoding one business. */
+const DOORS: Record<
+  HeroVisualVariant,
+  {
+    start: DemoState;
+    reduced: DemoState;
+    script: typeof SCRIPT;
+    customerName: string;
+    orderLabel: string;
+    orderLine: string;
+    orderPrice: string;
+    stockName: string;
+    stockEmptyLabel: string;
+    statusLabels: Record<Exclude<OrderStatus, 'none'>, string>;
+  }
+> = {
+  products: {
+    start: START,
+    reduced: REDUCED,
+    script: SCRIPT,
+    customerName: CUSTOMER,
+    orderLabel: 'Order #1042',
+    orderLine: `2 × ${PRODUCT}`,
+    orderPrice: 'Rs. 5,000',
+    stockName: `${PRODUCT} · M`,
+    stockEmptyLabel: 'Out of stock',
+    statusLabels: { new: 'New', awaiting: 'Awaiting payment', paid: 'Paid', confirmed: 'Confirmed' },
+  },
+  bookings: {
+    start: START_BOOKING,
+    reduced: REDUCED_BOOKING,
+    script: SCRIPT_BOOKING,
+    customerName: CLIENT,
+    orderLabel: 'Booking #B-204',
+    orderLine: SERVICE,
+    orderPrice: 'Today · 4:00 PM',
+    stockName: 'Today’s open slots',
+    stockEmptyLabel: 'Fully booked',
+    statusLabels: { new: 'Requested', awaiting: 'Confirming', paid: 'Slot held', confirmed: 'Booked' },
+  },
+};
+
 const CHANNEL_RAIL: PlatformId[] = ['whatsapp', 'instagram', 'messenger', 'web'];
 
-const STATUS_META: Record<Exclude<OrderStatus, 'none'>, { label: string; cls: string }> = {
-  new: { label: 'New', cls: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20' },
-  awaiting: { label: 'Awaiting payment', cls: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20' },
-  paid: { label: 'Paid', cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20' },
-  confirmed: { label: 'Confirmed', cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/25' },
+const STATUS_CLS: Record<Exclude<OrderStatus, 'none'>, string> = {
+  new: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20',
+  awaiting: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20',
+  paid: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20',
+  confirmed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/25',
 };
 
 const ALERT_META: Record<AlertKind, { icon: typeof ShoppingBag; cls: string }> = {
@@ -191,6 +352,8 @@ const ALERT_META: Record<AlertKind, { icon: typeof ShoppingBag; cls: string }> =
   payment: { icon: Wallet, cls: 'text-emerald-600 dark:text-emerald-400' },
   stock: { icon: PackageX, cls: 'text-amber-600 dark:text-amber-400' },
   handoff: { icon: LifeBuoy, cls: 'text-violet-600 dark:text-violet-400' },
+  booking: { icon: CalendarCheck, cls: 'text-sky-600 dark:text-sky-400' },
+  reminder: { icon: BellRing, cls: 'text-violet-600 dark:text-violet-400' },
 };
 
 /** Per-channel visual skin so the left panel reads as the real app it arrived on. */
@@ -323,35 +486,66 @@ function reducer(_s: DemoState, step: (s: DemoState) => DemoState): DemoState {
   return step(_s);
 }
 
-export function HeroVisual({ className }: { className?: string }) {
-  const [state, dispatch] = useReducer(reducer, START);
+export function HeroVisual({ className, variant = 'products' }: { className?: string; variant?: HeroVisualVariant }) {
+  const door = DOORS[variant];
+  const [state, dispatch] = useReducer(reducer, door.start);
+  // Cross-fade between doors (docs/27 §6.2 item 6, 200ms — not a slide). `false`
+  // while the old script's content is swapped for the new one underneath.
+  const [doorVisible, setDoorVisible] = useState(true);
+  const isFirstRun = useRef(true);
 
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      dispatch(() => REDUCED);
-      return;
-    }
-    let i = 1;
-    let timer: ReturnType<typeof setTimeout>;
-    const tick = () => {
-      dispatch(SCRIPT[i].step);
-      i = (i + 1) % SCRIPT.length;
-      timer = setTimeout(tick, SCRIPT[i].delay);
+    const active = DOORS[variant];
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let loopTimer: ReturnType<typeof setTimeout>;
+    let fadeTimer: ReturnType<typeof setTimeout>;
+
+    const startLoop = () => {
+      if (reducedMotion) {
+        dispatch(() => active.reduced);
+        return;
+      }
+      dispatch(() => active.start);
+      let i = 1;
+      const tick = () => {
+        dispatch(active.script[i].step);
+        i = (i + 1) % active.script.length;
+        loopTimer = setTimeout(tick, active.script[i].delay);
+      };
+      loopTimer = setTimeout(tick, active.script[1].delay);
     };
-    timer = setTimeout(tick, SCRIPT[1].delay);
-    return () => clearTimeout(timer);
-  }, []);
+
+    if (isFirstRun.current || reducedMotion) {
+      isFirstRun.current = false;
+      startLoop();
+    } else {
+      setDoorVisible(false);
+      fadeTimer = setTimeout(() => {
+        setDoorVisible(true);
+        startLoop();
+      }, 100);
+    }
+
+    return () => {
+      clearTimeout(loopTimer);
+      clearTimeout(fadeTimer);
+    };
+  }, [variant]);
 
   const skin = SKIN[state.channel];
   const platform = PLATFORMS[state.channel];
-  const visible = state.messages.slice(-4);
+  const visibleMessages = state.messages.slice(-4);
   const feed = state.alerts.slice(-3);
   const hasActivity = state.orderStatus !== 'none' || state.stockVisible || state.alerts.length > 0;
-  const initial = CUSTOMER.charAt(0);
+  const initial = door.customerName.charAt(0);
 
   return (
     <div
-      className={cn('relative isolate mx-auto w-full max-w-xl', className)}
+      className={cn(
+        'relative isolate mx-auto w-full max-w-xl transition-opacity duration-100 motion-reduce:transition-none',
+        doorVisible ? 'opacity-100' : 'opacity-0',
+        className,
+      )}
       onPointerMove={(e) => {
         if (e.pointerType !== 'mouse') return;
         const rect = e.currentTarget.getBoundingClientRect();
@@ -394,7 +588,7 @@ export function HeroVisual({ className }: { className?: string }) {
               {initial}
             </span>
             <div className="min-w-0 flex-1 leading-tight">
-              <p className="truncate text-sm font-semibold">{CUSTOMER}</p>
+              <p className="truncate text-sm font-semibold">{door.customerName}</p>
               <p className={cn('truncate text-[11px]', skin.sub)}>
                 {state.typing ? <span className="italic">typing…</span> : 'online'}
               </p>
@@ -419,7 +613,7 @@ export function HeroVisual({ className }: { className?: string }) {
                 </span>
               </div>
 
-              {visible.map((m) => (
+              {visibleMessages.map((m) => (
                 <div
                   key={m.id}
                   className={cn(
@@ -543,19 +737,19 @@ export function HeroVisual({ className }: { className?: string }) {
             )}
           >
             <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-              <span className="text-[11px] font-medium text-muted-foreground">Order #1042</span>
+              <span className="text-[11px] font-medium text-muted-foreground">{door.orderLabel}</span>
               <span
                 className={cn(
                   'rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset transition-colors duration-300',
-                  STATUS_META[state.orderStatus === 'none' ? 'new' : state.orderStatus].cls,
+                  STATUS_CLS[state.orderStatus === 'none' ? 'new' : state.orderStatus],
                 )}
               >
-                {STATUS_META[state.orderStatus === 'none' ? 'new' : state.orderStatus].label}
+                {door.statusLabels[state.orderStatus === 'none' ? 'new' : state.orderStatus]}
               </span>
             </div>
             <div className="mt-1 flex items-center justify-between gap-2">
-              <span className="truncate text-xs text-foreground">2 × {PRODUCT}</span>
-              <span className="shrink-0 text-xs font-semibold text-foreground">Rs. 5,000</span>
+              <span className="truncate text-xs text-foreground">{door.orderLine}</span>
+              <span className="shrink-0 text-xs font-semibold text-foreground">{door.orderPrice}</span>
             </div>
           </div>
 
@@ -568,9 +762,7 @@ export function HeroVisual({ className }: { className?: string }) {
                 : 'invisible',
             )}
           >
-            <span className="truncate text-xs text-foreground">
-              {PRODUCT} · <span className="text-muted-foreground">M</span>
-            </span>
+            <span className="truncate text-xs text-foreground">{door.stockName}</span>
             <span
               className={cn(
                 'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset transition-colors duration-300',
@@ -579,7 +771,7 @@ export function HeroVisual({ className }: { className?: string }) {
                   : 'bg-amber-500/10 text-amber-600 ring-amber-500/20 dark:text-amber-400',
               )}
             >
-              {state.stock === 0 ? 'Out of stock' : `${state.stock} left`}
+              {state.stock === 0 ? door.stockEmptyLabel : `${state.stock} left`}
             </span>
           </div>
 

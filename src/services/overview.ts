@@ -178,3 +178,95 @@ export async function getTenantAttentionItems(tenantId: string, limit = 5): Prom
     total: (pendingCount ?? 0) + (paymentCount ?? 0) + (handoffCount ?? 0) + (flaggedCount ?? 0),
   };
 }
+
+export interface CrewCard {
+  key: 'replies' | 'orders' | 'bookings';
+  name: string;
+  state: 'active' | 'quiet' | 'off';
+  /** One true recent outcome, or null to show state-only (docs/27 §7.5 — never fabricate an event). */
+  outcome: string | null;
+  timestamp: string | null;
+  href: string;
+}
+
+/**
+ * docs/27 §7.5 — "Your crew" strip. One card per capability the tenant actually
+ * has switched on, each carrying the single most recent real thing it did
+ * (never a fabricated sample event). `hasChannels` gates Replies (no point
+ * showing it "active" with nothing connected); `showBookings` picks Orders vs.
+ * Bookings the same way 7.4's hero metric does, since a tenant is one or the
+ * other, not both.
+ */
+export async function getCrewCards(
+  tenantId: string,
+  opts: { hasChannels: boolean; showBookings: boolean },
+): Promise<CrewCard[]> {
+  const supabase = await createSupabaseServerClient();
+
+  const [{ data: lastSession }, { data: lastOrder }, { data: lastAppointment }] = await Promise.all([
+    supabase
+      .from('chat_sessions')
+      .select('customer_name, last_message_at')
+      .eq('tenant_id', tenantId)
+      .order('last_message_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    opts.showBookings
+      ? Promise.resolve({ data: null })
+      : supabase
+          .from('orders')
+          .select('customer_name, order_number, amount_total, currency, created_at')
+          .eq('tenant_id', tenantId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+    opts.showBookings
+      ? supabase
+          .from('appointments')
+          .select('customer_name, service_name, created_at')
+          .eq('tenant_id', tenantId)
+          .neq('status', 'cancelled')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const cards: CrewCard[] = [
+    {
+      key: 'replies',
+      name: 'Replies',
+      state: !opts.hasChannels ? 'off' : lastSession ? 'active' : 'quiet',
+      outcome: lastSession ? `Replied to ${lastSession.customer_name ?? 'a customer'}` : null,
+      timestamp: lastSession?.last_message_at ?? null,
+      href: '/dashboard/chat',
+    },
+  ];
+
+  if (opts.showBookings) {
+    cards.push({
+      key: 'bookings',
+      name: 'Bookings',
+      state: lastAppointment ? 'active' : 'quiet',
+      outcome: lastAppointment
+        ? `Booked ${lastAppointment.service_name ?? 'an appointment'} for ${lastAppointment.customer_name ?? 'a customer'}`
+        : null,
+      timestamp: lastAppointment?.created_at ?? null,
+      href: '/dashboard/appointments',
+    });
+  } else {
+    const orderSize = lastOrder?.amount_total ? [lastOrder.currency, lastOrder.amount_total].filter(Boolean).join(' ') : null;
+    cards.push({
+      key: 'orders',
+      name: 'Orders',
+      state: lastOrder ? 'active' : 'quiet',
+      outcome: lastOrder
+        ? `Took ${orderSize ? `a ${orderSize}` : 'an'} order from ${lastOrder.customer_name ?? 'a customer'}`
+        : null,
+      timestamp: lastOrder?.created_at ?? null,
+      href: '/dashboard/orders',
+    });
+  }
+
+  return cards;
+}
