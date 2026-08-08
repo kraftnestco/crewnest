@@ -8,6 +8,7 @@ import {
   Cable,
   Rocket,
   Check,
+  X,
   ChevronDown,
   Menu,
   LogIn,
@@ -115,6 +116,31 @@ const FAQS = [
     a: 'Yes. Build a working demo of your AI employee in minutes, free and with no card required. The free plan lets you keep it running with a daily conversation cap, and you can upgrade whenever you’re ready.',
   },
 ];
+
+/**
+ * M6 (docs/27 §3) — the four pain/gain pairs behind the before/after
+ * section below. Drawn from FEATURES/FAQS above so the voice matches what's
+ * already on the page rather than introducing new copy; the first pain is
+ * the spec's own literal example.
+ */
+const BEFORE_AFTER = [
+  {
+    pain: 'Answering the same price question forty times a day.',
+    gain: 'Every price and catalogue question answered instantly, day or night.',
+  },
+  {
+    pain: 'Juggling WhatsApp, Instagram, Messenger, and your website in four different tabs.',
+    gain: 'One inbox. Every channel lands in the same place.',
+  },
+  {
+    pain: 'Re-typing order details from a screenshot into a notebook.',
+    gain: 'Orders captured and logged automatically, no manual entry.',
+  },
+  {
+    pain: 'Missing the one customer who needed you, not a bot, right now.',
+    gain: 'A human handoff any time it matters, one tap away.',
+  },
+] as const;
 
 export default function Home() {
   return (
@@ -249,6 +275,26 @@ export default function Home() {
                 Sign up
               </Link>
             </div>
+            {/*
+              M8 (docs/27 §3) — trust row directly under the hero CTAs, above
+              the fold on desktop. No verified usage numbers exist yet, so
+              per the spec ("do not invent social proof") this ships channel
+              logos plus the no-card line only; count-up motion for real
+              numbers is Stage 6, once there's something honest to count.
+            */}
+            <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground sm:flex-row lg:col-start-1 lg:row-start-5 lg:items-center lg:justify-start">
+              <div className="flex items-center -space-x-2">
+                {CHANNELS.map((id) => (
+                  <PlatformBadge
+                    key={id}
+                    platform={id}
+                    className="size-7 rounded-full ring-2 ring-background"
+                    iconClassName="size-3"
+                  />
+                ))}
+              </div>
+              <span>No card required to try it.</span>
+            </div>
           </div>
         </section>
 
@@ -348,6 +394,52 @@ export default function Home() {
                   </Card>
                 </TiltCard>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/*
+          M6 (docs/27 §3) — before/after section, inserted between Features
+          and Pricing. Sells the problem before the mechanism, the highest-
+          converting pattern for a non-technical audience. Left card stays
+          muted (the pains); right card carries the stage-primary accent (the
+          gains) so the two read as a clear before/after, not two equal
+          lists. Reveal animation is Stage 6 (§6 motion item 2) — this ships
+          the static structure only.
+        */}
+        <section className="bg-stage-deep text-stage-deep-fg">
+          <div className="mx-auto w-full max-w-7xl px-6 py-20">
+            <div className="mx-auto max-w-2xl text-center">
+              <Badge variant="secondary" className="border-transparent bg-stage-deep-fg/10 text-stage-deep-fg">
+                Before / after
+              </Badge>
+              <h2 className={cn(displayFont.className, 'mt-4 text-3xl tracking-tight text-balance')}>
+                Same business, a lot less repeating yourself.
+              </h2>
+            </div>
+            <div className="mt-10 grid gap-6 md:grid-cols-2">
+              <div className="rounded-xl bg-stage-deep-fg/5 p-6 ring-1 ring-stage-deep-fg/10">
+                <p className="text-sm font-medium text-stage-deep-fg/60">Right now</p>
+                <ul className="mt-4 space-y-4">
+                  {BEFORE_AFTER.map((pair) => (
+                    <li key={pair.pain} className="flex items-start gap-3">
+                      <X className="mt-0.5 size-4 shrink-0 text-stage-deep-fg/40" />
+                      <span className="text-stage-deep-fg/80">{pair.pain}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-xl bg-stage-deep-fg/10 p-6 ring-1 ring-stage-primary/40">
+                <p className="text-sm font-medium text-stage-primary">With CrewNest</p>
+                <ul className="mt-4 space-y-4">
+                  {BEFORE_AFTER.map((pair) => (
+                    <li key={pair.gain} className="flex items-start gap-3">
+                      <Check className="mt-0.5 size-4 shrink-0 text-stage-primary" />
+                      <span className="font-medium">{pair.gain}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </section>
