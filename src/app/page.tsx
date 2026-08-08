@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { PAYWALL_PLANS } from '@/services/demo/plans';
 import { Logomark } from './_landing/logomark';
 import { BeforeAfterGainCard } from './_landing/scroll-reveal';
+import { ChannelReskin } from './_landing/channel-reskin';
 import { SiteHeader } from './_landing/site-header';
 import { SECTION_LINKS } from './_landing/section-links';
 import { HeroSection } from './_landing/hero-section';
@@ -256,6 +257,29 @@ export default function Home() {
                   <p className="text-stage-warm-fg/75 sm:flex-1">{feature.description}</p>
                 </div>
               ))}
+            </div>
+
+            {/*
+              Motion item 4 (docs/27 §6.2 / §9 Phase 10) — the scroll-pinned
+              channel re-skin. "Pairs with the --stage-warm ground from M5"
+              (§6.2), and M5's own token table only assigns stage-warm to
+              this Features section — so rather than invent a ninth stage in
+              a sequence where "adjacent stages never share a ground" (§3
+              M5), this lives as a second block inside the SAME stage-warm
+              section rather than as its own page-level <section>.
+            */}
+            <div className="mt-16 border-t border-stage-warm-fg/15 pt-16">
+              <div className="mx-auto max-w-2xl text-center">
+                <h3 className={cn(displayFont.className, 'text-2xl tracking-tight text-balance')}>
+                  Feels native everywhere it shows up.
+                </h3>
+                <p className="mt-3 text-stage-warm-fg/75 text-balance">
+                  Same AI employee, same catalogue — it just wears whatever app your customer opened.
+                </p>
+              </div>
+              <div className="mt-10">
+                <ChannelReskin />
+              </div>
             </div>
           </div>
         </section>

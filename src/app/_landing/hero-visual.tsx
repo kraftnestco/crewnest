@@ -356,8 +356,13 @@ const ALERT_META: Record<AlertKind, { icon: typeof ShoppingBag; cls: string }> =
   reminder: { icon: BellRing, cls: 'text-violet-600 dark:text-violet-400' },
 };
 
-/** Per-channel visual skin so the left panel reads as the real app it arrived on. */
-const SKIN: Record<
+/**
+ * Per-channel visual skin so the left panel reads as the real app it arrived
+ * on. Exported for reuse by the scroll-pinned channel re-skin section
+ * (docs/27 §6.2 item 4, `_landing/channel-reskin.tsx`) — one set of brand
+ * colours, not two copies to keep in sync.
+ */
+export const SKIN: Record<
   PlatformId,
   {
     header: string;
