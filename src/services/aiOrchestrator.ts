@@ -229,7 +229,7 @@ export async function handleInboundMessage(
   // keeps a path to a human, and the owner sees the conversation waiting rather
   // than a silently dead thread.
   if (isLimited(entitlements.maxMessagesPerConversation)) {
-    const userMessageCount = await messages.countUserMessages(session.id);
+    const userMessageCount = await messages.countUserMessages(session.id, session.lengthLimitResetAt);
     if (userMessageCount > entitlements.maxMessagesPerConversation) {
       await sessions.setHandoff(session.id, true, 'length_limit');
       await messages.persist({

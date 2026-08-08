@@ -17,6 +17,7 @@ import {
   manualSendAction,
   markReadAction,
   resolveClarificationAction,
+  resumeAfterLengthLimitAction,
   takeOverAction,
 } from '@/app/admin/chat/actions';
 import { ClarificationPanel } from './clarification-panel';
@@ -223,6 +224,24 @@ export function ConversationPane({
     });
   }
 
+  /**
+   * The conversation-length cap re-fires on every message it counts, so
+   * flipping the takeover switch back to AI here did nothing — the very next
+   * customer message re-tripped it before the AI got a turn, and the switch
+   * silently lied about what it was actually doing. This calls the one lever
+   * that actually works instead (docs/27 §7A F3).
+   */
+  function handleResumeAfterLengthLimit() {
+    startTransition(async () => {
+      try {
+        await resumeAfterLengthLimitAction(session.id);
+        onTakeOverChange(session.id, false);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to resume the AI.');
+      }
+    });
+  }
+
   function handleSend() {
     const text = draft.trim();
     if (!text) return;
@@ -252,6 +271,7 @@ export function ConversationPane({
   const pendingClarification = parsePendingClarification(session.pending_clarification);
   const hasClarification = pendingClarification !== null;
   const hasAlert = Boolean(session.alert_signal);
+  const lengthLimitBlocked = session.is_human_handoff && session.handoff_cause === 'length_limit';
 
   return (
     <>
@@ -289,14 +309,31 @@ export function ConversationPane({
               sessionId={session.id}
               paymentMethods={tenant?.payments_enabled ? ((tenant.payment_methods as PaymentMethod[] | null) ?? []) : []}
             />
-            <div className="flex items-center gap-1.5 lg:gap-2" title={session.is_human_handoff ? 'The AI has stopped replying. You’re answering this chat yourself' : 'The AI is currently replying to this customer'}>
+            <div
+              className="flex items-center gap-1.5 lg:gap-2"
+              title={
+                lengthLimitBlocked
+                  ? "Over the plan's message limit for this chat — this switch can't turn the AI back on. Use \"Let the AI continue this chat\" below."
+                  : session.is_human_handoff
+                    ? 'The AI has stopped replying. You’re answering this chat yourself'
+                    : 'The AI is currently replying to this customer'
+              }
+            >
               {/* Full label needs the room; on phones the switch keeps an
                   accessible name instead so the row can't overflow. */}
               <span className="hidden text-xs font-medium text-muted-foreground lg:inline">Human takeover</span>
+              {/*
+                Disabled, not just toggleable-but-ineffective, while a length-limit
+                handoff is active. Flipping this off used to look like it turned the
+                AI back on, but the very next customer message re-tripped the same
+                cap before the AI got a turn — the switch was lying about what it
+                did. Now it visibly can't be touched, and the banner below (F3)
+                points at the one thing that actually works.
+              */}
               <Switch
                 checked={session.is_human_handoff}
                 onCheckedChange={handleTakeOver}
-                disabled={isPending}
+                disabled={isPending || lengthLimitBlocked}
                 aria-label="Human takeover"
               />
             </div>
@@ -348,8 +385,46 @@ export function ConversationPane({
             </Button>
           </div>
         </div>
+        {/*
+          Says why the AI stopped, in plain language, instead of leaving an
+          unexplained handoff that reads as "the AI broke" (reported from the
+          field as "the LLM started hallucinating" — it hadn't; it hit a quota
+          nobody had told the owner about). The one working recovery lever
+          sits right here too, so there's no need to go hunting for it.
+        */}
+        {lengthLimitBlocked && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-700 dark:text-amber-300">
+            <span>This chat reached this plan&apos;s conversation-length limit, so the AI stopped replying.</span>
+            <div className="flex shrink-0 items-center gap-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 border-amber-500/40 bg-transparent text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
+                onClick={handleResumeAfterLengthLimit}
+                disabled={isPending}
+              >
+                Let the AI continue this chat
+              </Button>
+              <a
+                href={viewer === 'admin' ? `/admin/clients/${session.tenant_id}` : '/dashboard/billing'}
+                className="font-medium underline underline-offset-2"
+              >
+                {viewer === 'admin' ? 'Open client' : 'Upgrade'}
+              </a>
+            </div>
+          </div>
+        )}
         <ScrollArea className="min-h-0 flex-1">
-          <div className="flex flex-col gap-2 px-4 py-3">
+          {/*
+            `overflow-x-hidden` backstop: a bubble with an unbreakable token
+            (a raw meeting URL, a long auto-linkified phone number) could still
+            widen this column even with the bubble's own `break-words` below,
+            because a flex/grid child defaults to `min-width: auto` and refuses
+            to shrink below its content. This clips at the column instead of
+            letting the whole thread pan sideways.
+          */}
+          <div className="flex flex-col gap-2 overflow-x-hidden px-4 py-3">
             {messages.map((m) => {
               if (m.role === 'system') {
                 return (
@@ -362,9 +437,17 @@ export function ConversationPane({
               }
               const attachments = (m.attachments as unknown as OrderAttachment[] | null) ?? [];
               return (
-                <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                <div key={m.id} className={`flex min-w-0 ${m.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                  {/*
+                    A raw meeting link (https://meet.google.com/nwm-wwhj-wrf) or an
+                    auto-linkified phone number has no natural break point, so
+                    without `break-words` (overflow-wrap: anywhere) + `min-w-0` it
+                    forced the bubble past its 75% cap, which pushed this flex row
+                    wider than the viewport — the whole thread panned sideways with
+                    the left edge of every bubble cut off (reported from the field).
+                  */}
                   <div
-                    className={`max-w-[75%] px-3.5 py-2 text-sm shadow-sm ${
+                    className={`max-w-[75%] min-w-0 break-words px-3.5 py-2 text-sm shadow-sm ${
                       m.role === 'user'
                         ? 'rounded-2xl rounded-bl-md bg-muted'
                         : 'rounded-2xl rounded-br-md bg-primary text-primary-foreground'

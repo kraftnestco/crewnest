@@ -309,6 +309,7 @@ export type Database = {
           is_human_handoff: boolean;
           alert_signal: string | null;
           handoff_cause: string | null;
+          length_limit_reset_at: string | null;
           last_message_at: string;
           unread_count: number;
           pending_review_order_id: string | null;
@@ -331,6 +332,7 @@ export type Database = {
           is_human_handoff?: boolean;
           alert_signal?: string | null;
           handoff_cause?: string | null;
+          length_limit_reset_at?: string | null;
           last_message_at?: string;
           unread_count?: number;
           pending_review_order_id?: string | null;
@@ -353,6 +355,7 @@ export type Database = {
           is_human_handoff?: boolean;
           alert_signal?: string | null;
           handoff_cause?: string | null;
+          length_limit_reset_at?: string | null;
           last_message_at?: string;
           unread_count?: number;
           pending_review_order_id?: string | null;

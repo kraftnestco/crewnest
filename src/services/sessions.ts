@@ -19,6 +19,7 @@ function mapSession(row: ChatSessionRow): ChatSession {
     isHumanHandoff: row.is_human_handoff,
     alertSignal: (row.alert_signal as AlertSignal | null) ?? null,
     handoffCause: (row.handoff_cause as HandoffCause | null) ?? null,
+    lengthLimitResetAt: row.length_limit_reset_at,
     pendingReviewOrderId: row.pending_review_order_id,
     pendingClarification: (row.pending_clarification as unknown as PendingClarification | null) ?? null,
     customerName: row.customer_name,

@@ -1,0 +1,25 @@
+-- 0047_length_limit_reset.sql
+-- Field bug F3 (docs/27-UI-REVAMP.md §7A.F3): a session that crosses the free
+-- plan's per-conversation message cap (0046) hands off to a human PERMANENTLY —
+-- `aiOrchestrator`'s check (`userMessageCount > maxMessagesPerConversation`)
+-- re-fires on every later message, since the count only grows. Toggling
+-- `is_human_handoff` back off did not recover it: the very next customer
+-- message re-triggered the same check before the AI ever got a turn. The only
+-- thing that actually worked was Erase customer data — a destructive "fix" for
+-- a quota.
+--
+-- This column gives the owner a non-destructive lever: "Let the AI continue
+-- this chat" stamps `now()` here, and the message count feeding the cap check
+-- is scoped to `chat_messages.created_at > length_limit_reset_at` from then on
+-- (services/messages.ts countUserMessages, services/aiOrchestrator.ts).
+-- The conversation gets another full cap's worth of messages before the same
+-- check can fire again — not an unlimited override, since letting a free-plan
+-- conversation run forever on one click would quietly defeat the cap's actual
+-- purpose (bounding master-key LLM cost per conversation, lib/entitlements.ts).
+-- Each additional cap-worth still requires the owner to notice the banner and
+-- act again.
+--
+-- Null = never reset; count every user message in the session, the existing
+-- behaviour. Additive only.
+alter table public.chat_sessions
+  add column if not exists length_limit_reset_at timestamptz;

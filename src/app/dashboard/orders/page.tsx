@@ -55,7 +55,17 @@ export default async function DashboardOrdersPage({
       initialOrders={orders ?? []}
       tenants={memberTenants ?? []}
       realtimeAccessToken={session?.access_token ?? null}
-      showBusinessColumn={ctx.memberships.length > 1}
+      // Always off here. This dropdown/column pair is agency vocabulary ("all
+      // clients") layered on a component that also serves the client shell,
+      // where the user IS the client, not one of several the caller manages.
+      // With it on, the label lied on first paint (server hard-filters to
+      // activeTenantId below, but the dropdown read "All clients" because it
+      // was seeded with initialTenantId={null}), and picking a business here
+      // didn't move `cn_active_tenant` — so Orders silently drifted onto a
+      // different business than the topbar and every other page still showed.
+      // The topbar's TenantSwitcher is the one "which business" control now;
+      // it's the thing that actually moves the cookie the whole app reads.
+      showBusinessColumn={false}
       chatBasePath="/dashboard/chat"
       initialStatus={initialStatus}
       initialTenantId={null}

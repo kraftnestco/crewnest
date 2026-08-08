@@ -129,6 +129,15 @@ export interface ChatSession {
   alertSignal: AlertSignal | null;
   /** Set at the same site as the handoff-triggering notification; null while never handed off. See docs/16 §2. */
   handoffCause: HandoffCause | null;
+  /**
+   * When set, the free-plan conversation-length cap only counts customer
+   * messages AFTER this timestamp (services/messages.ts countUserMessages).
+   * Stamped by the owner's "Let the AI continue this chat" action — a
+   * non-destructive alternative to Erase customer data, the only thing that
+   * previously un-stuck a session the cap had permanently handed off (docs/27
+   * §7A F3). Null means never reset: count every user message, unchanged.
+   */
+  lengthLimitResetAt: string | null;
   pendingReviewOrderId: string | null;
   pendingClarification: PendingClarification | null;
   /** Real customer identity surfaced on the Live Inbox instead of the raw platform id. Null until captured. */

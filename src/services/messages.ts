@@ -240,16 +240,26 @@ export async function countRecentAttachments(sessionId: string, windowMinutes: n
  * only: the assistant's own replies must not consume the customer's budget, or
  * a verbose AI would silently shorten how much the customer is allowed to say.
  *
- * Not time-windowed — the limit is per CONVERSATION, and a session that has
- * already run long stays long however slowly it got there.
+ * Not time-windowed by default — the limit is per CONVERSATION, and a session
+ * that has already run long stays long however slowly it got there.
+ *
+ * `since`, when given, counts only messages after that timestamp — how the
+ * owner's "Let the AI continue this chat" action (docs/27 §7A F3) resets the
+ * cap without touching customer data: it stamps `chat_sessions.length_limit_
+ * reset_at`, and every count from then on is scoped to messages after it, the
+ * same "another cap's worth, not unlimited" shape as the free-plan monthly
+ * cost ceiling's rolling window (aiOrchestrator.ts step 8b).
  */
-export async function countUserMessages(sessionId: string): Promise<number> {
+export async function countUserMessages(sessionId: string, since?: string | null): Promise<number> {
   const client = createServiceClient();
-  const { count, error } = await client
+  let query = client
     .from('chat_messages')
     .select('*', { count: 'exact', head: true })
     .eq('session_id', sessionId)
     .eq('role', 'user');
+  if (since) query = query.gt('created_at', since);
+
+  const { count, error } = await query;
 
   if (error) throw error;
   return count ?? 0;

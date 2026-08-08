@@ -242,6 +242,75 @@ export async function resolveClarificationAction(sessionId: string, note: string
 }
 
 /**
+ * "Let the AI continue this chat" — the non-destructive recovery for a session
+ * the free-plan conversation-length cap handed off (docs/27 §7A F3). Before
+ * this action existed, the only thing that actually un-stuck a capped session
+ * was Erase customer data: the length check re-fires on every message because
+ * it counts EVERY user message in the session, so flipping the take-over
+ * switch back off did nothing — the very next customer message re-tripped it
+ * before the AI got a turn.
+ *
+ * Scoped to `handoff_cause === 'length_limit'` deliberately: a session handed
+ * off for any OTHER reason (requested, alert, tool_exhaustion, media_review)
+ * must not be silently resumed by this button — those need the ordinary
+ * Human takeover toggle, which stays exactly as lying-free as it already is
+ * for them. RLS-scoped read is the access check, same shape as every other
+ * action here: no row back means no access.
+ */
+export async function resumeAfterLengthLimitAction(sessionId: string): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data: session, error: sessionError } = await supabase
+    .from('chat_sessions')
+    .select('id, handoff_cause')
+    .eq('id', sessionId)
+    .single();
+
+  if (sessionError || !session) {
+    throw new Error(sessionError?.message ?? 'Session not found.');
+  }
+  if (session.handoff_cause !== 'length_limit') return; // nothing to resume — refuse rather than clobber a different handoff
+
+  const { error: updateError } = await supabase
+    .from('chat_sessions')
+    .update({
+      is_human_handoff: false,
+      handoff_cause: null,
+      // Everything from here counts toward a FRESH cap, not an unlimited one —
+      // countUserMessages(sessionId, lengthLimitResetAt) only counts messages
+      // after this timestamp. Hitting the cap again re-triggers this same
+      // banner, requiring the owner to notice and act again rather than
+      // silently converting the conversation to unlimited length.
+      length_limit_reset_at: new Date().toISOString(),
+    })
+    .eq('id', sessionId);
+
+  if (updateError) throw new Error(updateError.message);
+
+  // Best-effort, same shape as resolveClarificationAction just above: the
+  // reset itself already succeeded by this point, so a reply failure here is
+  // logged, not surfaced as this action having failed. Runs the AI turn
+  // immediately rather than waiting for the customer to send something new —
+  // there may already be an unanswered message sitting from while this
+  // session was stuck in handoff.
+  try {
+    await aiOrchestrator.continueSession(
+      sessionId,
+      '[context] Staff reset this chat past the message-length limit and asked you to continue. Reply to whatever the customer said most recently — do not re-greet or restart the conversation.',
+      'human',
+    );
+  } catch (err) {
+    log.error('[chat] continueSession failed after length-limit reset', {
+      sessionId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  revalidatePath('/admin/chat');
+  revalidatePath('/dashboard/chat');
+}
+
+/**
  * Mint a short-TTL signed URL for the media attached to a session's OPEN clarification.
  * Takes the session id, not a bare storage path — verifies the path actually matches
  * the session's own `pending_clarification` before signing (same ownership-check shape
