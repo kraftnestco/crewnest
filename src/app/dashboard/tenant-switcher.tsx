@@ -18,8 +18,10 @@ export interface SwitchableTenant {
 }
 
 /**
- * Desktop sidebar switcher. A plain <select> is right here: it sits inside the
- * always-visible sidebar, where the current business is already labelled above it.
+ * Desktop sidebar switcher. A plain <select> is right here: its closed state
+ * already shows the active business as text, so there's no separate label
+ * needed above it (only rendered when there's more than one business to
+ * switch between — single-tenant members get that plain label instead).
  */
 export function TenantSwitcher({
   tenants,

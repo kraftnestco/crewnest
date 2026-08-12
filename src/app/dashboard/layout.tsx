@@ -92,14 +92,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
           {/* Account-type indicator — the admin (/admin) and client (/dashboard)
               shells otherwise look identical (same logo, same topbar component),
-              so this is the only always-visible cue for which one you're in and,
-              for a multi-tenant member, which business is currently active. */}
-          <div className="px-4 pb-3">
-            <span className="inline-flex max-w-full items-center truncate rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-medium text-foreground">
-              {activeTenantName}
-            </span>
-          </div>
-          {ctx.memberships.length > 1 && (
+              so this is the only always-visible cue for which one you're in.
+              Only shown when the TenantSwitcher below isn't — the switcher
+              already names the active business, so showing both duplicated it. */}
+          {ctx.memberships.length > 1 ? (
             <TenantSwitcher
               activeTenantId={activeTenantId}
               tenants={ctx.memberships.map((m) => ({
@@ -107,6 +103,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 name: tenantNameMap.get(m.tenantId) ?? m.tenantId,
               }))}
             />
+          ) : (
+            <div className="px-4 pb-3">
+              <span className="inline-flex max-w-full items-center truncate rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-medium text-foreground">
+                {activeTenantName}
+              </span>
+            </div>
           )}
           <DashboardNav showBusiness={showBusiness} showBookings={showBookings} />
           <div className="border-t border-sidebar-border p-3">
