@@ -250,7 +250,7 @@ export default async function DashboardHomePage() {
           />
         ) : (
           <div className="flex flex-col gap-4">
-            <Card className="bg-primary/5 ring-1 ring-primary/15">
+            <Card className="bg-[color-mix(in_oklch,var(--card),var(--primary)_6%)] ring-1 ring-primary/15">
               <CardHeader>
                 <CardTitle className="text-sm font-normal text-muted-foreground">{heroStat.label}</CardTitle>
               </CardHeader>

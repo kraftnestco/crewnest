@@ -70,7 +70,7 @@ export function BusinessIntake({ tenant }: { tenant: IntakeTenant & { intake_com
         }}
       />
       {importSummary && (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-foreground">
+        <div className="rounded-lg border border-primary/30 bg-[color-mix(in_oklch,var(--card),var(--primary)_6%)] px-3 py-2 text-sm text-foreground">
           {importSummary}
         </div>
       )}

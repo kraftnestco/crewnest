@@ -93,7 +93,7 @@ export function BillingPanel({
       )}
 
       {currentPlan !== 'free' && (
-        <Card>
+        <Card className="max-w-md">
           <CardHeader>
             <CardTitle className="text-sm font-normal text-muted-foreground">Manage subscription</CardTitle>
           </CardHeader>

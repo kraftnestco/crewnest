@@ -40,7 +40,7 @@ export default async function DashboardBillingPage() {
     : provider;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-4 lg:p-6">
+    <div className="space-y-6 p-4 lg:p-6">
       <PageHeader title="Billing" description="Manage your CrewNest plan and payment method." />
       <BillingPanel
         tenantId={tenant.id}
