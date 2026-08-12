@@ -27,7 +27,7 @@ export default async function DashboardTeamPage() {
   const members = await listTeamMembers(activeTenantId);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-6">
+    <div className="space-y-6 p-4 lg:p-6">
       <PageHeader
         title="My Team"
         description={`Manage who at ${tenant.business_name} can access this dashboard.`}

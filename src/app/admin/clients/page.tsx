@@ -33,7 +33,7 @@ export default async function ClientsPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 lg:p-6">
       <PageHeader
         title="Clients"
         description="Manage tenant businesses and their channels."

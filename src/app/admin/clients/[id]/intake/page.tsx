@@ -17,7 +17,7 @@ export default async function ClientIntakePage({ params }: { params: Promise<{ i
   if (!tenant) notFound();
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 lg:p-6">
       <div>
         <Link href="/admin/clients" className="text-xs text-muted-foreground underline underline-offset-2">
           ← Clients

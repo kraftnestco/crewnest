@@ -25,7 +25,7 @@ export default async function SystemHealthPage() {
   const total = HEALTH_CARDS.reduce((sum, c) => sum + counts[c.key], 0);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 lg:p-6">
       <PageHeader title="System health" description="Signals that need attention across all clients." />
 
       {total === 0 ? (

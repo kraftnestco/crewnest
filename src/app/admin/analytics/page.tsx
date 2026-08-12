@@ -109,7 +109,7 @@ export default async function AnalyticsPage({
   ];
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 lg:p-6">
       <PageHeader title="Analytics" description="Proof layer: volume, deflection, cost, and satisfaction across all clients." />
 
       <div className="flex flex-wrap items-center gap-2">

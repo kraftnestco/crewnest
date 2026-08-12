@@ -148,7 +148,7 @@ export function AppointmentsView({
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 lg:p-6">
       <PageHeader
         title="Appointments"
         description="Bookings the AI made in chat. Times show in each business's own timezone."

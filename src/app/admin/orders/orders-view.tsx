@@ -514,7 +514,7 @@ export function OrdersView({
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 lg:p-6">
       <PageHeader
         title="Orders"
         description="New orders appear instantly below; scroll down for full history."

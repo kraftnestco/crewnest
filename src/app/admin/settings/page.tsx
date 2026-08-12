@@ -27,7 +27,7 @@ export default async function SettingsPage() {
   ];
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 lg:p-6">
       <PageHeader title="Settings" description="Agency-level configuration and access." />
 
       <Card>

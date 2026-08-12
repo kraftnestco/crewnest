@@ -59,7 +59,7 @@ export default async function OverviewPage() {
   ];
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 lg:p-6">
       <PageHeader title="Overview" description="Snapshot of activity across all clients." />
 
       <div>

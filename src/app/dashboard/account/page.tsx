@@ -24,7 +24,7 @@ export default async function DashboardAccountPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-6">
+    <div className="mx-auto max-w-2xl space-y-6 p-4 lg:p-6">
       <PageHeader title="Account" description="Manage your profile, password, and notification preferences." />
       <AccountForm
         profile={{ fullName: ctx.fullName, email: ctx.email, notificationPrefs }}
