@@ -158,7 +158,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             that no longer overlaps anything, so it just added ~60-85px of dead
             space under the last row on every page.
           */}
-          <main className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain">
+          <main className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain bg-surface">
             {children}
           </main>
           <DashboardTabBar showBusiness={showBusiness} showBookings={showBookings} />

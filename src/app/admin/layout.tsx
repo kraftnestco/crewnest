@@ -79,7 +79,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               why (a wide table must not widen the page itself). */}
           {/* No bottom padding — the tab bar is a flex sibling that reserves
               its own height. See the client dashboard layout. */}
-          <main className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain">
+          <main className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain bg-surface">
             {children}
           </main>
           <AdminTabBar />
