@@ -36,7 +36,7 @@ export function PaywallModal({
             <Card
               key={plan.id}
               className={cn(
-                'relative',
+                'relative overflow-visible',
                 plan.highlight && 'ring-2 ring-primary shadow-lg sm:-my-1 sm:scale-[1.03]',
               )}
             >

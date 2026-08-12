@@ -108,13 +108,18 @@
   --chart-4: oklch(0.62 0.14 295);
   --chart-5: oklch(0.65 0.15 15);
   --radius: 0.75rem;
-  --sidebar: oklch(0.975 0.006 165);
+  /* Matches --surface (the main-content canvas) so the sidebar/topbar chrome
+     and the page canvas read as one shell — only bg-card boxes stand apart
+     from it. --sidebar-accent/-border shifted down by the same amount they
+     always sat below --sidebar, so hover states and the divider stay visible
+     against the darker base. */
+  --sidebar: oklch(0.93 0.01 165);
   --sidebar-foreground: oklch(0.25 0.015 175);
   --sidebar-primary: oklch(0.52 0.12 165);
   --sidebar-primary-foreground: oklch(0.985 0.005 165);
-  --sidebar-accent: oklch(0.93 0.018 165);
+  --sidebar-accent: oklch(0.885 0.02 165);
   --sidebar-accent-foreground: oklch(0.28 0.045 170);
-  --sidebar-border: oklch(0.905 0.01 165);
+  --sidebar-border: oklch(0.86 0.012 165);
   --sidebar-ring: oklch(0.65 0.1 165);
 
   /* Semantic status (docs/27 §2). *-text variants are darkened to clear

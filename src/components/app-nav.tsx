@@ -98,7 +98,7 @@ export function MobileTabBar({ items }: { items: NavItem[] }) {
      * <main> ends exactly where it begins, and there is nothing to compensate
      * for. `shrink-0` keeps it from being squeezed by a tall page.
      */
-    <nav data-slot="tab-bar" className="z-40 flex shrink-0 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+    <nav data-slot="tab-bar" className="z-40 flex shrink-0 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
       {visibleItems.map((item) => {
         const isActive = isActivePath(pathname, item);
         return (

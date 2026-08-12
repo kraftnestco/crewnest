@@ -138,7 +138,7 @@ export function BillingPanel({
             <Card
               key={plan.id}
               className={cn(
-                'relative',
+                'relative overflow-visible',
                 isCurrent && 'ring-2 ring-primary',
                 !isCurrent && plan.highlight && 'ring-1 ring-primary/40',
               )}

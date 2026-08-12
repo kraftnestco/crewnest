@@ -65,7 +65,7 @@ export async function AppTopbar({
   ]);
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm lg:px-6">
+    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b bg-surface/80 px-4 backdrop-blur-sm lg:px-6">
       <div className="flex min-w-0 items-center gap-2.5">
         {/* Brand + account badges show here on mobile only — the sidebar
             (which carries both on desktop) is hidden below lg. */}
