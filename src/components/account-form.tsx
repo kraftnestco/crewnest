@@ -210,7 +210,7 @@ export function AccountForm({
           <CardTitle className="text-sm font-normal text-muted-foreground">Notification preferences</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex max-w-md items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Email me</p>
               <p className="text-xs text-muted-foreground">Also send these notifications to your email.</p>
@@ -218,7 +218,7 @@ export function AccountForm({
             <Switch checked={emailEnabled} onCheckedChange={handleToggleEmail} disabled={isSavingPrefs} />
           </div>
           <PushToggle vapidPublicKey={vapidPublicKey} />
-          <div className="space-y-2.5 border-t pt-3">
+          <div className="max-w-md space-y-2.5 border-t pt-3">
             <p className="text-xs font-medium text-muted-foreground">Notification types</p>
             {types.map((type) => (
               <div key={type} className="flex items-center justify-between gap-4">

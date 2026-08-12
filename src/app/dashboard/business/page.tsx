@@ -32,7 +32,7 @@ export default async function DashboardBusinessPage() {
   if (!tenant) redirect('/dashboard');
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 p-4 lg:p-6">
+    <div className="space-y-8 p-4 lg:p-6">
       <PageHeader
         title="My Business"
         description={`Tell your AI assistant about ${tenant.business_name} and manage which channels it talks to customers on. Technical setup (API keys, tokens) is always handled by our team.`}

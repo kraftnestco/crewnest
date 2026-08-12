@@ -174,7 +174,7 @@ export function PushToggle({ vapidPublicKey }: { vapidPublicKey: string | null }
   if (support === 'loading') return null;
 
   return (
-    <div className="flex items-start justify-between gap-4 border-t pt-3">
+    <div className="flex max-w-md items-start justify-between gap-4 border-t pt-3">
       <div>
         <p className="text-sm font-medium">Push notifications on this device</p>
         {support === 'supported' && (
