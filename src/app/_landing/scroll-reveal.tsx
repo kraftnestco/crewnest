@@ -21,6 +21,7 @@ export function BeforeAfterGainCard({ items, className }: { items: readonly stri
     const el = ref.current;
     if (!el) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- show immediately when motion is reduced; media query is post-mount only
       setShown(true);
       return;
     }

@@ -112,6 +112,7 @@ export function AuthMarketingPanel() {
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- media query is only available after mount; sync once to skip the animation loop
       setReduced(true);
       setTyped(EXCHANGES[0].customer);
       setTypedFollowUp(EXCHANGES[0].followUp);
@@ -140,6 +141,7 @@ export function AuthMarketingPanel() {
     };
 
     if (phase === 'typing') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset follow-up when a new customer turn starts; driven by the phase machine, not render sync
       setTypedFollowUp('');
       type(exchange.customer, () => setPhase('thinking'), setTyped);
     } else if (phase === 'thinking') {
