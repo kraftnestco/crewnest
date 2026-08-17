@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -153,6 +153,13 @@ function InventoryRow({
 }) {
   const [value, setValue] = useState(item.stock === null ? '' : String(item.stock));
   const tracked = item.stock !== null;
+
+  // Keep the draft input aligned with server stock after +10 / Set / refresh.
+  // Without this, restock updates the badge but leaves the typed box stale.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync controlled draft from props after server mutation
+    setValue(item.stock === null ? '' : String(item.stock));
+  }, [item.stock]);
 
   function commit() {
     const trimmed = value.trim();
