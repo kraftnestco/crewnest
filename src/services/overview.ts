@@ -179,7 +179,7 @@ export async function getTenantAttentionItems(tenantId: string, limit = 5): Prom
   };
 }
 
-export interface CrewCard {
+export interface ClerkCard {
   key: 'replies' | 'orders' | 'bookings';
   name: string;
   state: 'active' | 'quiet' | 'off';
@@ -190,17 +190,17 @@ export interface CrewCard {
 }
 
 /**
- * docs/27 §7.5 — "Your crew" strip. One card per capability the tenant actually
+ * docs/27 §7.5 — "Your clerks" strip. One card per capability the tenant actually
  * has switched on, each carrying the single most recent real thing it did
  * (never a fabricated sample event). `hasChannels` gates Replies (no point
  * showing it "active" with nothing connected); `showBookings` picks Orders vs.
  * Bookings the same way 7.4's hero metric does, since a tenant is one or the
  * other, not both.
  */
-export async function getCrewCards(
+export async function getClerkCards(
   tenantId: string,
   opts: { hasChannels: boolean; showBookings: boolean },
-): Promise<CrewCard[]> {
+): Promise<ClerkCard[]> {
   const supabase = await createSupabaseServerClient();
 
   const [{ data: lastSession }, { data: lastOrder }, { data: lastAppointment }] = await Promise.all([
@@ -232,7 +232,7 @@ export async function getCrewCards(
       : Promise.resolve({ data: null }),
   ]);
 
-  const cards: CrewCard[] = [
+  const cards: ClerkCard[] = [
     {
       key: 'replies',
       name: 'Replies',

@@ -59,6 +59,17 @@ export interface CsatMetrics {
   sufficientSample: boolean;
 }
 
+export interface CommerceMetrics {
+  /** Confirmed/fulfilled orders plus booked appointments created in range. */
+  outcomesSecured: number;
+  ordersSecured: number;
+  appointmentsBooked: number;
+  /** Accepted orders in range; the denominator for payment conversion. */
+  paymentEligibleOrders: number;
+  paidOrders: number;
+  paymentConversionRate: number | null;
+}
+
 const ALL_HANDOFF_CAUSES: HandoffCause[] = ['requested', 'alert', 'tool_exhaustion', 'media_review'];
 const ALL_SENTIMENT_BUCKETS: SentimentBucket[] = [
   'frustrated',
@@ -255,4 +266,51 @@ export async function getCsat(tenantId: string | null, range: DateRange): Promis
   const averageRating = count > 0 ? ratings.reduce((sum, r) => sum + r, 0) / count : null;
 
   return { averageRating, count, distribution, sufficientSample: count >= MIN_CSAT_SAMPLE };
+}
+
+/**
+ * Revenue-proxy outcomes derived from existing order/appointment rows. "Secured"
+ * deliberately excludes pending and cancelled orders; payment conversion is
+ * current paid status among accepted (confirmed/fulfilled) orders, so refunded
+ * or failed payments do not read as collected revenue.
+ */
+export async function getCommerceMetrics(tenantId: string | null, range: DateRange): Promise<CommerceMetrics> {
+  const supabase = await createSupabaseServerClient();
+
+  let ordersQuery = supabase
+    .from('orders')
+    .select('status, payment_status')
+    .in('status', ['confirmed', 'fulfilled'])
+    .gte('created_at', range.from)
+    .lt('created_at', range.to);
+  let appointmentsQuery = supabase
+    .from('appointments')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'booked')
+    .gte('created_at', range.from)
+    .lt('created_at', range.to);
+
+  if (tenantId) {
+    ordersQuery = ordersQuery.eq('tenant_id', tenantId);
+    appointmentsQuery = appointmentsQuery.eq('tenant_id', tenantId);
+  }
+
+  const [{ data: orderRows, error: ordersError }, { count: appointmentsBooked, error: appointmentsError }] =
+    await Promise.all([ordersQuery, appointmentsQuery]);
+  if (ordersError) throw ordersError;
+  if (appointmentsError) throw appointmentsError;
+
+  const orders = orderRows ?? [];
+  const ordersSecured = orders.length;
+  const paidOrders = orders.filter((order) => order.payment_status === 'paid').length;
+  const paymentConversionRate = ordersSecured > 0 ? paidOrders / ordersSecured : null;
+
+  return {
+    outcomesSecured: ordersSecured + (appointmentsBooked ?? 0),
+    ordersSecured,
+    appointmentsBooked: appointmentsBooked ?? 0,
+    paymentEligibleOrders: ordersSecured,
+    paidOrders,
+    paymentConversionRate,
+  };
 }

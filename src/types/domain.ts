@@ -101,7 +101,7 @@ export interface Tenant {
   safepayCurrency: string | null;
 }
 
-/** The billing providers CrewNest can charge a tenant through (docs/25 §2). */
+/** The billing providers ClerkNest can charge a tenant through (docs/25 §2). */
 export type BillingProviderId = 'stripe' | 'safepay';
 
 /**
@@ -219,7 +219,7 @@ export interface Order {
 
 export type AppointmentStatus = 'booked' | 'cancelled' | 'completed' | 'no_show';
 
-/** A booked appointment (docs/24-APPOINTMENTS.md). CrewNest owns the schedule; Cal.com only mints the meeting link for `bookingMode='calcom'` tenants. */
+/** A booked appointment (docs/24-APPOINTMENTS.md). ClerkNest owns the schedule; Cal.com only mints the meeting link for `bookingMode='calcom'` tenants. */
 export interface Appointment {
   id: string;
   tenantId: string;

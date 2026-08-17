@@ -9,7 +9,7 @@
 >
 > **Don't confuse this with customer payments.** A tenant's own customers paying THEM (bank
 > transfer + payment-proof upload, docs/11) is already built and untouched by this doc. This doc is
-> about charging **tenants** for CrewNest itself.
+> about charging **tenants** for ClerkNest itself.
 
 ---
 
@@ -71,7 +71,7 @@ method updates. **No custom card-entry UI is built in this app, ever.**
 - Zero PCI scope: card data never touches this codebase's servers or client bundle. This is the same
   "zero secrets on the client" instinct CLAUDE.md already states for LLM/Meta keys, applied to
   payment data.
-- Both are genuinely hosted redirects — CrewNest links out, Stripe handles the form, Stripe redirects
+- Both are genuinely hosted redirects — ClerkNest links out, Stripe handles the form, Stripe redirects
   back. This matches the existing pattern of `sendText`/`sendTemplate` treating Meta as the system of
   record for delivery rather than reimplementing messaging UI.
 - **Provisioning path**: per handoff.md's own note, prefer the Vercel Marketplace's Stripe

@@ -15,6 +15,7 @@ import { log } from '@/lib/log';
 
 export type OrderRow = Database['public']['Tables']['orders']['Row'];
 export type OrderStatus = Database['public']['Enums']['order_status'];
+export type OrderSort = 'date_desc' | 'date_asc' | 'price_asc' | 'price_desc';
 
 const PAGE_SIZE = 25;
 
@@ -110,9 +111,10 @@ async function notifyCustomerOfOrderEvent(
 }
 
 export interface GetOrdersPageInput {
-  /** created_at cursor — fetch orders strictly older than this. Omit for the newest page. */
-  before?: string | null;
+  /** Zero-based page offset. Reset to zero whenever a filter or sort changes. */
+  offset?: number;
   status?: OrderStatus | 'all';
+  sort?: OrderSort;
   /**
    * Agency-only client filter (docs: admin orders client filter, mirrors the
    * notification bell's dropdown). Narrows an already-visible RLS result set —
@@ -129,17 +131,13 @@ export interface GetOrdersPageResult {
 }
 
 /**
- * Cursor-paginated (not offset) so realtime inserts prepending to an already-loaded
- * list never shift page boundaries — see the anon-role fix in admin/chat/actions.ts
- * for why this goes through the RLS-authenticated server client, not the browser client.
+ * Server-sorted pagination so date and price sorts apply to the entire order
+ * history, not only the rows already loaded in the browser. This still goes
+ * through the RLS-authenticated server client, never the browser client.
  */
 export async function getOrdersPageAction(input: GetOrdersPageInput): Promise<GetOrdersPageResult> {
   const supabase = await createSupabaseServerClient();
-  let query = supabase
-    .from('orders')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(PAGE_SIZE);
+  let query = supabase.from('orders').select('*');
 
   if (input.status && input.status !== 'all') {
     query = query.eq('status', input.status);
@@ -147,11 +145,27 @@ export async function getOrdersPageAction(input: GetOrdersPageInput): Promise<Ge
   if (input.tenantId) {
     query = query.eq('tenant_id', input.tenantId);
   }
-  if (input.before) {
-    query = query.lt('created_at', input.before);
+
+  switch (input.sort ?? 'date_desc') {
+    case 'date_asc':
+      query = query.order('created_at', { ascending: true });
+      break;
+    case 'price_asc':
+      query = query
+        .order('amount_total', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: false });
+      break;
+    case 'price_desc':
+      query = query
+        .order('amount_total', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false });
+      break;
+    default:
+      query = query.order('created_at', { ascending: false });
   }
 
-  const { data, error } = await query;
+  const offset = Math.max(0, input.offset ?? 0);
+  const { data, error } = await query.range(offset, offset + PAGE_SIZE - 1);
   if (error) throw new Error(error.message);
 
   return { orders: data ?? [], hasMore: (data ?? []).length === PAGE_SIZE };
@@ -294,6 +308,50 @@ export async function rejectOrderAction(orderId: string, reason?: string): Promi
   );
 
   revalidatePath('/admin/orders');
+}
+
+/**
+ * Owner-initiated cancellation from either Orders dashboard. Unlike "Reject"
+ * (pending review only), this also covers confirmed orders. Fulfilled and
+ * already-cancelled orders are terminal. The authenticated read is the access
+ * check before the service-role write, matching approve/reject above.
+ */
+export async function cancelOrderAction(orderId: string, reason: string): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+  const trimmedReason = reason.trim();
+  if (!trimmedReason) throw new Error('Please provide a cancellation reason.');
+
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('id, tenant_id, session_id, platform, external_user_id, status, notes, order_number, created_at')
+    .eq('id', orderId)
+    .single();
+
+  if (orderError || !order) {
+    throw new Error(orderError?.message ?? 'Order not found.');
+  }
+  if (order.status === 'fulfilled') {
+    throw new Error('A fulfilled order can no longer be cancelled.');
+  }
+  if (order.status === 'cancelled') {
+    throw new Error('This order is already cancelled.');
+  }
+
+  const notes = [order.notes, `Cancelled by business: ${trimmedReason}`].filter(Boolean).join('\n');
+  await orderService.reject(orderId, notes);
+
+  const tenant = await tenants.getById(order.tenant_id);
+  const noun = orderNoun(tenant);
+  await notifyCustomerOfOrderEvent(
+    supabase,
+    order,
+    tenant,
+    `${capitalize(orderLabel(noun, order, tenant))} has been cancelled — ${trimmedReason}.`,
+    'cancelled',
+  );
+
+  revalidatePath('/admin/orders');
+  revalidatePath('/dashboard/orders');
 }
 
 /**

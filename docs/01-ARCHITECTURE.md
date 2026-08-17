@@ -1,10 +1,10 @@
 # 01 — Architecture
 
-## 1. What CrewNest is, in one diagram
+## 1. What ClerkNest is, in one diagram
 
 ```
                          ┌──────────────────────────────────────────────┐
-   Customers             │                  CrewNest                     │
+   Customers             │                  ClerkNest                     │
                          │             (Next.js 16 on Vercel)            │
  WhatsApp ─┐             │                                                │
  FB DM ────┤  webhooks   │  app/api/webhooks/meta   ─┐                    │
@@ -26,7 +26,7 @@
                                                 └──────────────┘
 ```
 
-CrewNest is **one backend** serving **many tenants**. A tenant is identified from the *destination*
+ClerkNest is **one backend** serving **many tenants**. A tenant is identified from the *destination*
 of each inbound event (the Meta Page ID / WhatsApp phone-number ID the message arrived on, or the
 tenant public key on a website widget request). All of a tenant's config — brand persona
 (`system_prompt`), `catalog_data`, provider choice, and encrypted credentials — is loaded at runtime
@@ -120,7 +120,7 @@ Postgres itself enforces tenant boundaries.
 ## 5. Directory layout (target)
 
 ```
-src/crewnest/
+src/clerknest/
 ├── docs/                          # these specs (source of truth)
 ├── supabase/
 │   └── migrations/                # runnable SQL (schema, RLS, Vault helpers)

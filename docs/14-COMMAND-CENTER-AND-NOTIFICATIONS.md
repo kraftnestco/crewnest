@@ -1,6 +1,6 @@
 # 14 — Command Center, Live Notifications & Premium UX
 
-> **Commercial roadmap Track 1.** Turns CrewNest from "an inbox you have to go look at" into a system
+> **Commercial roadmap Track 1.** Turns ClerkNest from "an inbox you have to go look at" into a system
 > that *tells you* when something needs you, aggregates everything actionable into one glanceable place
 > for both the agency and each client, and wraps the whole authenticated experience in a premium,
 > self-explanatory UI. This is the nervous system the later commercial tracks (ROI analytics, lifecycle
@@ -343,7 +343,7 @@ verify with `tsc --noEmit` + `npm run build`, and a disposable smoke script for 
 logic if useful, then delete it — memory precedent).
 
 - **O1 — Schema.** `0023_notifications.sql` (table + RLS + `profiles.notification_prefs`) applied to the
-  LIVE Supabase project via the standard no-Docker `pg`-script-inside-`src/crewnest` precedent (script
+  LIVE Supabase project via the standard no-Docker `pg`-script-inside-`src/clerknest` precedent (script
   created → run → deleted). Hand-edit `types/database.ts`; add `Notification` to `types/domain.ts`.
 - **O2 — Service + actions.** `services/notifications.ts` (`notify`, `notifyBoth`); the four server
   actions (§4.3) with the async-only-export split. No emit points wired yet.

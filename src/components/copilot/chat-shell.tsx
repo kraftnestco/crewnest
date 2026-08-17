@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
  * no propose/apply concepts (those stay in each copilot's own patch/action UI).
  */
 
-/** KraftNest mark on the CrewNest brand green — used in the header, empty state, and beside every reply. */
+/** KraftNest mark on the ClerkNest brand rose — used in the header, empty state, and beside every reply. */
 export function CopilotAvatar({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
   const lg = size === 'lg';
   return (
@@ -24,7 +24,7 @@ export function CopilotAvatar({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
     >
       <Image
         src="/kraftnest-mark.png"
-        alt="CrewAI"
+        alt="ClerkAI"
         width={44}
         height={44}
         className="h-full w-full object-contain"

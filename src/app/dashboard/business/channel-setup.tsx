@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Check, CheckCircle2, CircleDashed, ShieldCheck } from 'lucide-react';
+import { PlatformBadge, type PlatformId } from '@/app/_landing/platform-icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -13,6 +14,13 @@ import { StatusPill } from '@/components/status-pill';
 import { cn } from '@/lib/utils';
 import { requestPlatformSetupAction } from '../actions';
 import { initialRequestPlatformSetupState, type PlatformChannel } from '../action-state';
+
+const CHANNEL_BADGE: Record<PlatformChannel, PlatformId> = {
+  whatsapp: 'whatsapp',
+  facebook: 'messenger',
+  instagram: 'instagram',
+  web: 'web',
+};
 
 // docs/27 §5 C1 — "3–5 business days" was a vague range; owners want a date.
 // No new backend field for this: we compute it from the existing
@@ -271,6 +279,11 @@ export function ChannelSetup({
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
+                    <PlatformBadge
+                      platform={CHANNEL_BADGE[c.value]}
+                      className="size-5 rounded-md shadow-none"
+                      iconClassName="size-3"
+                    />
                     <span className="text-sm font-medium">{c.label}</span>
                     {isConnected && <StatusPill tone="success">Connected</StatusPill>}
                     {isPendingSetup && <StatusPill tone="pending">Setting up</StatusPill>}
@@ -333,6 +346,11 @@ export function ChannelSetup({
                       checked={selected.includes(c.value)}
                       onChange={() => toggle(c.value)}
                       className="h-3.5 w-3.5"
+                    />
+                    <PlatformBadge
+                      platform={CHANNEL_BADGE[c.value]}
+                      className="size-5 rounded-md shadow-none"
+                      iconClassName="size-3"
                     />
                     <span className="text-sm font-medium">{c.label}</span>
                   </span>

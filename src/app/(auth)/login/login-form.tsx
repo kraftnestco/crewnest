@@ -99,23 +99,23 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <form action={formAction} className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
+      <form action={formAction} className="flex flex-col gap-3">
         <input type="hidden" name="redirect" value={redirectTo} />
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" autoComplete="email" required className="h-11" />
+          <Input id="email" name="email" type="email" autoComplete="email" required className="h-10" />
         </div>
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="password">Password</Label>
-          <Input id="password" name="password" type="password" autoComplete="current-password" required className="h-11" />
+          <Input id="password" name="password" type="password" autoComplete="current-password" required className="h-10" />
         </div>
 
         {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 
-        <Button type="submit" disabled={isPending} className="mt-2 h-11">
+        <Button type="submit" disabled={isPending} className="mt-1 h-10">
           {isPending ? 'Signing in…' : 'Sign in'}
         </Button>
 
@@ -145,7 +145,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
 
       {googleError && <p className="text-sm text-destructive">{googleError}</p>}
 
-      <Button type="button" variant="outline" onClick={handleGoogle} disabled={googlePending} className="h-11">
+      <Button type="button" variant="outline" onClick={handleGoogle} disabled={googlePending} className="h-10">
         {googlePending ? 'Redirecting…' : 'Continue with Google'}
       </Button>
     </div>

@@ -69,154 +69,188 @@
 }
 
 /*
- * CrewNest design DNA — light-first, deep-emerald accent on warm sage-tinted
- * neutrals. The background carries a whisper of green (chroma ≤0.006) so pure
- * white cards visibly lift off it; the same hue family (~165) runs through
- * borders, muted text, and the sidebar so every surface feels related.
+ * ClerkNest design DNA — light-first, brand-rose accent on warm paper
+ * neutrals, taken straight from the landing page palette: ivory #faf8f3,
+ * sand, linen, espresso #191410, and rose #d91b5b.
+ *
+ * The rose does the pointing, not the decorating: it fills primary buttons,
+ * the active nav item, and the focus ring, and otherwise appears only as a
+ * low-alpha wash (bg-primary/5, /15) — the same restraint the landing page
+ * uses. The colour that actually covers area is the warm neutral ramp, whose
+ * hue (~85) is what keeps the app feeling like the brand without going pink
+ * everywhere. Backgrounds carry that warmth at chroma ≤0.02 so pure white
+ * cards still visibly lift off them.
+ *
  * Dark theme is the personal-preference option (toggle in the app top bar),
- * tuned as green-tinted charcoal — never pure black.
+ * tuned as warm obsidian/espresso — never pure black, never grey.
+ *
+ * Contrast for every text pair below is verified by
+ * `node scripts/check-theme-contrast.mjs`, not eyeballed. Rose sits ~23° from
+ * --destructive on the hue wheel, which that script also guards: primary and
+ * destructive buttons must stay tellable apart.
  */
 :root {
-  --background: oklch(0.988 0.003 165);
+  --background: oklch(0.979 0.007 88.6);
   /* Scrollable page canvas behind admin/dashboard cards — deliberately a
      visible step darker than --background (which stays near-white because
      it also backs "elevated" surfaces like active tabs/switch thumbs over a
      --muted track). This is the fix for cards reading as barely-there boxes
      against the page: bg-card stays pure white, bg-surface sits underneath
      it clearly darker, and only the two dashboard/admin shells use it. */
-  --surface: oklch(0.93 0.01 165);
-  --foreground: oklch(0.17 0.012 175);
+  --surface: oklch(0.935 0.016 84);
+  --foreground: oklch(0.196 0.011 60.7);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.17 0.012 175);
+  --card-foreground: oklch(0.196 0.011 60.7);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.17 0.012 175);
-  --primary: oklch(0.52 0.12 165);
-  --primary-foreground: oklch(0.985 0.005 165);
-  --secondary: oklch(0.955 0.01 165);
-  --secondary-foreground: oklch(0.3 0.035 170);
-  --muted: oklch(0.955 0.006 165);
-  --muted-foreground: oklch(0.5 0.018 175);
-  --accent: oklch(0.945 0.02 165);
-  --accent-foreground: oklch(0.3 0.05 170);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.915 0.008 165);
-  --input: oklch(0.915 0.008 165);
-  --ring: oklch(0.65 0.1 165);
-  --chart-1: oklch(0.6 0.13 163);
-  --chart-2: oklch(0.62 0.12 235);
-  --chart-3: oklch(0.76 0.14 80);
-  --chart-4: oklch(0.62 0.14 295);
-  --chart-5: oklch(0.65 0.15 15);
+  --popover-foreground: oklch(0.196 0.011 60.7);
+  /* Brand rose, exactly #d91b5b — the same value the landing page ships. */
+  --primary: oklch(0.574 0.218 10);
+  --primary-foreground: oklch(0.985 0.005 90);
+  --secondary: oklch(0.955 0.012 85);
+  --secondary-foreground: oklch(0.3 0.02 62);
+  --muted: oklch(0.955 0.01 85);
+  --muted-foreground: oklch(0.515 0.015 65);
+  --accent: oklch(0.945 0.018 84);
+  --accent-foreground: oklch(0.3 0.03 60);
+  /* Pushed off the stock red toward vermilion (hue 33) and darkened, so it
+     reads as a different colour from the rose primary rather than a shade of
+     it — and so white label text still clears 4.5:1 at that lightness. */
+  --destructive: oklch(0.52 0.19 33);
+  --border: oklch(0.909 0.019 83);
+  --input: oklch(0.909 0.019 83);
+  --ring: oklch(0.65 0.16 10);
+  /* Rose leads; the rest are the landing page's orchid/gold plus a green and
+     a blue, spread far enough apart in hue to stay separable in a legend. */
+  --chart-1: oklch(0.62 0.19 10);
+  --chart-2: oklch(0.66 0.141 296);
+  --chart-3: oklch(0.763 0.139 74);
+  --chart-4: oklch(0.6 0.11 165);
+  --chart-5: oklch(0.62 0.12 235);
   --radius: 0.75rem;
   /* Matches --surface (the main-content canvas) so the sidebar/topbar chrome
      and the page canvas read as one shell — only bg-card boxes stand apart
      from it. --sidebar-accent/-border shifted down by the same amount they
      always sat below --sidebar, so hover states and the divider stay visible
      against the darker base. */
-  --sidebar: oklch(0.93 0.01 165);
-  --sidebar-foreground: oklch(0.25 0.015 175);
-  --sidebar-primary: oklch(0.52 0.12 165);
-  --sidebar-primary-foreground: oklch(0.985 0.005 165);
-  --sidebar-accent: oklch(0.885 0.02 165);
-  --sidebar-accent-foreground: oklch(0.28 0.045 170);
-  --sidebar-border: oklch(0.86 0.012 165);
-  --sidebar-ring: oklch(0.65 0.1 165);
+  --sidebar: oklch(0.935 0.016 84);
+  --sidebar-foreground: oklch(0.27 0.015 62);
+  --sidebar-primary: oklch(0.574 0.218 10);
+  --sidebar-primary-foreground: oklch(0.985 0.005 90);
+  /* Hover stays a warm neutral, not a pink wash — only the one active item in
+     the nav gets --sidebar-primary, so the rose marks position instead of
+     tinting the whole rail. */
+  --sidebar-accent: oklch(0.89 0.022 84);
+  --sidebar-accent-foreground: oklch(0.28 0.03 60);
+  --sidebar-border: oklch(0.865 0.02 83);
+  --sidebar-ring: oklch(0.65 0.16 10);
 
   /* Semantic status (docs/27 §2). *-text variants are darkened to clear
-     4.5:1 against their own *-tint — verified via the canvas method in §10,
-     not assumed from the raw values. --danger reuses --destructive as its
-     base (this app already has one), only adding the tint/text pair success
-     and pending get natively, so all three read as one family. */
-  --success: oklch(0.52 0.12 165);
-  --success-text: oklch(0.45 0.11 165);
-  --success-tint: oklch(0.95 0.03 165);
-  --pending: oklch(0.7 0.15 70);
-  --pending-text: oklch(0.5 0.13 65);
-  --pending-tint: oklch(0.96 0.05 90);
-  --danger-text: oklch(0.5 0.2 27);
-  --danger-tint: oklch(0.95 0.03 27);
+     4.5:1 against their own *-tint — verified by the contrast script, not
+     assumed from the raw values.
 
-  /* Marketing stage grounds (docs/27 §2/M5). --stage-deep pushed off the
-     generic mint-teal toward true forest green, and --stage-warm off the
-     flat cream-paper cliché toward a saturated honey/brass, so the two read
-     as a deliberate forest+brass pairing instead of the default AI-template
-     dark/cream/mint recipe. --stage-primary stays untouched — it's pinned to
-     the app's live --primary accent (see below), not free to recolor alone. */
-  --stage-ink: oklch(0.2 0.02 172);
-  --stage-ink-fg: oklch(0.96 0.005 165);
-  --stage-deep: oklch(0.34 0.1 150);
-  --stage-deep-fg: oklch(0.97 0.008 150);
+     --success is now green in its own right. It used to be defined as a copy
+     of --primary back when the accent was emerald; keeping that link would
+     have turned every "delivered"/"active" badge pink and left the UI with no
+     colour that means "good". Green stays, whatever the brand accent does. */
+  --success: oklch(0.52 0.12 160);
+  --success-text: oklch(0.45 0.11 160);
+  --success-tint: oklch(0.95 0.03 160);
+  --pending: oklch(0.676 0.129 71);
+  --pending-text: oklch(0.5 0.11 68);
+  --pending-tint: oklch(0.955 0.04 82);
+  --danger-text: oklch(0.5 0.18 32);
+  --danger-tint: oklch(0.95 0.03 32);
+
+  /* Marketing stage grounds (docs/27 §2/M5), retuned to the landing page's
+     own sequence: obsidian ink, a deep wine band, and the honey/brass warm
+     section. These back /try, the legal pages and the auth marketing panel —
+     leaving them forest green would have stranded those surfaces on the old
+     palette while the landing page next door is rose-on-obsidian.
+     --stage-primary is pinned to the app's bright --primary (see below), not
+     free to recolor alone. */
+  --stage-ink: oklch(0.151 0.006 68);
+  --stage-ink-fg: oklch(0.979 0.007 88.6);
+  --stage-deep: oklch(0.27 0.045 8);
+  --stage-deep-fg: oklch(0.97 0.008 60);
   --stage-warm: oklch(0.88 0.07 78);
   --stage-warm-fg: oklch(0.22 0.045 55);
 
   /*
    * CTA colour for content sitting on a FIXED-dark stage (stage-ink/-deep).
-   * docs/27 §5 M5: --primary at its LIGHT value (oklch(0.52 ...)) is too dark
-   * to pop against stage-ink, so a themed CTA there could look muddy in light
+   * docs/27 §5 M5: --primary at its LIGHT value (the raw #d91b5b) only makes
+   * 3.6:1 against stage-ink, so a themed CTA there could look muddy in light
    * mode even though the stage itself never changes with the toggle. Pinned
    * to .dark's own --primary value (the bright variant) — same "near-identical
    * between themes" reasoning as the stage-* grounds themselves.
    */
-  --stage-primary: oklch(0.72 0.14 163);
-  --stage-primary-foreground: oklch(0.16 0.025 170);
+  --stage-primary: oklch(0.66 0.17 8);
+  --stage-primary-foreground: oklch(0.16 0.012 60);
 }
 
 .dark {
-  --background: oklch(0.15 0.008 175);
-  --surface: oklch(0.15 0.008 175);
-  --foreground: oklch(0.96 0.005 165);
-  --card: oklch(0.19 0.01 175);
-  --card-foreground: oklch(0.96 0.005 165);
-  --popover: oklch(0.19 0.01 175);
-  --popover-foreground: oklch(0.96 0.005 165);
-  --primary: oklch(0.72 0.14 163);
-  --primary-foreground: oklch(0.16 0.025 170);
-  --secondary: oklch(0.25 0.012 175);
-  --secondary-foreground: oklch(0.96 0.005 165);
-  --muted: oklch(0.24 0.01 175);
-  --muted-foreground: oklch(0.68 0.015 170);
-  --accent: oklch(0.27 0.025 170);
-  --accent-foreground: oklch(0.95 0.01 165);
-  --destructive: oklch(0.704 0.191 22.216);
+  /* Obsidian #0d0b09 and espresso #191410 from the landing palette — a warm
+     near-black, so the dark theme reads as the same brand rather than a
+     generic grey inversion. */
+  --background: oklch(0.151 0.006 68);
+  --surface: oklch(0.151 0.006 68);
+  --foreground: oklch(0.96 0.005 88);
+  --card: oklch(0.196 0.011 61);
+  --card-foreground: oklch(0.96 0.005 88);
+  --popover: oklch(0.196 0.011 61);
+  --popover-foreground: oklch(0.96 0.005 88);
+  /* Lifted off the raw #d91b5b: --primary is used as accent *text* in ~38
+     places, and the flat brand rose only makes 3.6:1 on obsidian. This
+     brighter rose clears 5.3:1 on cards while still filling buttons. Chroma
+     is pulled back from the brand value as it lightens — rose at this
+     lightness and full 0.218 chroma goes neon against a dark ground. */
+  --primary: oklch(0.66 0.17 8);
+  --primary-foreground: oklch(0.16 0.012 60);
+  --secondary: oklch(0.25 0.014 64);
+  --secondary-foreground: oklch(0.96 0.005 88);
+  --muted: oklch(0.24 0.012 64);
+  --muted-foreground: oklch(0.7 0.014 70);
+  --accent: oklch(0.27 0.022 60);
+  --accent-foreground: oklch(0.95 0.008 88);
+  --destructive: oklch(0.7 0.18 33);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.6 0.1 165);
-  --chart-1: oklch(0.7 0.14 163);
-  --chart-2: oklch(0.68 0.12 235);
-  --chart-3: oklch(0.8 0.14 80);
-  --chart-4: oklch(0.68 0.14 295);
-  --chart-5: oklch(0.7 0.15 15);
-  --sidebar: oklch(0.17 0.01 175);
-  --sidebar-foreground: oklch(0.94 0.008 165);
-  --sidebar-primary: oklch(0.72 0.14 163);
-  --sidebar-primary-foreground: oklch(0.16 0.025 170);
-  --sidebar-accent: oklch(0.26 0.02 172);
-  --sidebar-accent-foreground: oklch(0.95 0.01 165);
+  --ring: oklch(0.62 0.16 10);
+  --chart-1: oklch(0.68 0.19 10);
+  --chart-2: oklch(0.7 0.14 296);
+  --chart-3: oklch(0.81 0.14 78);
+  --chart-4: oklch(0.7 0.12 165);
+  --chart-5: oklch(0.68 0.12 235);
+  --sidebar: oklch(0.175 0.008 64);
+  --sidebar-foreground: oklch(0.94 0.008 88);
+  --sidebar-primary: oklch(0.66 0.17 8);
+  --sidebar-primary-foreground: oklch(0.16 0.012 60);
+  --sidebar-accent: oklch(0.26 0.02 62);
+  --sidebar-accent-foreground: oklch(0.95 0.008 88);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.6 0.1 165);
+  --sidebar-ring: oklch(0.62 0.16 10);
 
-  /* Semantic status, dark. --success mirrors --primary's dark value
-     deliberately — same hue family as light mode, per the file's own DNA. */
-  --success: oklch(0.72 0.14 163);
-  --success-text: oklch(0.8 0.13 163);
-  --success-tint: oklch(0.27 0.04 165);
-  --pending: oklch(0.78 0.14 75);
+  /* Semantic status, dark. --success is green on its own terms here too — see
+     the note in :root for why it no longer tracks --primary. */
+  --success: oklch(0.72 0.14 162);
+  --success-text: oklch(0.8 0.13 162);
+  --success-tint: oklch(0.28 0.04 162);
+  --pending: oklch(0.78 0.13 78);
   --pending-text: oklch(0.85 0.12 80);
   --pending-tint: oklch(0.28 0.05 75);
-  --danger-text: oklch(0.78 0.15 25);
-  --danger-tint: oklch(0.28 0.06 25);
+  --danger-text: oklch(0.78 0.15 30);
+  --danger-tint: oklch(0.29 0.06 30);
 
   /* Marketing stage grounds, dark — deliberately near-identical to :root's:
      these are a committed visual sequence for the marketing page, not a
      themed surface. The intervening light sections carry the theme instead. */
-  --stage-ink: oklch(0.2 0.02 172);
-  --stage-ink-fg: oklch(0.96 0.005 165);
-  --stage-deep: oklch(0.34 0.1 150);
-  --stage-deep-fg: oklch(0.97 0.008 150);
+  --stage-ink: oklch(0.151 0.006 68);
+  --stage-ink-fg: oklch(0.979 0.007 88.6);
+  --stage-deep: oklch(0.27 0.045 8);
+  --stage-deep-fg: oklch(0.97 0.008 60);
   --stage-warm: oklch(0.88 0.07 78);
   --stage-warm-fg: oklch(0.22 0.045 55);
-  --stage-primary: oklch(0.72 0.14 163);
-  --stage-primary-foreground: oklch(0.16 0.025 170);
+  --stage-primary: oklch(0.66 0.17 8);
+  --stage-primary-foreground: oklch(0.16 0.012 60);
 }
 
 @layer base {
@@ -232,7 +266,7 @@
 }
 
 /*
- * Reserved for the marketing hero headline and the "CrewNest" wordmark only.
+ * Reserved for the marketing hero headline and the "ClerkNest" wordmark only.
  * Dials the Big Shoulders variable font to its Display-cut optical size
  * (next/font only exposes the base family, not separate Display/Text
  * instances) at its heaviest weight.
@@ -243,7 +277,21 @@
   font-variation-settings: 'opsz' 72;
 }
 
-/* Wordmark only — the "CrewNest" logo lockup. Baloo 2, bold and rounded. */
+/*
+ * App page titles (dashboard + admin `PageHeader` and its topbar slot).
+ * Bricolage Grotesque rather than the marketing hero's Big Shoulders: that face
+ * is an ultra-condensed display cut, which reads as squished at the 18-24px
+ * sizes a page title actually uses. This is the same family already carrying
+ * `font-heading` on cards and dialogs, so a page title and the cards under it
+ * finally belong to one typeface.
+ */
+.font-page-heading {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* Wordmark only — the "ClerkNest" logo lockup. Baloo 2, bold and rounded. */
 .font-logo {
   font-family: var(--font-logo);
   font-weight: 700;

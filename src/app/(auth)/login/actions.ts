@@ -90,16 +90,15 @@ export async function signInAction(_prev: SignInState, formData: FormData): Prom
   // points imply. This only applies when a destination was actually requested —
   // a bare /login has no intent to enforce, so it just routes to whichever
   // portal this account actually has.
+  //
+  // Wrong-portal failures use the same copy as a bad password so the form never
+  // discloses whether an email is an agency or client account.
   const wantsAdmin = explicitRedirect?.startsWith('/admin') ?? false;
   const wantsClient = explicitRedirect?.startsWith('/dashboard') ?? false;
 
-  if (wantsAdmin && !isAdmin) {
+  if ((wantsAdmin && !isAdmin) || (wantsClient && isAdmin)) {
     await supabase.auth.signOut();
-    return { error: 'This isn’t an agency admin account. Use “Sign in as client” instead.' };
-  }
-  if (wantsClient && isAdmin) {
-    await supabase.auth.signOut();
-    return { error: 'This is an agency admin account. Use “Sign in as admin” instead.' };
+    return { error: 'Invalid email or password.' };
   }
 
   redirect(explicitRedirect ?? (isAdmin ? '/admin' : '/dashboard'));

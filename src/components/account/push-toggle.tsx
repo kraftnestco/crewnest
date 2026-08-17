@@ -184,7 +184,7 @@ export function PushToggle({ vapidPublicKey }: { vapidPublicKey: string | null }
         )}
         {support === 'needs-install' && (
           <p className="text-xs text-muted-foreground">
-            On iPhone, add CrewNest to your Home Screen first (Share → Add to Home Screen), then turn this on.
+            On iPhone, add ClerkNest to your Home Screen first (Share → Add to Home Screen), then turn this on.
           </p>
         )}
         {support === 'unsupported' && (

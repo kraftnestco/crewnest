@@ -3,9 +3,16 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PageHeader } from '@/components/page-header';
-import { getVolume, getDeflection, getCostBreakdown, getSentimentHealth, getCsat } from '@/services/analytics';
+import { AnalyticsInfoDialog } from '@/components/analytics-info-dialog';
+import {
+  getVolume,
+  getDeflection,
+  getCostBreakdown,
+  getSentimentHealth,
+  getCsat,
+  getCommerceMetrics,
+} from '@/services/analytics';
 import type { DateRange, SentimentBucket } from '@/services/analytics';
-import { MIN_CSAT_SAMPLE } from '@/lib/constants';
 
 /**
  * docs/16-ANALYTICS-AND-PROOF.md §5 — the agency proof layer. Date range and
@@ -61,19 +68,19 @@ export default async function AnalyticsPage({
   const selectedRange = RANGE_OPTIONS.find((r) => r.value === rangeParam) ?? RANGE_OPTIONS[1];
   const sortKey = SORT_OPTIONS.find((s) => s.value === sortParam)?.value ?? 'cost';
 
-  // eslint-disable-next-line react-hooks/purity -- Server Component render runs once per request; wall-clock cutoff is intentional
   const to = new Date();
   const from = new Date(to.getTime() - selectedRange.days * 24 * 60 * 60 * 1000);
   const range: DateRange = { from: from.toISOString(), to: to.toISOString() };
 
   const supabase = await createSupabaseServerClient();
 
-  const [volume, deflection, cost, sentiment, csat, { data: tenantRows }] = await Promise.all([
+  const [volume, deflection, cost, sentiment, csat, commerce, { data: tenantRows }] = await Promise.all([
     getVolume(null, range),
     getDeflection(null, range),
     getCostBreakdown(null, range),
     getSentimentHealth(null, range),
     getCsat(null, range),
+    getCommerceMetrics(null, range),
     supabase.from('tenants').select('id, business_name').order('business_name'),
   ]);
 
@@ -96,15 +103,40 @@ export default async function AnalyticsPage({
   });
 
   const headlineCards = [
-    { label: 'Conversations started', value: volume.conversationsStarted.toLocaleString() },
-    { label: 'Deflection rate', value: formatPercent(deflection.deflectionRate) },
+    {
+      label: 'Conversations started',
+      value: volume.conversationsStarted.toLocaleString(),
+      tone: 'bg-primary/20 ring-primary/35',
+    },
+    {
+      label: 'Deflection rate',
+      value: formatPercent(deflection.deflectionRate),
+      tone: 'bg-emerald-500/20 ring-emerald-500/35 dark:bg-emerald-400/20 dark:ring-emerald-400/35',
+    },
     {
       label: 'Cost (BYOK / platform)',
       value: `${formatUsd(cost.byokCostUsd)} / ${formatUsd(cost.masterCostUsd)}`,
+      tone: 'bg-violet-500/20 ring-violet-500/35 dark:bg-violet-400/20 dark:ring-violet-400/35',
     },
     {
       label: 'CSAT',
       value: csat.sufficientSample ? `${csat.averageRating!.toFixed(1)} / 5` : 'Not enough data yet',
+      tone: 'bg-amber-500/20 ring-amber-500/35 dark:bg-amber-400/20 dark:ring-amber-400/35',
+    },
+    {
+      label: 'Orders / bookings secured',
+      value: commerce.outcomesSecured.toLocaleString(),
+      tone: 'bg-sky-500/20 ring-sky-500/35 dark:bg-sky-400/20 dark:ring-sky-400/35',
+    },
+    {
+      label: 'Handoff rate',
+      value: formatPercent(deflection.deflectionRate === null ? null : 1 - deflection.deflectionRate),
+      tone: 'bg-orange-500/20 ring-orange-500/35 dark:bg-orange-400/20 dark:ring-orange-400/35',
+    },
+    {
+      label: 'Payment conversion',
+      value: formatPercent(commerce.paymentConversionRate),
+      tone: 'bg-teal-500/20 ring-teal-500/35 dark:bg-teal-400/20 dark:ring-teal-400/35',
     },
   ];
 
@@ -130,7 +162,7 @@ export default async function AnalyticsPage({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {headlineCards.map((c) => (
-          <Card key={c.label}>
+          <Card key={c.label} className={c.tone}>
             <CardHeader>
               <CardTitle className="text-sm font-normal text-muted-foreground">{c.label}</CardTitle>
             </CardHeader>
@@ -218,6 +250,7 @@ export default async function AnalyticsPage({
           </Table>
         </div>
       </div>
+      <AnalyticsInfoDialog audience="admin" />
     </div>
   );
 }

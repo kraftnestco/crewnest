@@ -42,7 +42,7 @@ Three tiers, built in value order:
   in CI against a Postgres service container seeded with the migrations.
 - **R3 — Integration (documented, lighter).** Webhook→reply with a **fake `LlmProvider`** injected
   through `getProvider` (return a scripted reply / tool call) against a transactional test DB. Design
-  the seam now (provider factory already indirects — a `CREWNEST_TEST_PROVIDER` env or a DI hook), ship
+  the seam now (provider factory already indirects — a `CLERKNEST_TEST_PROVIDER` env or a DI hook), ship
   one happy-path + one handoff-path test; expand later. Not a launch blocker, but the seam is part of
   Stage R so it isn't retrofitted.
 

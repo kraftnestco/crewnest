@@ -1,9 +1,9 @@
 -- 0042_appointments.sql
 -- Appointment booking for service businesses. See docs/24-APPOINTMENTS.md.
 --
--- CrewNest owns scheduling; Cal.com (when used) only mints a meeting link for a
+-- ClerkNest owns scheduling; Cal.com (when used) only mints a meeting link for a
 -- booking that has already been decided here — docs/24 §1.1 explains why, in
--- short: one CrewNest-owned Cal.com account means shared availability, so
+-- short: one ClerkNest-owned Cal.com account means shared availability, so
 -- letting Cal.com own slots would make two tenants collide on the same hour.
 --
 -- Additive only. Safe to re-run.

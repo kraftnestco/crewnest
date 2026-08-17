@@ -5,7 +5,7 @@ import { Logomark } from '@/app/_landing/logomark';
 import { TryDemo } from '@/components/demo/try-demo';
 
 export const metadata = {
-  title: 'Try CrewNest for your business',
+  title: 'Try ClerkNest for your business',
   description: 'Answer a few questions about your business and chat with your own AI employee. Free, no signup.',
 };
 
@@ -16,7 +16,7 @@ export default function TryPage() {
         <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link href="/" className="flex items-center gap-2">
             <Logomark />
-            <span className="font-logo text-lg">CrewNest</span>
+            <span className="font-logo text-lg">ClerkNest</span>
           </Link>
           <Link href="/login?redirect=/dashboard" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
             Sign in

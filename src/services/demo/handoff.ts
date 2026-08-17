@@ -7,7 +7,7 @@ import type { DemoTenantInput } from './schema';
  * round trip through the provider and back via /auth/callback, which drops
  * any in-memory state. Same tab throughout, so sessionStorage survives it.
  */
-export const DEMO_HANDOFF_KEY = 'crewnest_demo_handoff';
+export const DEMO_HANDOFF_KEY = 'clerknest_demo_handoff';
 
 export interface DemoHandoff {
   demoTenant: DemoTenantInput;

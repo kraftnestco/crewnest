@@ -80,14 +80,14 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {plan && (
         <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
           You selected the <span className="font-medium text-foreground">{plan.name}</span> plan ({plan.price}).
         </p>
       )}
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="signup-email">Email</Label>
           <Input
@@ -95,7 +95,7 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
             type="email"
             autoComplete="email"
             required
-            className="h-11"
+            className="h-10"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
@@ -107,7 +107,7 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
             type="password"
             autoComplete="new-password"
             required
-            className="h-11"
+            className="h-10"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -119,7 +119,7 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
             type="password"
             autoComplete="new-password"
             required
-            className="h-11"
+            className="h-10"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
           />
@@ -127,7 +127,7 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <Button type="submit" disabled={pending} className="mt-2 h-11">
+        <Button type="submit" disabled={pending} className="mt-1 h-10">
           {pending ? 'Creating account…' : 'Create account'}
         </Button>
       </form>
@@ -138,7 +138,7 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
         <div className="h-px flex-1 bg-border" />
       </div>
 
-      <Button type="button" variant="outline" onClick={handleGoogle} disabled={googlePending} className="h-11">
+      <Button type="button" variant="outline" onClick={handleGoogle} disabled={googlePending} className="h-10">
         {googlePending ? 'Redirecting…' : 'Continue with Google'}
       </Button>
     </div>

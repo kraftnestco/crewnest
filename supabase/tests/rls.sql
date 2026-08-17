@@ -60,11 +60,11 @@ insert into auth.users (
   raw_app_meta_data, raw_user_meta_data
 ) values
   ('00000000-0000-0000-0000-000000000000', :'admin_user'::uuid,   'authenticated', 'authenticated',
-   'rls-test-admin@crewnest.test',    '', now(), now(), now(), '{}', '{}'),
+   'rls-test-admin@clerknest.test',    '', now(), now(), now(), '{}', '{}'),
   ('00000000-0000-0000-0000-000000000000', :'tenant_a_user'::uuid, 'authenticated', 'authenticated',
-   'rls-test-tenant-a@crewnest.test', '', now(), now(), now(), '{}', '{}'),
+   'rls-test-tenant-a@clerknest.test', '', now(), now(), now(), '{}', '{}'),
   ('00000000-0000-0000-0000-000000000000', :'tenant_b_user'::uuid, 'authenticated', 'authenticated',
-   'rls-test-tenant-b@crewnest.test', '', now(), now(), now(), '{}', '{}')
+   'rls-test-tenant-b@clerknest.test', '', now(), now(), now(), '{}', '{}')
 on conflict (id) do nothing;
 
 -- `handle_new_user` (0007) already created the matching public.profiles rows.
@@ -104,7 +104,7 @@ insert into public.webhook_events (provider, provider_msg_id, tenant_id)
 values ('whatsapp', 'rls-test-evt-a', :'tenant_a'::uuid), ('whatsapp', 'rls-test-evt-b', :'tenant_b'::uuid);
 
 insert into public.demo_leads (email, business_name, business_type, intake_snapshot)
-values ('rls-test-lead@crewnest.test', 'RLS Test Lead Co', 'product', '{}'::jsonb);
+values ('rls-test-lead@clerknest.test', 'RLS Test Lead Co', 'product', '{}'::jsonb);
 
 -- Agency-scope row for tenant A + one tenant-scope row per tenant — the exact
 -- shape needed to prove the two notification audiences never cross (0023).
@@ -149,7 +149,7 @@ select pg_temp.assert_eq('tenant A sees only its own order-media objects', 1,
 select pg_temp.assert_eq('tenant A cannot read webhook_events (admin-only)', 0,
   (select count(*) from public.webhook_events where tenant_id in (:'tenant_a'::uuid, :'tenant_b'::uuid)));
 select pg_temp.assert_eq('tenant A cannot read demo_leads (admin-only)', 0,
-  (select count(*) from public.demo_leads where email = 'rls-test-lead@crewnest.test'));
+  (select count(*) from public.demo_leads where email = 'rls-test-lead@clerknest.test'));
 select pg_temp.assert_eq('tenant A sees only its own tenant-scope notification', 1,
   (select count(*) from public.notifications where scope = 'tenant' and tenant_id in (:'tenant_a'::uuid, :'tenant_b'::uuid)));
 select pg_temp.assert_eq('tenant A sees no agency-scope notifications', 0,
@@ -191,7 +191,7 @@ select pg_temp.assert_eq('admin sees both order-media objects', 2,
 select pg_temp.assert_eq('admin sees the webhook_events fixture rows', 2,
   (select count(*) from public.webhook_events where tenant_id in (:'tenant_a'::uuid, :'tenant_b'::uuid)));
 select pg_temp.assert_eq('admin sees the demo_leads fixture row', 1,
-  (select count(*) from public.demo_leads where email = 'rls-test-lead@crewnest.test'));
+  (select count(*) from public.demo_leads where email = 'rls-test-lead@clerknest.test'));
 select pg_temp.assert_eq('admin sees the agency-scope notification', 1,
   (select count(*) from public.notifications where scope = 'agency' and tenant_id in (:'tenant_a'::uuid, :'tenant_b'::uuid)));
 -- The load-bearing "audiences don't cross" case (0023): a platform admin is
@@ -220,7 +220,7 @@ select pg_temp.assert_eq('anon sees no notifications', 0,
 select pg_temp.assert_eq('anon sees no webhook_events', 0,
   (select count(*) from public.webhook_events where tenant_id in (:'tenant_a'::uuid, :'tenant_b'::uuid)));
 select pg_temp.assert_eq('anon sees no demo_leads', 0,
-  (select count(*) from public.demo_leads where email = 'rls-test-lead@crewnest.test'));
+  (select count(*) from public.demo_leads where email = 'rls-test-lead@clerknest.test'));
 select pg_temp.assert_eq('anon sees no order-media objects', 0,
   (select count(*) from storage.objects
     where bucket_id = 'order-media' and (storage.foldername(name))[1]::uuid in (:'tenant_a'::uuid, :'tenant_b'::uuid)));

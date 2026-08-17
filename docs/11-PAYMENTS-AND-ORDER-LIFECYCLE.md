@@ -15,7 +15,7 @@ tenant with `payments_enabled = false` behaves exactly as the doc-09/doc-10 orde
 mechanical for Sonnet, stage by stage — **except** the sub-steps tagged `[OPUS]` in §11, which must pause
 for an Opus pass before they are built.
 
-> **Market reality this design is shaped by.** CrewNest's first clients are Pakistani SMBs. There, the
+> **Market reality this design is shaped by.** ClerkNest's first clients are Pakistani SMBs. There, the
 > dominant payment reality is **Cash on Delivery**, then **manual transfer** (JazzCash / Easypaisa / bank
 > account, customer sends a screenshot of the receipt), and only then **hosted gateways** (Safepay,
 > PayFast — Stripe is not available in PK). So the design is **tiered**: COD and manual-transfer ship

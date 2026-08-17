@@ -23,7 +23,7 @@ So a customer sending
 > are you open today?
 
 gets two separate replies, the first answering only "hey". Humans don't do that: a person reads the
-whole burst, then answers once. This document specifies how CrewNest does the same.
+whole burst, then answers once. This document specifies how ClerkNest does the same.
 
 **Scope decision (confirmed with the owner):** the fix lands in the **queue/worker layer only** —
 WhatsApp, Messenger, Instagram. The website widget (`api/chat/route.ts`) is a synchronous

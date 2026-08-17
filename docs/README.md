@@ -1,11 +1,11 @@
-# CrewNest — Architecture & Build Docs
+# ClerkNest — Architecture & Build Docs
 
-> **CrewNest** is a multi-tenant SaaS that gives businesses "AI employees": an AI that answers
+> **ClerkNest** is a multi-tenant SaaS that gives businesses "AI employees": an AI that answers
 > customer messages across WhatsApp, Facebook/Instagram DMs, and website chat, grounded in each
 > client's own catalogue and brand persona — with a human-takeover inbox and an agency dashboard
 > to onboard, monitor, and control every client from one place.
 
-This `docs/` folder is the **single source of truth** for how CrewNest is designed. It was written
+This `docs/` folder is the **single source of truth** for how ClerkNest is designed. It was written
 in an Opus planning session so that implementation sessions (Sonnet) can build without re-deciding
 architecture. **Read the docs in order before writing code.**
 

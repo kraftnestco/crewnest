@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { formatDate } from '@/lib/format-date';
 import { PageHeader } from '@/components/page-header';
 import { EditClientDialog } from './edit-client-dialog';
 import { InviteClientDialog } from './[id]/invite/invite-client-dialog';
@@ -76,7 +77,7 @@ export default async function ClientsPage() {
                         title={
                           (t.platform_setup_notes ? `"${t.platform_setup_notes}" — ` : '') +
                           (t.platform_setup_requested_at
-                            ? `requested ${new Date(t.platform_setup_requested_at).toLocaleDateString()}`
+                            ? `requested ${formatDate(t.platform_setup_requested_at)}`
                             : '')
                         }
                       >
@@ -89,7 +90,7 @@ export default async function ClientsPage() {
                   {t.is_active ? <Badge>Active</Badge> : <Badge variant="outline">Inactive</Badge>}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {new Date(t.created_at).toLocaleDateString()}
+                  {formatDate(t.created_at)}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">

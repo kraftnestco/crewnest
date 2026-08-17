@@ -1,4 +1,4 @@
-/* CrewNest service worker — docs/21-WEB-PUSH-NOTIFICATIONS.md §1.
+/* ClerkNest service worker — docs/21-WEB-PUSH-NOTIFICATIONS.md §1.
  *
  * DELIBERATELY MINIMAL. This handles `push` and `notificationclick` and NOTHING
  * else. In particular it registers NO `fetch` handler, so it cannot serve
@@ -29,7 +29,7 @@ self.addEventListener('push', (event) => {
     return;
   }
 
-  const title = payload.title || 'CrewNest';
+  const title = payload.title || 'ClerkNest';
   event.waitUntil(
     self.registration.showNotification(title, {
       body: payload.body || '',
@@ -47,7 +47,7 @@ self.addEventListener('notificationclick', (event) => {
   const link = (event.notification.data && event.notification.data.link) || '/dashboard';
   const target = new URL(link, self.location.origin).href;
 
-  // Focus an already-open CrewNest tab and navigate it, rather than piling up
+  // Focus an already-open ClerkNest tab and navigate it, rather than piling up
   // duplicate tabs every time a notification is tapped.
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {

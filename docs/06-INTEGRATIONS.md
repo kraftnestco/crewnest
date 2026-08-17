@@ -64,7 +64,7 @@ and Voice are stubbed now, built later.
 ### 2.2 Widget script (`public/embed/widget.js`)
 - Self-contained, dependency-free JS. A client embeds:
   ```html
-  <script src="https://<app>/embed/widget.js" data-crewnest-key="pk_live_xxx" defer></script>
+  <script src="https://<app>/embed/widget.js" data-clerknest-key="pk_live_xxx" defer></script>
   ```
 - Renders a launcher + chat panel, persists a `sessionKey` in `localStorage`, POSTs to `/api/chat`.
 - Ships **no** secrets — only the public key. Never receives tenant config.

@@ -35,21 +35,26 @@ export function AuthShell({
 }) {
   return (
     <div className="flex min-h-screen">
-      <div className="flex w-full flex-col justify-center px-6 py-12 sm:px-12 lg:w-[46%] lg:px-16 xl:w-2/5">
+      {/*
+        Vertical rhythm is deliberately tight: the whole column — down to the
+        support line — has to clear a short laptop viewport without scrolling,
+        which the previous 12/6/8 spacing scale didn't.
+      */}
+      <div className="flex w-full flex-col justify-center px-6 py-8 sm:px-12 lg:w-[46%] lg:px-16 xl:w-2/5">
         <div className="mx-auto w-full max-w-sm">
-          <Logomark className="size-9" />
-          <h1 className="mt-6 text-2xl font-semibold tracking-tight text-balance">{title}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+          <Logomark className="size-8" />
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-balance">{title}</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
 
           {whatNext && (
-            <p className="mt-4 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">{whatNext}</p>
+            <p className="mt-3 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">{whatNext}</p>
           )}
 
-          <div className="mt-6">{children}</div>
+          <div className="mt-4">{children}</div>
 
-          {footer && <div className="mt-6 text-center text-sm text-muted-foreground">{footer}</div>}
+          {footer && <div className="mt-4 text-center text-sm text-muted-foreground">{footer}</div>}
 
-          <p className="mt-8 text-center text-xs text-muted-foreground">
+          <p className="mt-4 text-center text-xs text-muted-foreground">
             Trouble signing in?{' '}
             <a href={`mailto:${SUPPORT_EMAIL}`} className="text-foreground underline underline-offset-2">
               {SUPPORT_EMAIL}

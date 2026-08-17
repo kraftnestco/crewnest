@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/page-header';
+import { formatDate } from '@/lib/format-date';
 import { log } from '@/lib/log';
 
 export default async function SettingsPage() {
@@ -70,7 +71,7 @@ export default async function SettingsPage() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{a.email}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {new Date(a.created_at).toLocaleDateString()}
+                    {formatDate(a.created_at)}
                   </TableCell>
                 </TableRow>
               ))}

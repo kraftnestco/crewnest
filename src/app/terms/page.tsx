@@ -3,8 +3,8 @@ import { LegalPage } from '@/app/_landing/legal-page';
 import { SUPPORT_EMAIL } from '@/lib/constants';
 
 export const metadata: Metadata = {
-  title: 'Terms of Service — CrewNest',
-  description: 'The terms that govern use of CrewNest.',
+  title: 'Terms of Service — ClerkNest',
+  description: 'The terms that govern use of ClerkNest.',
 };
 
 
@@ -12,14 +12,14 @@ export default function TermsPage() {
   return (
     <LegalPage title="Terms of Service" updated="July 23, 2026">
       <p>
-        These terms govern your use of CrewNest, a service that gives businesses an AI assistant to answer their
+        These terms govern your use of ClerkNest, a service that gives businesses an AI assistant to answer their
         customers across WhatsApp, Facebook Messenger, Instagram, and website chat. By creating an account or
         using the service, you agree to them.
       </p>
 
       <h2>The service</h2>
       <p>
-        CrewNest connects to messaging channels you authorize, answers customer messages using AI grounded in
+        ClerkNest connects to messaging channels you authorize, answers customer messages using AI grounded in
         the business information you provide, records orders, and gives you a dashboard to supervise and take
         over conversations. AI-generated replies are produced automatically; you are responsible for reviewing
         how your assistant represents your business.
@@ -46,12 +46,12 @@ export default function TermsPage() {
       <h2>Acceptable use &amp; suspension</h2>
       <p>
         We may suspend or terminate accounts that violate these terms, abuse the platform, or create risk for
-        other users or for CrewNest&apos;s standing with the messaging platforms it depends on.
+        other users or for ClerkNest&apos;s standing with the messaging platforms it depends on.
       </p>
 
       <h2>Disclaimers &amp; liability</h2>
       <p>
-        The service is provided &quot;as is&quot;. AI replies can be imperfect; CrewNest is not liable for
+        The service is provided &quot;as is&quot;. AI replies can be imperfect; ClerkNest is not liable for
         business outcomes arising from AI-generated responses, channel outages, or actions of the third-party
         platforms we connect to. To the maximum extent permitted by law, our total liability is limited to the
         fees you paid in the three months before the claim.

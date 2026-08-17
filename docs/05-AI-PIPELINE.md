@@ -1,6 +1,6 @@
 # 05 — AI Pipeline
 
-This is the "brain" of CrewNest: how an inbound message becomes a grounded, on-brand reply, cheaply
+This is the "brain" of ClerkNest: how an inbound message becomes a grounded, on-brand reply, cheaply
 and safely. The reference implementation is `services/aiOrchestrator.ts` (trigger-agnostic) plus the
 `services/ai/*` modules.
 

@@ -8,7 +8,7 @@ import { TopbarHeadingProvider } from '@/components/topbar-heading';
 import { signOutAction } from '@/app/admin/actions';
 import { Logomark } from '@/app/_landing/logomark';
 import { DashboardNav, DashboardTabBar } from './dashboard-nav';
-import { MobileTenantSwitcher, TenantSwitcher } from './tenant-switcher';
+import { MobileTenantSwitcher, TenantBadge, TenantSwitcher } from './tenant-switcher';
 import { log } from '@/lib/log';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -26,9 +26,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="w-full max-w-sm rounded-xl bg-card p-6 text-center ring-1 ring-foreground/10">
-          <h1 className="font-hero-display text-lg">Access pending</h1>
+          <h1 className="font-page-heading text-lg">Access pending</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your account isn&apos;t linked to a business yet. Ask your CrewNest contact to grant access.
+            Your account isn&apos;t linked to a business yet. Ask your ClerkNest contact to grant access.
           </p>
           <form action={signOutAction} className="mt-4">
             <Button type="submit" variant="outline" className="w-full">
@@ -86,7 +86,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="flex items-center gap-3 p-4">
             <Logomark className="size-8" />
             <div className="min-w-0">
-              <p className="font-logo text-2xl leading-none">CrewNest</p>
+              <p className="font-logo text-2xl leading-none">ClerkNest</p>
               <p className="mt-1 truncate text-[0.7rem] text-muted-foreground">By KraftNest Automations</p>
             </div>
           </div>
@@ -104,11 +104,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               }))}
             />
           ) : (
-            <div className="px-4 pb-3">
-              <span className="inline-flex max-w-full items-center truncate rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-medium text-foreground">
-                {activeTenantName}
-              </span>
-            </div>
+            <TenantBadge name={activeTenantName} />
           )}
           <DashboardNav showBusiness={showBusiness} showBookings={showBookings} />
           <div className="border-t border-sidebar-border p-3">

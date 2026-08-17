@@ -18,7 +18,7 @@
   gains the previously-unreachable Home item (exact match).
 - Both shells: sidebar `hidden lg:flex` + Logomark brand; fixed bottom tab bar `< lg` (first 5
   items — Team/Settings stay desktop-only); `main` gets `pb-16 lg:pb-0`; topbar shows
-  Logomark + CrewNest on mobile.
+  Logomark + ClerkNest on mobile.
 - PWA: `app/manifest.ts` (standalone, `/dashboard` start, `#0E7A5A`), `public/icons/` set
   (192/512 + maskable + apple-touch), root-metadata icons. No service worker/offline (deliberate —
   realtime app, stale cache would mislead).
@@ -152,7 +152,7 @@ order, low-stock notification, one-tap restock. Explicitly NOT variants/warehous
 ## Track G — Growth mechanics
 
 - **G1 — plan-gated referral badge + attribution — ✅ SHIPPED.** The free-plan web widget's
-  "Powered by CrewNest" footer is now plan-gated and doubles as a referral link; paid plans remove it.
+  "Powered by ClerkNest" footer is now plan-gated and doubles as a referral link; paid plans remove it.
   - **Config endpoint:** public `GET /api/widget/config?key=pk_live_…` (`app/api/widget/config/route.ts`)
     resolves the tenant via `resolveByWidgetKey` and returns `{ branding: boolean, referralUrl }`
     (`branding = plan !== 'free'` inverted; `referralUrl = ${APP_URL}/?ref=<slug|id>`). CORS echoes the
@@ -176,7 +176,7 @@ order, low-stock notification, one-tap restock. Explicitly NOT variants/warehous
 
 1. **Competitors are flow-builders, not AI employees.** Wati / Interakt / Gallabox / AiSensy /
    SleekFlow sell shared inboxes + drag-and-drop chatbot builders + broadcasts (₹2.5k–$399/mo).
-   None lead with a grounded autonomous agent that captures orders end-to-end. CrewNest's
+   None lead with a grounded autonomous agent that captures orders end-to-end. ClerkNest's
    positioning — "AI employee, not chatbot builder" — is genuinely differentiated; never ship a
    flow-builder UI, it's the old paradigm and a maintenance sink.
 2. **Tidio Lyro validates Magic Import** — its whole onboarding is "paste website URL, AI learns
@@ -195,7 +195,7 @@ order, low-stock notification, one-tap restock. Explicitly NOT variants/warehous
    market-proven, not exotic.
 6. **Pakistan market reality (our wedge):** social commerce heading toward ~35% of online retail
    by end-2026, deals close inside DMs, COD dominates with brutal RTO (return-to-origin) rates.
-   **CrewNest's quantifiable ROI story: AI confirmation of order + address before dispatch cuts
+   **ClerkNest's quantifiable ROI story: AI confirmation of order + address before dispatch cuts
    RTO.** Sell that number, not "AI chat." JazzCash/EasyPaisa rising → manual-transfer flow is
    the right rail today; inventory mismatch across platforms is a top seller pain → Track I.
 7. **Vertical AI receptionists are standalone products** (Retell $0.07/min, AgentZap, Voiceoc) —
@@ -204,7 +204,7 @@ order, low-stock notification, one-tap restock. Explicitly NOT variants/warehous
 
 ## Track A — Vertical automation matrix (full front-office automation per niche)
 
-Goal (user, 2026-07-23): a tenant's business should run itself through CrewNest. Per-niche
+Goal (user, 2026-07-23): a tenant's business should run itself through ClerkNest. Per-niche
 requirements, mapped to what exists vs. what's needed:
 
 | Niche | Runs today | Missing for "fully automated" |
@@ -222,7 +222,7 @@ Cross-cutting automation (applies to every niche, ordered by leverage):
 2. **Payment-proof auto-verification** — vision pass on receipt screenshots; auto-approve under
    a tenant-set threshold, queue above it.
 3. **Owner daily digest** — WhatsApp summary to the tenant each morning (chats, orders, revenue,
-   items low on stock, pending approvals). Makes CrewNest the daily habit.
+   items low on stock, pending approvals). Makes ClerkNest the daily habit.
 4. **Auto-KB learning** — mine human-handoff resolutions into suggested FAQ entries the tenant
    approves with one tap (closes the "AI gets smarter" loop).
 5. **Re-engagement broadcasts** — abandoned checkout nudge, restock alerts (requires WhatsApp

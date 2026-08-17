@@ -1,18 +1,36 @@
 import Link from 'next/link';
+import {
+  Building2,
+  ClipboardCheck,
+  CreditCard,
+  Flag,
+  Headset,
+  MessageCircle,
+  Radio,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { HomeIcon, type HomeIconTone } from '@/components/home-icon';
 import { getAgencyNeedsAttention } from '@/services/overview';
 import { PageHeader } from '@/components/page-header';
+import { formatDateTime } from '@/lib/format-date';
 
-const NEEDS_ATTENTION_CARDS = [
-  { key: 'ordersToApprove', label: 'Orders to approve', href: '/admin/orders?status=pending' },
-  { key: 'paymentsToVerify', label: 'Payments to verify', href: '/admin/orders' },
-  { key: 'liveHandoffs', label: 'Live handoffs', href: '/admin/chat' },
-  { key: 'flaggedChats', label: 'Flagged chats', href: '/admin/chat' },
-  { key: 'channelRequests', label: 'Channel requests', href: '/admin/clients' },
-] as const;
+const NEEDS_ATTENTION_CARDS: {
+  key: 'ordersToApprove' | 'paymentsToVerify' | 'liveHandoffs' | 'flaggedChats' | 'channelRequests';
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  tone: HomeIconTone;
+}[] = [
+  { key: 'ordersToApprove', label: 'Orders to approve', href: '/admin/orders?status=pending', icon: ClipboardCheck, tone: 'amber' },
+  { key: 'paymentsToVerify', label: 'Payments to verify', href: '/admin/orders', icon: CreditCard, tone: 'sky' },
+  { key: 'liveHandoffs', label: 'Live handoffs', href: '/admin/chat', icon: Headset, tone: 'violet' },
+  { key: 'flaggedChats', label: 'Flagged chats', href: '/admin/chat', icon: Flag, tone: 'orange' },
+  { key: 'channelRequests', label: 'Channel requests', href: '/admin/clients', icon: Radio, tone: 'teal' },
+];
 
 export default async function OverviewPage() {
   const supabase = await createSupabaseServerClient();
@@ -52,10 +70,10 @@ export default async function OverviewPage() {
       : { data: [] };
   const tenantNameById = new Map((tenantRows ?? []).map((t) => [t.id, t.business_name]));
 
-  const stats = [
-    { label: 'Clients', value: tenantCount ?? 0 },
-    { label: 'Active conversations (24h)', value: activeSessionCount ?? 0 },
-    { label: 'Human handoffs', value: handoffCount ?? 0 },
+  const stats: { label: string; value: number; icon: LucideIcon; tone: HomeIconTone }[] = [
+    { label: 'Clients', value: tenantCount ?? 0, icon: Building2, tone: 'primary' },
+    { label: 'Active conversations (24h)', value: activeSessionCount ?? 0, icon: MessageCircle, tone: 'success' },
+    { label: 'Human handoffs', value: handoffCount ?? 0, icon: Headset, tone: 'rose' },
   ];
 
   return (
@@ -76,14 +94,19 @@ export default async function OverviewPage() {
                 <Link
                   key={c.key}
                   href={c.href}
-                  className={`rounded-xl p-4 ring-1 transition-colors ${
+                  className={`flex items-center gap-3 rounded-xl p-4 ring-1 transition-colors ${
                     count > 0
                       ? 'bg-card ring-foreground/10 hover:ring-foreground/20'
                       : 'bg-card/40 text-muted-foreground ring-foreground/5'
                   }`}
                 >
-                  <p className={`text-2xl font-semibold ${count === 0 ? 'text-muted-foreground' : ''}`}>{count}</p>
-                  <p className="mt-1 text-xs">{c.label}</p>
+                  <HomeIcon icon={c.icon} tone={c.tone} className="size-9" />
+                  <div className="min-w-0">
+                    <p className={`text-2xl font-semibold tabular-nums ${count === 0 ? 'text-muted-foreground' : ''}`}>
+                      {count}
+                    </p>
+                    <p className="mt-0.5 text-xs">{c.label}</p>
+                  </div>
                 </Link>
               );
             })}
@@ -94,11 +117,12 @@ export default async function OverviewPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {stats.map((s) => (
           <Card key={s.label}>
-            <CardHeader>
-              <CardTitle className="text-sm font-normal text-muted-foreground">{s.label}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold">{s.value}</p>
+            <CardContent className="flex items-center gap-3 p-4">
+              <HomeIcon icon={s.icon} tone={s.tone} />
+              <div className="min-w-0">
+                <p className="text-sm text-muted-foreground">{s.label}</p>
+                <p className="mt-0.5 text-2xl font-semibold tabular-nums">{s.value}</p>
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -133,7 +157,7 @@ export default async function OverviewPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {new Date(row.created_at).toLocaleString()}
+                    {formatDateTime(row.created_at)}
                   </TableCell>
                 </TableRow>
               ))}

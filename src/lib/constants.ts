@@ -12,7 +12,7 @@ import { ENTITLEMENTS } from './entitlements';
 export const META_GRAPH_BASE = 'https://graph.facebook.com';
 
 /**
- * The one address CrewNest shows a visitor/customer anywhere in the app —
+ * The one address ClerkNest shows a visitor/customer anywhere in the app —
  * previously an independent literal in privacy/page.tsx AND terms/page.tsx,
  * which could silently drift out of sync with each other (and with the auth
  * screens' support line, docs/27 §4 A3).

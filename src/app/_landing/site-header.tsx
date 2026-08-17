@@ -65,7 +65,7 @@ export function SiteHeader() {
               scrolled && 'opacity-0',
             )}
           >
-            <p className="font-logo text-2xl leading-none">CrewNest</p>
+            <p className="font-logo text-2xl leading-none">ClerkNest</p>
             <p className="mt-1 truncate text-xs text-muted-foreground">By KraftNest Automations</p>
           </div>
         </div>

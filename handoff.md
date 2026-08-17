@@ -1,6 +1,6 @@
-# CrewNest — Project Handoff & Remaining-Work Map (START HERE)
+# ClerkNest — Project Handoff & Remaining-Work Map (START HERE)
 
-**Read this first.** It is the single entry point for the person now carrying CrewNest to completion.
+**Read this first.** It is the single entry point for the person now carrying ClerkNest to completion.
 It is self-contained on purpose: the prior developer's cross-session AI "memory" lives on their machine
 and is **not** available to you — so this repo's docs are the only source of truth. After this file, read
 `CLAUDE.md` + `AGENTS.md` (how-we-work rules) and `docs/` (architecture source of truth). Update this file
@@ -20,9 +20,22 @@ doc). This section is a progress marker against that build order, not a replacem
 27-UI-REVAMP.md itself before continuing**, this is just "where we stopped."
 
 **To resume:** *"Read `docs/27-UI-REVAMP.md` and `handoff.md` §0, then continue the UI revamp from Stage
-5 (M6 and M8) forward."*
+5 (M6 and M8) forward — or pick any remaining Stage 8 polish the founder flags."*
 
-### What's done (commits `6a69f69`..`40648e0`, all on `main`, all pushed — nothing sitting local/unpushed)
+### Session update — branding + dashboard/admin UI polish (local → this push)
+
+Work landed in this commit (not previously on remote). Resume notes for the next person:
+
+- **Rebrand CrewNest → ClerkNest** across docs/README/overview + app chrome; rose brand `#d91b5b`; warm paper dashboard theme in `globals.css` (light + dark). Contrast helper: `scripts/check-theme-contrast.mjs`.
+- **Marketing landing** is served from `public/clerknest-assets/index.html` via a Next rewrite in `next.config.ts`. Scroll header fade (transparent → blur) is driven by `public/clerknest-assets/landing-links.js` (prebuilt bundle — don't edit minified JSX). **Do not commit** the root `Clerknest assets/` design-export folder (gitignored).
+- **Client Home** (`dashboard/page.tsx`): icon tiles (`HomeIcon`), quota ring, clerks strip (`clerk-strip.tsx`, renamed from crew), upgrade teaser; date formatting via `lib/format-date.ts` (hydration-safe `en-GB`).
+- **Orders** (`orders-view.tsx`, shared admin + client): responsive cards; name ` - ` phone; status icons; calendar/clock on Placed; column stacks (Items → Owner/Platform; Payment → Action; Placed + Cancel); payment cell shows Mark paid / Paid / etc. on the **right**; owner **Cancel order** dialog → `cancelOrderAction` (reason required, customer notified). Pending Review → Reject still separate.
+- **Admin Overview + System Health**: colored `HomeIcon` tiles per metric card.
+- **My Business channels**: `PlatformBadge` next to WhatsApp / Messenger / Instagram / Website.
+- **Auth**: marketing panel matches split-screen proof (chips, two-turn chat, channel rail); tighter vertical rhythm so support line fits without scroll; **wrong-portal login** (client on `/admin` or admin on client login) returns only `Invalid email or password.` — no account-type disclosure (`login/actions.ts`).
+- **Analytics** (client + admin): added Orders/bookings secured, Handoff rate, Payment conversion (`getCommerceMetrics`); brighter card tints; floating info dialog (`analytics-info-dialog.tsx`) explaining every metric.
+
+### What's done (commits `6a69f69`..`40648e0`, plus later main history — see git log)
 
 Every item below was verified against the **real live app** before being marked done — typecheck +
 `npm run build` + the full `vitest` suite every time, and for anything visual, an actual headless-browser
@@ -71,7 +84,7 @@ it's leftover from a session that didn't clean up and is safe to delete.
   heading and wasn't in any nav list — fixed, and a single `SECTION_LINKS` array now drives the desktop
   nav + hamburger + footer so they can't drift apart again).
 - **Stage 2 — Dashboard nav** = D-08 above (they're the same fix, doc lists it as its own stage).
-- **Stage 4 — Auth** (`7e9ecd7`) — A1 (login's `<h1>` was literally `CrewNest` — the exact grammar of a
+- **Stage 4 — Auth** (`7e9ecd7`) — A1 (login's `<h1>` was literally `ClerkNest` — the exact grammar of a
   phishing page; now states the page's purpose), A2 (new shared `AuthShell`, real split-screen on `lg+`
   with a static non-animated proof panel — not a stock illustration — form-only below `lg`), A3 ("what
   happens next" line + a real support address, promoted a duplicated literal in privacy/terms pages to
@@ -128,7 +141,7 @@ Neither blocks anything above; just don't assume they're fine.
 
 ---
 
-## 1. What CrewNest is
+## 1. What ClerkNest is
 
 Multi-tenant SaaS: an "AI employee" for small businesses. A client's customers message on
 WhatsApp / Messenger / Instagram / a website widget and get accurate, on-brand, catalogue-grounded
@@ -137,8 +150,8 @@ watches + takes over from a dashboard. Two dashboards: **agency/admin** (`/admin
 many clients) and **client** (`/dashboard`, a single business owner). Both have a guard-railed **Copilot**
 (a Claude-style chat that edits the business by proposing changes the owner one-tap applies).
 
-- **Live:** `crewnest-rouge.vercel.app` (Vercel, GitHub continuous deploy — **pushing `main` = a
-  production deploy**). Repo: **`kraftnestco/crewnest`** (moved from `khubaibagha/crewnest` around
+- **Live:** `clerknest-rouge.vercel.app` (Vercel, GitHub continuous deploy — **pushing `main` = a
+  production deploy**). Repo: **`kraftnestco/clerknest`** (moved from `khubaibagha/clerknest` around
   2026-07-27; that move silently broke Vercel's webhook — see §5 item 2).
 - **Stack:** Next.js 16 (App Router, Turbopack, RSC) · Supabase (Postgres + Auth + RLS + Vault + Storage)
   · Tailwind v4 · LLM via OpenAI **or** OpenRouter (per-tenant, BYOK or master key).
@@ -150,7 +163,7 @@ many clients) and **client** (`/dashboard`, a single business owner). Both have 
 ## 2. Run it + deploy
 
 ```bash
-cd src/crewnest
+cd src/clerknest
 cp .env.example .env.local     # then fill in real values (see §5 — some vars are MISSING from the example)
 npm install
 npm run dev                    # http://localhost:3000
@@ -228,8 +241,8 @@ Stripe account (§4d); Phase 3 **Stage P** is done and deployed (§4e).
   Service tenants with `booking_enabled` get three tools (`check_availability`, `book_appointment`,
   `cancel_appointment`), real slots computed from their own hours/closures/timezone, and dashboards at
   `/admin/appointments` + `/dashboard/appointments` with the per-client filter.
-  **CrewNest owns the schedule; Cal.com only mints a Google Meet link** for tenants whose meetings have
-  no home of their own (docs/24 §1.1 explains why Cal.com must NOT own availability: one CrewNest-owned
+  **ClerkNest owns the schedule; Cal.com only mints a Google Meet link** for tenants whose meetings have
+  no home of their own (docs/24 §1.1 explains why Cal.com must NOT own availability: one ClerkNest-owned
   Cal.com account means shared availability, so two tenants would collide on the same hour).
   Verified live: the Cal.com API round trip (slots → book → Meet URL → cancel), the double-booking guard
   (a second booking of the same slot returns null, not an error), that cancelling frees the slot, and now
@@ -455,7 +468,7 @@ Resend domain. **Do 4b before QA (4g)** — most "bugs" at this stage are missin
 2. Create **three** recurring Products/Prices matching `PAYWALL_PLANS` (§4d.1a): Starter **$39/mo**,
    Growth **$49/mo**, Pro $79/mo.
 3. Note the `price_…` ids → `STRIPE_PRICE_STARTER` / **`STRIPE_PRICE_GROWTH`** / `STRIPE_PRICE_PRO`.
-4. Register the webhook endpoint `https://crewnest-rouge.vercel.app/api/webhooks/stripe`; take the
+4. Register the webhook endpoint `https://clerknest-rouge.vercel.app/api/webhooks/stripe`; take the
    signing secret → `STRIPE_WEBHOOK_SECRET`. Set `STRIPE_SECRET_KEY`.
 
 **Safepay (Pakistani tenants):**
@@ -465,7 +478,7 @@ Resend domain. **Do 4b before QA (4g)** — most "bugs" at this stage are missin
    `services/demo/plans.ts`** (Starter Rs 11,000 · Growth Rs 14,000 · Pro Rs 22,000) — the plan carries
    the amount, so these are two halves of one number (docs/25 §3.2).
 7. Note the `plan_…` ids → `SAFEPAY_PLAN_STARTER` / **`SAFEPAY_PLAN_GROWTH`** / `SAFEPAY_PLAN_PRO`.
-8. Register `https://crewnest-rouge.vercel.app/api/webhooks/safepay`; secret → `SAFEPAY_WEBHOOK_SECRET`.
+8. Register `https://clerknest-rouge.vercel.app/api/webhooks/safepay`; secret → `SAFEPAY_WEBHOOK_SECRET`.
    Set `SAFEPAY_SECRET_KEY`. **Keep `SAFEPAY_ENVIRONMENT=sandbox`** until a real end-to-end test passes.
 
 **Both:** set every var in `.env.local` **and** Vercel (Production + Preview). Then run the unchecked
@@ -584,7 +597,7 @@ change to `(auth)/signup/`; left out because it was outside the build request. S
   webhook endpoint (`/api/webhooks/stripe`) in the Stripe dashboard. Per the Vercel marketplace note
   below, prefer a real provisioned Stripe integration over hand-rolled keys if that path is available.
 - **Don't confuse with customer payments:** taking a *customer's* money for an order (bank transfer +
-  payment-proof upload) is already built and untouched. 4d is about charging *tenants* for CrewNest itself.
+  payment-proof upload) is already built and untouched. 4d is about charging *tenants* for ClerkNest itself.
 
 ### 4e. Stage P completion — reliability & durable delivery — **DONE, deployed, tested live**
 - **Spec:** [`docs/15-RELIABILITY-AND-DURABILITY.md`](docs/15-RELIABILITY-AND-DURABILITY.md) (all `[OPUS]`
@@ -725,14 +738,14 @@ The prior owner must privately hand you the **secret values** (never in git/this
    var usually presents as a silent feature no-op, not a crash. **None of them are set yet** — this is the
    single biggest outstanding ops task, and several finished features are inert without it (see §5.1).
 
-   **⚠️ ROOT CAUSE FOUND 2026-08-02 — THE REPO MOVED.** `khubaibagha/crewnest` →
-   **`kraftnestco/crewnest`**. GitHub redirects *git operations* after a transfer, so `git push` kept
+   **⚠️ ROOT CAUSE FOUND 2026-08-02 — THE REPO MOVED.** `khubaibagha/clerknest` →
+   **`kraftnestco/clerknest`**. GitHub redirects *git operations* after a transfer, so `git push` kept
    working and gave no hint anything had changed. But **webhooks and app integrations do NOT follow the
    redirect** — Vercel was still watching the old address, so it silently stopped receiving push events.
    Everything observed follows from that one fact:
    - pushes succeeded (redirect) and CI ran (Actions moved with the repo), so GitHub looked healthy;
    - Vercel created **no** deployment after 2026-07-27 — verified via
-     `gh api repos/<owner>/crewnest/deployments`, which is a good way to check this independently of the
+     `gh api repos/<owner>/clerknest/deployments`, which is a good way to check this independently of the
      dashboard;
    - manual **Redeploy** still worked (Vercel rebuilds from its own stored connection), which made it look
      like a permissions problem rather than a plumbing one;
@@ -743,10 +756,10 @@ The prior owner must privately hand you the **secret values** (never in git/this
 
    **Earlier diagnoses in this doc were WRONG** (a missing Vercel GitHub App installation, needing
    `khubaibagha` to grant repo access, needing Vercel Pro for team members). None of those were the cause;
-   ignore them. The local git remote has been repointed to `kraftnestco/crewnest`.
+   ignore them. The local git remote has been repointed to `kraftnestco/clerknest`.
 
    **Remaining fix (dashboard-only, cannot be done from the CLI):** Vercel → project → Settings → Git →
-   **disconnect**, then **reconnect** choosing `kraftnestco/crewnest`. That re-registers the webhook against
+   **disconnect**, then **reconnect** choosing `kraftnestco/clerknest`. That re-registers the webhook against
    the new address. `kraftnestco-6204` owns the Vercel team, so the repo should be selectable directly — no
    involvement from `khubaibagha` needed. Then push (or Redeploy) and confirm a NEW row appears.
 
@@ -810,7 +823,7 @@ just doesn't work" rather than an error):**
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | All email notification fan-out. Domain already verified. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | **Web push (docs/21).** Built and DB-applied, completely inert until all four land. |
 | `CRON_SECRET` | `/api/cron/maintenance` AND `api/internal/process-message` (the Stage P worker bridge) reject every request. **Must be the same value in Vercel and as a Supabase Edge Function secret.** |
-| `CALCOM_API_KEY`, `CALCOM_EVENT_TYPE_ID`, `CALCOM_ATTENDEE_EMAIL` | **Appointment meeting links (docs/24).** Only for tenants with `booking_mode='calcom'`. Unset ⇒ the appointment still books, just with a blank `meeting_url` (docs/24 §4.3 — a link generator failing must never retract a time already promised). Event type id is `6539354`; attendee email is a single fixed CrewNest address by decision (§4.4), so Cal.com confirmations land there, not with the customer. |
+| `CALCOM_API_KEY`, `CALCOM_EVENT_TYPE_ID`, `CALCOM_ATTENDEE_EMAIL` | **Appointment meeting links (docs/24).** Only for tenants with `booking_mode='calcom'`. Unset ⇒ the appointment still books, just with a blank `meeting_url` (docs/24 §4.3 — a link generator failing must never retract a time already promised). Event type id is `6539354`; attendee email is a single fixed ClerkNest address by decision (§4.4), so Cal.com confirmations land there, not with the customer. |
 | `SENTRY_DSN` | Error tracking. |
 
 **Optional but fails LOUDLY rather than silently — deliberate:**
@@ -839,15 +852,15 @@ account, tracked here so nothing gets lost across sessions. **Do them in this or
 steps depend on an earlier one.
 
 **Correction (2026-08-02):** an earlier note here blamed a missing Vercel GitHub App installation. That
-was **wrong**. The real cause was the repo moving to `kraftnestco/crewnest`, which broke Vercel's webhook
+was **wrong**. The real cause was the repo moving to `kraftnestco/clerknest`, which broke Vercel's webhook
 while leaving `git push` and CI working — full write-up in §5 item 2. Disregard the App-installation theory.
 
 **A. Vercel / deploy pipeline — ✅ ALL DONE 2026-08-03.** Kept for the record; skip to B.
 - ~~A0. Reconnect Vercel to the moved repo~~ — done. Pushes to `main` now auto-deploy; verified by
-  `gh api repos/kraftnestco/crewnest/deployments` showing new `vercel[bot]` rows per push.
+  `gh api repos/kraftnestco/clerknest/deployments` showing new `vercel[bot]` rows per push.
 - ~~A1. Env vars in Vercel~~ — done (9 added: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_APP_URL`,
   `RESEND_*`, the four `VAPID_*`, `CRON_SECRET`), plus `INBOUND_WORKER_SECRET` for the nudge.
-- ~~A2. Confirm deployed URL~~ — `https://crewnest-rouge.vercel.app`.
+- ~~A2. Confirm deployed URL~~ — `https://clerknest-rouge.vercel.app`.
 - ~~A3. Re-point the worker~~ — done: `APP_URL`, `CRON_SECRET`, `INBOUND_WORKER_SECRET` set as Edge
   Function secrets and confirmed via `npx supabase secrets list`.
 - ~~A4. Stage P happy path~~ — **verified live**: a real Instagram message went webhook → queue → worker
@@ -945,10 +958,10 @@ while leaving `git push` and CI working — full write-up in §5 item 2. Disrega
 **Gotchas that will waste your time if you don't know them:**
 - **Env is cached at module load.** After editing `.env.local`, **restart the dev server** or changes are
   ignored. (Find the PID on port 3000, kill it, `npm run dev` again.)
-- **Scratch DB scripts must live inside `src/crewnest/`**, not the OS temp dir — Node resolves
+- **Scratch DB scripts must live inside `src/clerknest/`**, not the OS temp dir — Node resolves
   `node_modules` relative to the importing file, so a temp-dir script can't find `@supabase/supabase-js`.
   Run once, delete immediately; never commit them.
-- **`Glob`/ripgrep can time out** on broad `src/crewnest/**` patterns — fall back to listing a specific
+- **`Glob`/ripgrep can time out** on broad `src/clerknest/**` patterns — fall back to listing a specific
   directory.
 - **Manual-migration drift** (above) — the #1 source of "works locally, broken in prod."
 - **Widget sessions persist their key in `localStorage`** — clear it between manual tests or a muted
@@ -980,7 +993,7 @@ and fails. `public/sw.js` resolves the link against `self.location.origin` (line
 correct behaviour — the origin is just stale. Cosmetic, and self-inflicted by having subscribed from
 localhost.
 
-**Fix / how to avoid it.** Subscribe from the real deployed URL (`crewnest-rouge.vercel.app`), not
+**Fix / how to avoid it.** Subscribe from the real deployed URL (`clerknest-rouge.vercel.app`), not
 localhost, then delete the stale localhost row or it keeps firing duplicates to the same device.
 A subscription is bound to the origin it was created on and **cannot be migrated** — origin is part of
 its identity. **When testing push, always subscribe from the prod URL.**

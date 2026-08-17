@@ -3,8 +3,8 @@ import { LegalPage } from '@/app/_landing/legal-page';
 import { SUPPORT_EMAIL } from '@/lib/constants';
 
 export const metadata: Metadata = {
-  title: 'How we connect your channels — CrewNest',
-  description: 'Exactly what CrewNest can and cannot see when you connect WhatsApp, Messenger, or Instagram.',
+  title: 'How we connect your channels — ClerkNest',
+  description: 'Exactly what ClerkNest can and cannot see when you connect WhatsApp, Messenger, or Instagram.',
 };
 
 export default function SecurityPage() {
@@ -12,13 +12,13 @@ export default function SecurityPage() {
     <LegalPage title="How we connect your channels" updated="August 8, 2026">
       <p>
         The short version: <strong>we never ask for, see, or store your Facebook, Instagram, or WhatsApp
-        password.</strong> This page explains exactly what CrewNest can and can&apos;t see once a channel is
+        password.</strong> This page explains exactly what ClerkNest can and can&apos;t see once a channel is
         connected, in plain language — no jargon.
       </p>
 
       <h2>How the connection actually works</h2>
       <p>
-        For WhatsApp, Messenger, and Instagram, you add CrewNest as a <strong>Partner</strong> on your own Meta
+        For WhatsApp, Messenger, and Instagram, you add ClerkNest as a <strong>Partner</strong> on your own Meta
         Business Manager — a permission Meta itself manages, not something we invent. You stay logged in as
         yourself the whole time; you&apos;re granting a scoped, revocable permission, not handing over a login.
         We&apos;re never shown your password, and there&apos;s no login screen where we could see it even if we
@@ -42,14 +42,14 @@ export default function SecurityPage() {
 
       <h2>Where the access itself is kept</h2>
       <p>
-        The access Meta grants us is stored encrypted. It isn&apos;t something a person at CrewNest can open and
+        The access Meta grants us is stored encrypted. It isn&apos;t something a person at ClerkNest can open and
         read — our system uses it automatically, only to send and receive messages on the channel you connected,
         and for nothing else.
       </p>
 
       <h2>Turning it off</h2>
       <p>
-        You&apos;re in control of the permission the whole time. You can remove CrewNest&apos;s Partner access
+        You&apos;re in control of the permission the whole time. You can remove ClerkNest&apos;s Partner access
         from your own Meta Business Manager at any moment, or ask us to disconnect a channel, and it stops
         immediately. Questions? Reach us at{' '}
         <a className="underline hover:text-foreground" href={`mailto:${SUPPORT_EMAIL}`}>

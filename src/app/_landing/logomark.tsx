@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * The actual favicon/app-icon asset (public/icons/icon-192.png), not a
- * recreated glyph — every on-page "CrewNest" lockup should be pixel-identical
+ * recreated glyph — every on-page "ClerkNest" lockup should be pixel-identical
  * to the browser-tab/home-screen icon, not a different color and a different
  * bird drawn from a generic lucide icon.
  */

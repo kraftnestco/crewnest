@@ -22,9 +22,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="w-full max-w-sm rounded-xl bg-card p-6 text-center ring-1 ring-foreground/10">
-          <h1 className="font-hero-display text-lg">Access pending</h1>
+          <h1 className="font-page-heading text-lg">Access pending</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your account isn&apos;t authorized for the CrewNest dashboard yet. Ask a platform admin to
+            Your account isn&apos;t authorized for the ClerkNest dashboard yet. Ask a platform admin to
             grant access.
           </p>
           <form action={signOutAction} className="mt-4">
@@ -49,17 +49,24 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <div className="flex items-center gap-3 p-4">
             <Logomark className="size-8" />
             <div className="min-w-0">
-              <p className="font-logo text-2xl leading-none">CrewNest</p>
+              <p className="font-logo text-2xl leading-none">ClerkNest</p>
               <p className="mt-1 truncate text-[0.7rem] text-muted-foreground">By KraftNest Automations</p>
             </div>
           </div>
           {/* Account-type indicator — the admin (/admin) and client (/dashboard)
               shells otherwise look identical (same logo, same topbar component),
-              so this is the only always-visible cue for which one you're in. */}
-          <div className="px-4 pb-3">
-            <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] font-medium text-primary">
-              Agency
-            </span>
+              so this is the only always-visible cue for which one you're in.
+              Card chrome matches the client business switcher so the two shells
+              sit at the same visual weight under the wordmark. */}
+          <div className="px-3 pb-3">
+            <div className="flex w-full items-center gap-2.5 rounded-lg bg-card px-2.5 py-2 text-left ring-1 ring-sidebar-border">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.6rem] font-medium tracking-wide text-muted-foreground uppercase">
+                  Portal
+                </span>
+                <span className="block truncate text-sm leading-tight font-medium">Agency</span>
+              </span>
+            </div>
           </div>
           <AdminNav />
           <div className="border-t border-sidebar-border p-3">

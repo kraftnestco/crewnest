@@ -527,7 +527,7 @@ export default function Home() {
             <div className="max-w-xs">
               <div className="flex items-center gap-2">
                 <Logomark className="size-6" />
-                <span className="font-logo text-lg">CrewNest</span>
+                <span className="font-logo text-lg">ClerkNest</span>
               </div>
               <p className="mt-3 text-sm text-muted-foreground">
                 AI employees that answer your customers, take orders, and never miss a message.
@@ -574,7 +574,7 @@ export default function Home() {
             </div>
           </div>
           <p className="mt-10 border-t border-border pt-6 text-xs text-muted-foreground">
-            © {new Date().getFullYear()} CrewNest. All rights reserved.
+            © {new Date().getFullYear()} ClerkNest. All rights reserved.
           </p>
         </div>
       </footer>

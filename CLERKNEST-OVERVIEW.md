@@ -1,6 +1,6 @@
-# CrewNest — System Description (state as of 2026-08-05)
+# ClerkNest — System Description (state as of 2026-08-05)
 
-A factual description of what CrewNest is and what is actually implemented. Written to brief an LLM
+A factual description of what ClerkNest is and what is actually implemented. Written to brief an LLM
 that has no other context on the project. Distinguishes **shipped and verified against real traffic**,
 **shipped but unverified**, **designed but unbuilt**, and **stub**.
 
@@ -8,7 +8,7 @@ that has no other context on the project. Distinguishes **shipped and verified a
 
 ## 1. What the product is
 
-CrewNest is a **multi-tenant SaaS that gives small businesses an "AI employee."** A client business's
+ClerkNest is a **multi-tenant SaaS that gives small businesses an "AI employee."** A client business's
 own customers message it on WhatsApp, Facebook Messenger, Instagram DMs, or a website chat widget, and
 an LLM answers in the business's brand voice, grounded in that business's catalogue and knowledge base.
 The AI does not just answer questions — it **takes orders, books appointments, checks stock, collects
@@ -45,12 +45,12 @@ Stripe is not available in Pakistan.
 | Errors | Sentry |
 | Meetings | Cal.com API (link generation only) |
 | Tests | Vitest |
-| Hosting | Vercel (Hobby), continuous deploy from `main` on GitHub `kraftnestco/crewnest` |
+| Hosting | Vercel (Hobby), continuous deploy from `main` on GitHub `kraftnestco/clerknest` |
 
 **Next.js 16 specifics that matter:** middleware is renamed `proxy.ts`; `cookies()`/`headers()` are
 async; `params`/`searchParams` are Promises; `after()` runs work post-response.
 
-Live at `crewnest-rouge.vercel.app`. **Pushing to `main` deploys to production** — there is no staging
+Live at `clerknest-rouge.vercel.app`. **Pushing to `main` deploys to production** — there is no staging
 branch.
 
 ---
@@ -195,7 +195,7 @@ Two money-safety invariants hold across the whole tool surface: **the model can 
 to re-derive an authoritative amount from the catalogue. `→ paid` comes only from a human dashboard
 action or a signature-verified webhook.
 
-**(b) SaaS billing** (CrewNest charging its client businesses) — **Stripe only.**
+**(b) SaaS billing** (ClerkNest charging its client businesses) — **Stripe only.**
 
 - Flat-fee subscriptions on free / $39 Starter / $49 Growth / $79 Pro (docs/26). Hosted Stripe Checkout + Customer Portal,
   zero custom card UI.
@@ -211,8 +211,8 @@ Tools: `check_availability`, `book_appointment`, `cancel_appointment`, gated on
 `bookingEnabled && businessType === 'service'`.
 
 - ✅ **Verified end to end** on a real Instagram conversation with a live Google Meet link.
-- **CrewNest owns the schedule; Cal.com only mints a meeting link.** Cal.com must *not* own
-  availability — one CrewNest-owned Cal.com account means shared availability, so two tenants would
+- **ClerkNest owns the schedule; Cal.com only mints a meeting link.** Cal.com must *not* own
+  availability — one ClerkNest-owned Cal.com account means shared availability, so two tenants would
   collide on the same hour. Slots are computed from each tenant's own hours, closures, and timezone.
 - Day-first conversation flow: "which day?" → "what time?" → check → book.
 - Double-booking guard; cancelling frees the slot.

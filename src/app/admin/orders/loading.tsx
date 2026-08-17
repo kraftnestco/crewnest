@@ -12,7 +12,24 @@ export default function Loading() {
           <Skeleton key={i} className="h-8 w-20 rounded-full" />
         ))}
       </div>
-      <Skeleton className="h-96 rounded-xl" />
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="space-y-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((__, field) => (
+                <Skeleton key={field} className="h-20 rounded-lg" />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

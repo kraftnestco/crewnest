@@ -205,7 +205,7 @@ return the reply on, no queue needed, no window. Only Meta inbound moves to pgmq
 
 Backward-compatible at every step; `tsc --noEmit` + `npm run build` stay green (no test framework yet —
 doc 17 Stage R adds it). Migrations applied by the user via the standard no-Docker `pg`-script-inside-
-`src/crewnest` precedent; `database.ts` hand-edited.
+`src/clerknest` precedent; `database.ts` hand-edited.
 
 **Migration `0029_reliability.sql`** — `webhook_events` lifecycle columns (§3.2), `rate_limit_buckets`
 (§5), `notifications_type_check` widened to add `'system_alert'`, `chat_sessions.delivery_blocked_reason

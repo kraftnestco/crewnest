@@ -5,7 +5,7 @@ import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * The M6 before/after "With CrewNest" card (docs/27 §6.2 item 2) — on scroll
+ * The M6 before/after "With ClerkNest" card (docs/27 §6.2 item 2) — on scroll
  * into view the card goes scale(0.96)→1 + translateY(12px)→0 over 400ms,
  * then the gain rows stagger in at 60ms. Self-contained rather than a
  * generic reveal wrapper: a Server Component can't hand a Client Component
@@ -46,7 +46,7 @@ export function BeforeAfterGainCard({ items, className }: { items: readonly stri
         className,
       )}
     >
-      <p className="text-sm font-medium text-stage-primary">With CrewNest</p>
+      <p className="text-sm font-medium text-stage-primary">With ClerkNest</p>
       <ul className="mt-4 space-y-4">
         {items.map((gain, i) => (
           <li

@@ -41,7 +41,7 @@ export default async function DashboardBillingPage() {
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
-      <PageHeader title="Billing" description="Manage your CrewNest plan and payment method." />
+      <PageHeader title="Billing" description="Manage your ClerkNest plan and payment method." />
       <BillingPanel
         tenantId={tenant.id}
         currentPlan={tenant.plan}

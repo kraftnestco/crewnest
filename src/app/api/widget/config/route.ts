@@ -5,7 +5,7 @@ import { log } from '@/lib/log';
 
 /**
  * Public widget config (docs/19 G1). The embed script fetches this to decide
- * whether to show the "Powered by CrewNest" referral badge: free tenants show it
+ * whether to show the "Powered by ClerkNest" referral badge: free tenants show it
  * (a growth surface), paid tenants have it removed. Returns only public,
  * non-sensitive data (a boolean + a marketing URL) — never keys or plan details.
  *

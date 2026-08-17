@@ -29,7 +29,7 @@ export default async function LoginPage({
 
   return (
     <AuthShell
-      title="Sign in to CrewNest"
+      title="Sign in to ClerkNest"
       description={
         existingAccountEmail
           ? `Currently signed in as ${existingAccountEmail}. Sign in below to switch accounts.`
@@ -37,7 +37,7 @@ export default async function LoginPage({
             ? 'Sign in to your business dashboard.'
             : 'Sign in to the agency dashboard.'
       }
-      whatNext="Use the email your CrewNest setup was sent to."
+      whatNext="Use the email your ClerkNest setup was sent to."
       footer={
         // Agency admin accounts are invited, never self-serve — only offer the
         // signup link when this sign-in is headed for the client dashboard

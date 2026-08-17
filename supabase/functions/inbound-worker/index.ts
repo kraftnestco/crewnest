@@ -24,7 +24,7 @@ const QUEUE_NAME = 'inbound_messages';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const APP_URL = Deno.env.get('APP_URL')!; // e.g. https://crewnest-rouge.vercel.app — the Vercel deploy, not Supabase
+const APP_URL = Deno.env.get('APP_URL')!; // e.g. https://clerknest-rouge.vercel.app — the Vercel deploy, not Supabase
 const CRON_SECRET = Deno.env.get('CRON_SECRET')!; // same secret api/internal/process-message checks
 const WORKER_SECRET = Deno.env.get('INBOUND_WORKER_SECRET')!; // authenticates the caller of THIS function
 

@@ -1,43 +1,53 @@
 /*!
- * CrewNest embeddable chat widget — Phase 1.
+ * ClerkNest embeddable chat widget — Phase 1.
  *
  * Self-contained, dependency-free. A client embeds:
- *   <script src="https://<app>/embed/widget.js" data-crewnest-key="pk_live_xxx" defer></script>
+ *   <script src="https://<app>/embed/widget.js" data-clerknest-key="pk_live_xxx" defer></script>
  *
  * Ships NO secrets — only the tenant's public key. Talks to POST /api/chat on the
  * origin that served this script. Renders inside a Shadow DOM so the host page's
  * CSS can neither leak in nor be clobbered. See docs/06-INTEGRATIONS.md §2.2.
  *
  * Optional data-* attributes on the script tag:
- *   data-crewnest-key       (required) tenant public key
- *   data-crewnest-api       override API origin (defaults to this script's origin)
- *   data-crewnest-title     panel header text        (default "Chat with us")
- *   data-crewnest-accent    accent colour            (default "#4f46e5")
- *   data-crewnest-greeting  first assistant bubble   (default a friendly hello)
+ *   data-clerknest-key       (required) tenant public key
+ *   data-clerknest-api       override API origin (defaults to this script's origin)
+ *   data-clerknest-title     panel header text        (default "Chat with us")
+ *   data-clerknest-accent    accent colour            (default "#4f46e5")
+ *   data-clerknest-greeting  first assistant bubble   (default a friendly hello)
+ *
+ * Legacy CrewNest attributes (`data-crewnest-*`) are still accepted so existing
+ * embeds keep working during the rename. Prefer the ClerkNest names for new installs.
  */
 (function () {
   'use strict';
 
-  if (window.__crewnestWidgetLoaded) return;
+  if (window.__clerknestWidgetLoaded || window.__crewnestWidgetLoaded) return;
+  window.__clerknestWidgetLoaded = true;
   window.__crewnestWidgetLoaded = true;
+
+  function attr(el, name) {
+    return el.getAttribute('data-clerknest-' + name) || el.getAttribute('data-crewnest-' + name);
+  }
 
   // --- locate our own <script> tag (currentScript is null for defer'd scripts) ---
   var script =
     document.currentScript ||
     (function () {
-      var all = document.querySelectorAll('script[data-crewnest-key]');
+      var all = document.querySelectorAll(
+        'script[data-clerknest-key],script[data-crewnest-key]',
+      );
       return all[all.length - 1] || null;
     })();
   if (!script) return;
 
-  var PUBLIC_KEY = script.getAttribute('data-crewnest-key');
+  var PUBLIC_KEY = attr(script, 'key');
   if (!PUBLIC_KEY) {
-    console.error('[CrewNest] missing data-crewnest-key on the embed script tag.');
+    console.error('[ClerkNest] missing data-clerknest-key on the embed script tag.');
     return;
   }
 
   var API_BASE =
-    script.getAttribute('data-crewnest-api') ||
+    attr(script, 'api') ||
     (function () {
       try {
         return new URL(script.src, location.href).origin;
@@ -45,16 +55,23 @@
         return '';
       }
     })();
-  var TITLE = script.getAttribute('data-crewnest-title') || 'Chat with us';
-  var ACCENT = script.getAttribute('data-crewnest-accent') || '#4f46e5';
-  var GREETING =
-    script.getAttribute('data-crewnest-greeting') || 'Hi! 👋 How can we help you today?';
+  var TITLE = attr(script, 'title') || 'Chat with us';
+  var ACCENT = attr(script, 'accent') || '#4f46e5';
+  var GREETING = attr(script, 'greeting') || 'Hi! 👋 How can we help you today?';
 
   // --- durable session key (survives reloads; the server keeps the transcript) ---
-  var SESSION_STORE_KEY = 'crewnest:session:' + PUBLIC_KEY;
+  var SESSION_STORE_KEY = 'clerknest:session:' + PUBLIC_KEY;
+  var LEGACY_SESSION_STORE_KEY = 'crewnest:session:' + PUBLIC_KEY;
   var sessionKey = '';
   try {
     sessionKey = localStorage.getItem(SESSION_STORE_KEY) || '';
+    if (!sessionKey) {
+      sessionKey = localStorage.getItem(LEGACY_SESSION_STORE_KEY) || '';
+      if (sessionKey) {
+        localStorage.setItem(SESSION_STORE_KEY, sessionKey);
+        localStorage.removeItem(LEGACY_SESSION_STORE_KEY);
+      }
+    }
   } catch (e) {}
   if (!sessionKey) {
     sessionKey =
@@ -68,7 +85,7 @@
 
   // --- mount host + Shadow DOM (full style isolation) ---
   var host = document.createElement('div');
-  host.setAttribute('data-crewnest-widget', '');
+  host.setAttribute('data-clerknest-widget', '');
   host.style.cssText = 'all:initial;position:fixed;z-index:2147483000;';
   document.body.appendChild(host);
   var root = host.attachShadow({ mode: 'open' });
@@ -143,7 +160,7 @@
     '<button class="close" aria-label="Close chat">' + CLOSE_ICON + '</button>' +
     '</div>' +
     '<div class="messages" aria-live="polite"></div>' +
-    '<div class="branding">Powered by CrewNest</div>' +
+    '<div class="branding">Powered by ClerkNest</div>' +
     '<div class="footer">' +
     '<textarea rows="1" placeholder="Type a message…" aria-label="Message"></textarea>' +
     '<button class="send" aria-label="Send">' + SEND_ICON + '</button>' +
@@ -160,7 +177,7 @@
   var closeBtn = panel.querySelector('.close');
 
   // --- plan-gated referral badge (docs/19 G1) ---------------------------------
-  // Default (and fail-open) is the static "Powered by CrewNest" text already in
+  // Default (and fail-open) is the static "Powered by ClerkNest" text already in
   // the markup. Paid tenants get it removed; free tenants get it upgraded to a
   // referral link. A fetch failure just leaves the static text — never blocks chat.
   (function loadBranding() {
@@ -183,7 +200,7 @@
           a.setAttribute('href', url);
           a.setAttribute('target', '_blank');
           a.setAttribute('rel', 'noopener noreferrer');
-          a.textContent = 'Powered by CrewNest';
+          a.textContent = 'Powered by ClerkNest';
           brandingEl.textContent = '';
           brandingEl.appendChild(a);
         }

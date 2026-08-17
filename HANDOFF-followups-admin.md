@@ -1,7 +1,7 @@
 # HANDOFF — Customer Follow-ups + Admin-Copilot Actions (+ signup/caps audit)
 
-**Author:** Opus (design pass). **Implementer:** Sonnet. **Repo:** `src/crewnest/` (Next 16 + Supabase,
-live on Vercel `crewnest-rouge.vercel.app`, GitHub CD — pushing `main` deploys prod).
+**Author:** Opus (design pass). **Implementer:** Sonnet. **Repo:** `src/clerknest/` (Next 16 + Supabase,
+live on Vercel `clerknest-rouge.vercel.app`, GitHub CD — pushing `main` deploys prod).
 
 This doc is self-contained. Read the referenced files before writing code; do **not** rebuild anything
 listed under "Already built." Three work items, independent — do them in order, `tsc` + `build` green after
@@ -184,7 +184,7 @@ select cron.schedule(
   '*/15 * * * *',
   $$
   select net.http_get(
-    url     := 'https://<PROD_DOMAIN>/api/cron/follow-ups',   -- e.g. crewnest-rouge.vercel.app or the custom domain
+    url     := 'https://<PROD_DOMAIN>/api/cron/follow-ups',   -- e.g. clerknest-rouge.vercel.app or the custom domain
     headers := jsonb_build_object(
       'Authorization',
       'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'follow_ups_cron_secret')

@@ -11,7 +11,7 @@ export default async function SignupPage({
 
   return (
     <AuthShell
-      title="Create your CrewNest account"
+      title="Create your ClerkNest account"
       description="We'll set up your AI employee from what you just built in the demo."
       whatNext="We'll email you a short code to confirm your account — no link to click, just type it in."
       footer={

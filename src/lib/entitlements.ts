@@ -37,7 +37,7 @@ export interface PlanEntitlements {
   maxMessagesPerConversation: number;
   /** How many channels (WhatsApp/Messenger/Instagram/web) may be connected at once. */
   maxChannels: number;
-  /** The owner-facing "personal AI assistant" (the CrewAI Copilot). */
+  /** The owner-facing "personal AI assistant" (the ClerkAI Copilot). */
   hasCopilot: boolean;
 }
 

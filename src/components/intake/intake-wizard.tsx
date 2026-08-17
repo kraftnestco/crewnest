@@ -682,9 +682,17 @@ export function IntakeWizard({
       {submitError && <p className="text-sm text-destructive">{submitError}</p>}
 
       <div className="flex items-center justify-between">
-        <Button type="button" variant="outline" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}>
-          Back
-        </Button>
+        {/* Omitted rather than disabled on the first step. A greyed-out Back
+            with nowhere to go reads as a broken control, and people click it
+            repeatedly waiting for something to happen. The empty span keeps
+            Next pinned right so the row doesn't shift on step change. */}
+        {step > 0 ? (
+          <Button type="button" variant="outline" onClick={() => setStep((s) => Math.max(0, s - 1))}>
+            Back
+          </Button>
+        ) : (
+          <span />
+        )}
         {step < LAST_STEP ? (
           <Button type="button" onClick={() => setStep((s) => Math.min(LAST_STEP, s + 1))}>
             Next

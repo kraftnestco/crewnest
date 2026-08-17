@@ -47,7 +47,7 @@ export const cancelAppointmentTool: ToolExecutor = {
       return { ok: false, message: `Appointment #${appointment_number} can no longer be cancelled.` };
     }
 
-    // CrewNest-side cancellation is the source of truth and happens first — it
+    // ClerkNest-side cancellation is the source of truth and happens first — it
     // is what frees the slot via the partial unique index.
     await appointments.setStatus(appointment.id, 'cancelled');
 

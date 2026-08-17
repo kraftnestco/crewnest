@@ -1,15 +1,30 @@
 import Link from 'next/link';
+import {
+  AlertTriangle,
+  CircleDollarSign,
+  Frown,
+  MessageSquareOff,
+  WalletCards,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
+import { HomeIcon, type HomeIconTone } from '@/components/home-icon';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { formatDateTime } from '@/lib/format-date';
 import { getSystemHealth } from '@/services/systemHealth';
 
-const HEALTH_CARDS = [
-  { key: 'failedDeliveries', label: 'Failed deliveries' },
-  { key: 'failedPayments', label: 'Failed payments' },
-  { key: 'unhappyCustomers', label: 'Unhappy customers' },
-  { key: 'cancellationRisk', label: 'At risk of cancelling' },
-  { key: 'costAlertsUnread', label: 'Cost-cap alerts' },
-] as const;
+const HEALTH_CARDS: {
+  key: 'failedDeliveries' | 'failedPayments' | 'unhappyCustomers' | 'cancellationRisk' | 'costAlertsUnread';
+  label: string;
+  icon: LucideIcon;
+  tone: HomeIconTone;
+}[] = [
+  { key: 'failedDeliveries', label: 'Failed deliveries', icon: MessageSquareOff, tone: 'orange' },
+  { key: 'failedPayments', label: 'Failed payments', icon: WalletCards, tone: 'sky' },
+  { key: 'unhappyCustomers', label: 'Unhappy customers', icon: Frown, tone: 'violet' },
+  { key: 'cancellationRisk', label: 'At risk of cancelling', icon: AlertTriangle, tone: 'amber' },
+  { key: 'costAlertsUnread', label: 'Cost-cap alerts', icon: CircleDollarSign, tone: 'rose' },
+];
 
 /** docs/20 Part 1 — read-only triage dashboard over signals that already exist; no new table, no migration. */
 export default async function SystemHealthPage() {
@@ -39,12 +54,17 @@ export default async function SystemHealthPage() {
             return (
               <div
                 key={c.key}
-                className={`rounded-xl p-4 ring-1 ${
+                className={`flex items-center gap-3 rounded-xl p-4 ring-1 ${
                   count > 0 ? 'bg-card ring-foreground/10' : 'bg-card/40 text-muted-foreground ring-foreground/5'
                 }`}
               >
-                <p className={`text-2xl font-semibold ${count === 0 ? 'text-muted-foreground' : ''}`}>{count}</p>
-                <p className="mt-1 text-xs">{c.label}</p>
+                <HomeIcon icon={c.icon} tone={c.tone} className="size-9" />
+                <div className="min-w-0">
+                  <p className={`text-2xl font-semibold tabular-nums ${count === 0 ? 'text-muted-foreground' : ''}`}>
+                    {count}
+                  </p>
+                  <p className="mt-0.5 text-xs">{c.label}</p>
+                </div>
               </div>
             );
           })}
@@ -71,7 +91,7 @@ export default async function SystemHealthPage() {
                       </Link>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {new Date(row.createdAt).toLocaleString()}
+                      {formatDateTime(row.createdAt)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -107,7 +127,7 @@ export default async function SystemHealthPage() {
                       {n.body && <p className="mt-0.5 text-xs text-muted-foreground">{n.body}</p>}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {new Date(n.createdAt).toLocaleString()}
+                      {formatDateTime(n.createdAt)}
                     </TableCell>
                   </TableRow>
                 ))}

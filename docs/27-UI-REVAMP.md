@@ -1,7 +1,7 @@
 # 27 — UI Revamp (implementation spec)
 
 **Status:** ready to implement. **Audience:** Sonnet.
-**Supersedes:** the standalone `crewnest-ui-revamp-guide.md`. Where the two disagree, this file wins —
+**Supersedes:** the standalone `clerknest-ui-revamp-guide.md`. Where the two disagree, this file wins —
 it was written against the tree at `ca8a93a`, the earlier guide was written against screenshots.
 
 Read `docs/README.md` → `01-ARCHITECTURE` → `02-SECURITY` → `19-PREMIUM-UI-AND-GROWTH` first.
@@ -13,7 +13,7 @@ This file assumes the locked decisions in `CLAUDE.md`, especially **#2, zero sec
 
 ### 0.1 The complexity doctrine (read this before every task)
 
-CrewNest sells to two owners at once: a shop owner who has never configured software, and a
+ClerkNest sells to two owners at once: a shop owner who has never configured software, and a
 technical operator who wants depth. Serving both does **not** mean a "simple / advanced" toggle —
 that doubles the surface area and tells the non-technical owner they are in the wrong mode.
 
@@ -241,7 +241,7 @@ Insert between Features and Pricing. Two cards, side by side on desktop, stacked
 - **Left, muted card — "Right now"**: four pains, short and concrete, in the owner's own words.
   Draw from the FAQ copy already in `page.tsx:70-95` so the voice matches. e.g. *"Answering the same
   price question forty times a day."*
-- **Right, `--stage-deep` card — "With CrewNest"**: the four corresponding gains, each a plain
+- **Right, `--stage-deep` card — "With ClerkNest"**: the four corresponding gains, each a plain
   outcome, not a feature name.
 
 This is the single highest-converting section pattern for a non-technical audience: it sells the
@@ -290,8 +290,8 @@ highlighted card reads as guidance rather than a second button.
 
 The `<h1>` becomes the **purpose**, not the wordmark:
 
-- Login: `Sign in to CrewNest` (h1) with the logomark above it as an image, not a heading.
-- Signup: `Create your CrewNest account`.
+- Login: `Sign in to ClerkNest` (h1) with the logomark above it as an image, not a heading.
+- Signup: `Create your ClerkNest account`.
 
 A centred card containing only a logo and two fields is the visual grammar of a phishing page. This
 one change removes most of that read.
@@ -307,7 +307,7 @@ Replace the centred `max-w-sm` card with a two-column layout on `lg+`:
 
 ### A3 — Say what happens next
 
-Above the form, one line: *"Use the email your CrewNest setup was sent to."* Under the submit
+Above the form, one line: *"Use the email your ClerkNest setup was sent to."* Under the submit
 button, the support route. Every auth screen must answer "what if this doesn't work".
 
 ### A4 — Keep the OTP-not-link decision, and explain it
@@ -342,7 +342,7 @@ paragraph. Lead with it.
 
 - Promote the "You never need to share passwords or API keys with us" line to a **bordered callout at
   the top of the screen**, with a link to a new `/security` page explaining, in the owner's language,
-  exactly what CrewNest can and cannot see.
+  exactly what ClerkNest can and cannot see.
 - Replace the flat "requested" state with a **visible three-step tracker**: Requested → We're
   connecting → Live. Show the timestamp of the last change. An owner who can see progress waits;
   an owner staring at an unchanged checkbox assumes it broke.
@@ -452,9 +452,9 @@ Needs attention                              ← ALWAYS, all plans/roles
   · one row per item, human sentence + one action
   · or "Nothing needs you right now." when clear
 ──────────────────────────────────────────
-Your crew                                    ← strip, below the queue
+Your clerks                                    ← strip, below the queue
 ──────────────────────────────────────────
-Ask CrewAI                                   ← Copilot: Growth+ admin
+Ask ClerkAI                                   ← Copilot: Growth+ admin
   (or the upgrade teaser below Growth — existing copy is good)
 ──────────────────────────────────────────
 Last 30 days                                 ← stats, tiered per 7.2
@@ -497,7 +497,7 @@ Rename `Inventory` → `My Stock` in `dashboard-nav.tsx:37` (`shortLabel` alread
 proves the product is working, which is orders this month for a product business and appointments
 booked for a service one. The rest drop to a compact row. One hero number per screen.
 
-### 7.5 "Your crew" strip
+### 7.5 "Your clerks" strip
 
 Per the product decision: the AI-employee metaphor lives on the marketing page, in onboarding, and as
 a **strip below the needs-attention queue** — never as the greeting.
@@ -583,7 +583,7 @@ Three changes:
 
 1. **Say why, in the inbox.** When a session is handed off with reason `length_limit`, the
    conversation pane shows a banner: *"This chat reached your plan's limit of 20 messages. Reply
-   yourself, or upgrade to let CrewAI keep going."* — with the upgrade link. Today the owner sees an
+   yourself, or upgrade to let ClerkAI keep going."* — with the upgrade link. Today the owner sees an
    unexplained handoff. The reason is already stored; surface it.
 2. **Give a non-destructive reset.** *Erase customer data* must not be the recovery path for a quota.
    Add an explicit owner action — "Let the AI continue this chat" — that resets the counted window
@@ -610,7 +610,7 @@ From the earlier guide, deliberately **not** doing:
   phone behaviour and the current spec doesn't give it one.
 - **A five-colour sentiment palette.** Two semantic colours plus neutral is the ceiling until there
   is a demonstrated need. More colours is more to learn.
-- **Renaming the product.** Keep CrewNest. Add a tagline instead.
+- **Renaming the product.** Keep ClerkNest. Add a tagline instead.
 - **Hex tokens.** See §0.3.
 
 ---

@@ -17,7 +17,7 @@ export const displayFont = Bricolage_Grotesque({
  * headings (`.font-hero-display`). Big Shoulders, loaded as the full variable
  * font so `.font-hero-display` (globals.css) can dial in the Display-cut
  * optical size via `font-variation-settings`. Deliberately NOT the wordmark
- * font — the "CrewNest" logo has its own `logoFont` below so the two can be
+ * font — the "ClerkNest" logo has its own `logoFont` below so the two can be
  * tuned independently.
  */
 export const heroFont = Big_Shoulders({
@@ -27,7 +27,7 @@ export const heroFont = Big_Shoulders({
 });
 
 /**
- * Logo/wordmark font — used by `.font-logo` on the "CrewNest" lockup ONLY
+ * Logo/wordmark font — used by `.font-logo` on the "ClerkNest" lockup ONLY
  * (sidebar, marketing nav/footer, mobile topbar) and nowhere else. Baloo 2 is
  * a rounded, thick display face for a warm, brand-forward wordmark; carried at
  * a bold weight (see `.font-logo` in globals.css).

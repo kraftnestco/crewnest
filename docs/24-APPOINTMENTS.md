@@ -21,7 +21,7 @@ it, the same way `create_order` works for product businesses.
 | **A — own link** | Business already has a Zoom room / Meet room / physical address | Their fixed link or address, attached to every booking |
 | **B — Cal.com** | Business has nothing | A fresh Google Meet URL minted per booking via Cal.com |
 
-**CrewNest owns scheduling in BOTH paths.** Availability, slot computation, conflict prevention and
+**ClerkNest owns scheduling in BOTH paths.** Availability, slot computation, conflict prevention and
 the appointments table are ours. Cal.com is a *meeting-link generator* for path B and nothing more.
 
 ### 1.1 Why Cal.com does not own scheduling — the decisive constraint
@@ -29,7 +29,7 @@ the appointments table are ours. Cal.com is a *meeting-link generator* for path 
 Verified live 2026-08-03 against a real Cal.com account: the API works end to end (slots → book →
 Meet URL → cancel, all confirmed). Letting Cal.com own scheduling would genuinely be less code.
 
-It is still wrong here, for one reason: **CrewNest owns ONE Cal.com account for all tenants.** Cal.com
+It is still wrong here, for one reason: **ClerkNest owns ONE Cal.com account for all tenants.** Cal.com
 availability is a property of that account, so every tenant would share one calendar. Two different
 businesses booking "Tuesday 3pm" would collide with each other — a defect that appears the moment
 there are two service tenants, and gets worse from there.
@@ -38,7 +38,7 @@ Per-tenant Cal.com accounts would fix it, but that means every business owner cr
 an account during onboarding, which defeats the point of path B (it exists precisely for businesses
 that have nothing).
 
-So: CrewNest computes slots per tenant from that tenant's own hours; Cal.com is called only to mint a
+So: ClerkNest computes slots per tenant from that tenant's own hours; Cal.com is called only to mint a
 link for a booking that has *already* been decided.
 
 ---
@@ -180,15 +180,15 @@ timeZone, language } }`. The response carries `meetingUrl` (also mirrored in `lo
 messaging on WhatsApp/Instagram has given us a name and a phone number, never an email, and asking for
 one mid-booking is friction for something they don't need.
 
-**Decision: a single fixed CrewNest address (`CALCOM_ATTENDEE_EMAIL`) is used for every booking**, with
+**Decision: a single fixed ClerkNest address (`CALCOM_ATTENDEE_EMAIL`) is used for every booking**, with
 the customer's real name passed through as `attendee.name` so Cal.com's records and the calendar event
 still identify them. Verified in testing: the Meet link does not depend on the attendee email being the
 customer's.
 
-**Consequence, accepted:** Cal.com's confirmation and reminder emails go to that CrewNest address, not
+**Consequence, accepted:** Cal.com's confirmation and reminder emails go to that ClerkNest address, not
 to the customer, and every booking across every tenant lands in one inbox. The customer's record of the
 appointment is the chat message the AI sends them, which is where they already are. If customers should
-later get an emailed confirmation, send it from CrewNest via the existing Resend integration rather
+later get an emailed confirmation, send it from ClerkNest via the existing Resend integration rather
 than by putting a real customer address into Cal.com — that keeps Cal.com as a pure link generator
 (§1.1) instead of a second source of truth about the booking.
 
@@ -222,7 +222,7 @@ Stated so they're deliberate omissions, not oversights:
   WhatsApp, an approved template (the same blocker as docs' follow-ups item). Deliberately deferred.
 - **No payment on booking.** Deposits would ride the existing payment methods; not wired here.
 - **No two-way calendar sync.** A tenant blocking time in their own Google Calendar is invisible to
-  CrewNest. Path B writes bookings *to* Cal.com's calendar, but nothing reads back.
+  ClerkNest. Path B writes bookings *to* Cal.com's calendar, but nothing reads back.
 - **No reschedule tool** (§4.1).
 
 ---

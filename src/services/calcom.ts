@@ -6,10 +6,10 @@ import { log } from '@/lib/log';
  * Cal.com client — a MEETING-LINK GENERATOR, nothing more
  * (docs/24-APPOINTMENTS.md §1.1, §4.4).
  *
- * CrewNest owns the schedule. Cal.com is called only after a slot has already
+ * ClerkNest owns the schedule. Cal.com is called only after a slot has already
  * been decided and inserted, purely to mint a Google Meet URL for tenants with
  * `bookingMode='calcom'`. We never read availability from Cal.com: one
- * CrewNest-owned Cal.com account means its availability is shared across every
+ * ClerkNest-owned Cal.com account means its availability is shared across every
  * tenant, so two businesses would collide on the same hour.
  *
  * API versions are PER-ENDPOINT and differ; a wrong one returns a confusing
@@ -57,7 +57,7 @@ export async function createBooking(args: {
         eventTypeId: Number(env.CALCOM_EVENT_TYPE_ID),
         attendee: {
           name: args.customerName,
-          // A single fixed CrewNest address, by decision (docs/24 §4.4):
+          // A single fixed ClerkNest address, by decision (docs/24 §4.4):
           // WhatsApp/Instagram customers have no email on file and asking for
           // one mid-booking is friction for something they don't need. The
           // customer's real NAME still rides along, so the calendar event
@@ -67,7 +67,7 @@ export async function createBooking(args: {
           timeZone: args.timeZone,
           language: 'en',
         },
-        metadata: { source: 'crewnest' },
+        metadata: { source: 'clerknest' },
       }),
       signal: AbortSignal.timeout(10_000),
     });
@@ -94,7 +94,7 @@ export async function createBooking(args: {
 
 /**
  * Cancel a Cal.com booking. Best-effort for the same reason as above: the
- * CrewNest-side cancellation is the source of truth, and a failure here leaves
+ * ClerkNest-side cancellation is the source of truth, and a failure here leaves
  * a stale Cal.com entry — untidy, but it must never block the customer's
  * cancellation from succeeding.
  */
@@ -113,12 +113,12 @@ export async function cancelBooking(uid: string, reason = 'Cancelled by customer
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
-      log.warn('[calcom] cancel failed — CrewNest-side cancellation still stands', { status: res.status });
+      log.warn('[calcom] cancel failed — ClerkNest-side cancellation still stands', { status: res.status });
       return false;
     }
     return true;
   } catch (err) {
-    log.warn('[calcom] cancel threw — CrewNest-side cancellation still stands', {
+    log.warn('[calcom] cancel threw — ClerkNest-side cancellation still stands', {
       error: err instanceof Error ? err.message : 'unknown',
     });
     return false;

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { formatDateTime } from '@/lib/format-date';
 import type { Database } from '@/types/database';
 import type { OrderAttachment, PaymentMethod, PendingClarification } from '@/types/domain';
 import {
@@ -553,7 +554,7 @@ export function ConversationPane({
                   </div>
                   <div className="flex justify-between gap-2">
                     <dt className="text-muted-foreground">Started</dt>
-                    <dd>{new Date(session.created_at).toLocaleString()}</dd>
+                    <dd>{formatDateTime(session.created_at)}</dd>
                   </div>
                   {session.alert_signal && (
                     <div className="flex justify-between gap-2">

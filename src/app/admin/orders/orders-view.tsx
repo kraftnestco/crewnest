@@ -1,16 +1,20 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { ChevronDown } from 'lucide-react';
+import { ArrowDownUp, CalendarDays, CheckCircle2, ChevronDown, Clock, PackageCheck, Phone, Zap, XCircle } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { PlatformBadge, type PlatformId } from '@/app/_landing/platform-icons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { PageHeader } from '@/components/page-header';
 import { StatusLegend, ORDER_STATUS_LEGEND } from '@/components/status-legend';
+import { formatDate, formatDateTime, formatTime } from '@/lib/format-date';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,24 +22,34 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type { Database } from '@/types/database';
 import type { OrderAttachment } from '@/types/domain';
 
 const ALL_CLIENTS = '__all__';
 import {
   approveOrderAction,
+  cancelOrderAction,
   fulfillOrderAction,
   getOrderMediaUrlAction,
   getOrdersPageAction,
   markPaidAction,
-  markRefundedAction,
   rejectOrderAction,
   rejectPaymentProofAction,
   type OrderRow,
+  type OrderSort,
   type OrderStatus,
 } from './actions';
 
 type PaymentStatus = Database['public']['Enums']['payment_status'];
+type Platform = Database['public']['Enums']['platform'];
 
 const PAYMENT_STATUS_BADGE: Record<PaymentStatus, 'default' | 'outline' | 'secondary' | 'destructive'> = {
   unpaid: 'outline',
@@ -51,6 +65,43 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
   gateway: 'Online',
 };
 
+const PLATFORM_DISPLAY: Record<
+  Exclude<Platform, 'voice'>,
+  { badge: PlatformId; label: string }
+> = {
+  whatsapp: { badge: 'whatsapp', label: 'WhatsApp' },
+  facebook: { badge: 'messenger', label: 'Messenger' },
+  instagram: { badge: 'instagram', label: 'Instagram' },
+  web: { badge: 'web', label: 'Website' },
+};
+
+function OrderPlatform({ platform, compact = false }: { platform: Platform | null; compact?: boolean }) {
+  if (!platform) return <span>—</span>;
+
+  if (platform === 'voice') {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-lg bg-violet-500 text-white">
+          <Phone className="size-3" aria-hidden />
+        </span>
+        <span className={compact ? 'sr-only' : undefined}>Voice</span>
+      </span>
+    );
+  }
+
+  const display = PLATFORM_DISPLAY[platform];
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <PlatformBadge
+        platform={display.badge}
+        className="size-6 rounded-lg shadow-none"
+        iconClassName="size-3"
+      />
+      <span className={compact ? 'sr-only' : undefined}>{display.label}</span>
+    </span>
+  );
+}
+
 type TenantRow = Pick<Database['public']['Tables']['tenants']['Row'], 'id' | 'business_name'>;
 
 const STATUS_FILTERS: Array<{ value: OrderStatus | 'all'; label: string }> = [
@@ -61,12 +112,37 @@ const STATUS_FILTERS: Array<{ value: OrderStatus | 'all'; label: string }> = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
+const SORT_OPTIONS: Array<{ value: OrderSort; label: string }> = [
+  { value: 'date_desc', label: 'Date: newest first' },
+  { value: 'date_asc', label: 'Date: oldest first' },
+  { value: 'price_asc', label: 'Price: low to high' },
+  { value: 'price_desc', label: 'Price: high to low' },
+];
+
 const STATUS_BADGE: Record<OrderStatus, 'default' | 'outline' | 'secondary' | 'destructive'> = {
   pending: 'outline',
   confirmed: 'default',
   fulfilled: 'secondary',
   cancelled: 'destructive',
 };
+
+const STATUS_ICON: Record<OrderStatus, { icon: LucideIcon; className: string }> = {
+  pending: { icon: Clock, className: 'text-amber-500' },
+  // Filled primary badge, so the icon has to inherit the badge's foreground.
+  confirmed: { icon: CheckCircle2, className: 'text-current' },
+  fulfilled: { icon: PackageCheck, className: 'text-emerald-500' },
+  cancelled: { icon: XCircle, className: 'text-destructive' },
+};
+
+function OrderStatusBadge({ status }: { status: OrderStatus }) {
+  const { icon: Icon, className } = STATUS_ICON[status];
+  return (
+    <Badge variant={STATUS_BADGE[status]} className="shrink-0 gap-1 capitalize">
+      <Icon className={cn('size-3.5', className)} aria-hidden />
+      {status}
+    </Badge>
+  );
+}
 
 function itemsSummary(items: unknown): string {
   if (!Array.isArray(items)) return '—';
@@ -76,6 +152,40 @@ function itemsSummary(items: unknown): string {
       return `${item.name ?? '?'} ×${item.qty ?? 1}`;
     })
     .join(', ');
+}
+
+function sortOrders(rows: OrderRow[], sort: OrderSort): OrderRow[] {
+  return [...rows].sort((a, b) => {
+    if (sort === 'date_asc' || sort === 'date_desc') {
+      const delta = Date.parse(a.created_at) - Date.parse(b.created_at);
+      return sort === 'date_asc' ? delta : -delta;
+    }
+
+    // Orders without a total (quotes/custom requests) always follow priced
+    // orders, regardless of direction, matching the server's nullsLast order.
+    if (a.amount_total === null && b.amount_total === null) return Date.parse(b.created_at) - Date.parse(a.created_at);
+    if (a.amount_total === null) return 1;
+    if (b.amount_total === null) return -1;
+    const delta = a.amount_total - b.amount_total;
+    return sort === 'price_asc' ? delta : -delta;
+  });
+}
+
+function OrderField({
+  label,
+  children,
+  className,
+}: {
+  label: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn('min-w-0 rounded-lg bg-muted/80 px-2.5 py-2 ring-1 ring-foreground/10', className)}>
+      <p className="mb-0.5 text-[0.625rem] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
+      <div className="min-w-0 whitespace-normal break-words text-sm">{children}</div>
+    </div>
+  );
 }
 
 type OrderItemLike = { name?: string; qty?: number; customization?: string };
@@ -202,7 +312,7 @@ function FulfilledOrderDetail({ order }: { order: OrderRow }) {
         </div>
       )}
       {order.review_submitted_at && (
-        <p className="text-xs text-muted-foreground">Submitted {new Date(order.review_submitted_at).toLocaleString()}</p>
+        <p className="text-xs text-muted-foreground">Submitted {formatDateTime(order.review_submitted_at)}</p>
       )}
     </div>
   );
@@ -236,6 +346,75 @@ function FulfillAction({
   );
 }
 
+function CancelOrderButton({
+  order,
+  onCancelled,
+}: {
+  order: OrderRow;
+  onCancelled: (orderId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const [isActing, startActing] = useTransition();
+
+  function handleCancel() {
+    if (!reason.trim()) {
+      toast.error('Please provide a cancellation reason.');
+      return;
+    }
+
+    startActing(async () => {
+      try {
+        await cancelOrderAction(order.id, reason);
+        setOpen(false);
+        setReason('');
+        toast.success('Order cancelled and the customer was notified.');
+        onCancelled(order.id);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to cancel order.');
+      }
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next && !isActing) setReason('');
+      }}
+    >
+      <Button size="sm" variant="destructive" className="h-9 w-full" onClick={() => setOpen(true)}>
+        Cancel order
+      </Button>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Cancel this order?</DialogTitle>
+          <DialogDescription>
+            Tell the customer why it is being cancelled. This message will be sent to them.
+          </DialogDescription>
+        </DialogHeader>
+        <Textarea
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          placeholder="Cancellation reason"
+          aria-label="Cancellation reason"
+          rows={3}
+          disabled={isActing}
+        />
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isActing}>
+            Keep order
+          </Button>
+          <Button type="button" variant="destructive" onClick={handleCancel} disabled={isActing || !reason.trim()}>
+            {isActing ? 'Cancelling…' : 'Cancel and notify customer'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /** Fetches a short-TTL signed URL for one order attachment and renders it by kind (docs/10 §4/§5/§6.1). */
 function OrderAttachmentPreview({ orderId, attachment }: { orderId: string; attachment: OrderAttachment }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -263,7 +442,7 @@ function OrderAttachmentPreview({ orderId, attachment }: { orderId: string; atta
 
   if (attachment.kind === 'image') {
     // eslint-disable-next-line @next/next/no-img-element -- signed URL, not an optimizable static asset
-    return <img src={url} alt="Order attachment" className="max-h-32 rounded-lg object-contain" />;
+    return <img src={url} alt="Order attachment" className="max-h-32 max-w-full rounded-lg object-contain" />;
   }
   if (attachment.kind === 'audio') {
     return <audio controls src={url} className="h-8 max-w-full" />;
@@ -297,17 +476,6 @@ function PaymentCell({
     });
   }
 
-  function handleMarkRefunded() {
-    startActing(async () => {
-      try {
-        await markRefundedAction(order.id);
-        onDone('Order marked as refunded.');
-      } catch (err) {
-        onDone(err instanceof Error ? err.message : 'Failed to mark refunded.', true);
-      }
-    });
-  }
-
   function handleReject() {
     startActing(async () => {
       try {
@@ -319,34 +487,45 @@ function PaymentCell({
     });
   }
 
+  // Unpaid → only a Mark-paid button (no separate Unpaid badge). Paid → only
+  // the Paid label. Other statuses keep a status chip, with verify/reject
+  // actions when a proof is waiting.
+  const statusLabel =
+    order.payment_status === 'awaiting_verification'
+      ? 'Awaiting verification'
+      : order.payment_status.replace('_', ' ');
+
   return (
-    <div className="space-y-1">
-      <Badge variant={PAYMENT_STATUS_BADGE[order.payment_status]} className="capitalize">
-        {order.payment_status.replace('_', ' ')}
-      </Badge>
-      {order.payment_method && (
-        <div className="text-xs text-muted-foreground">
-          {PAYMENT_METHOD_LABEL[order.payment_method] ?? order.payment_method}
-          {order.amount_total !== null && ` · ${order.currency ?? ''} ${order.amount_total}`}
-        </div>
-      )}
-      {proof && (
-        <div className="max-w-[8rem]">
-          <OrderAttachmentPreview orderId={order.id} attachment={proof} />
-        </div>
-      )}
-      {/* Stacked, not side-by-side (docs: orders row width) — two buttons on one
-          line (Verify + Reject) was the widest thing in any row, forcing the
-          whole table wider than the viewport. A column can only ever be as
-          wide as its widest single button once they're stacked. */}
-      <div className="flex flex-col items-start gap-1 pt-0.5">
-        {order.payment_status === 'unpaid' && (
-          <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={handleMarkPaid} disabled={isActing}>
-            Mark paid
-          </Button>
+    <div className="flex min-w-0 items-start justify-between gap-2">
+      <div className="min-w-0 space-y-1">
+        {order.payment_method && (
+          <div className="text-xs text-muted-foreground">
+            {PAYMENT_METHOD_LABEL[order.payment_method] ?? order.payment_method}
+            {order.amount_total !== null && ` · ${order.currency ?? ''} ${order.amount_total}`}
+          </div>
         )}
-        {order.payment_status === 'awaiting_verification' && (
+        {proof && (
+          <div className="max-w-[8rem]">
+            <OrderAttachmentPreview orderId={order.id} attachment={proof} />
+          </div>
+        )}
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+        {order.payment_status === 'unpaid' ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2.5 text-xs"
+            onClick={handleMarkPaid}
+            disabled={isActing}
+          >
+            {isActing ? 'Saving…' : 'Mark paid'}
+          </Button>
+        ) : order.payment_status === 'awaiting_verification' ? (
           <>
+            <Badge variant={PAYMENT_STATUS_BADGE.awaiting_verification} className="capitalize">
+              Awaiting verification
+            </Badge>
             <Button
               size="sm"
               variant="outline"
@@ -368,17 +547,10 @@ function PaymentCell({
               Reject
             </Button>
           </>
-        )}
-        {order.payment_status === 'paid' && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 px-2 text-xs"
-            onClick={handleMarkRefunded}
-            disabled={isActing}
-          >
-            Mark refunded
-          </Button>
+        ) : (
+          <Badge variant={PAYMENT_STATUS_BADGE[order.payment_status]} className="capitalize">
+            {order.payment_status === 'paid' ? 'Paid' : statusLabel}
+          </Badge>
         )}
       </div>
     </div>
@@ -411,19 +583,18 @@ export function OrdersView({
    */
   initialTenantId?: string | null;
 }) {
-  // Full column count (desktop). On mobile most columns are `hidden`, so a
-  // detail row spanning this many cells would still stretch the table; the
-  // expanded rows below use a span that can't exceed the visible count.
-  const columnCount = showBusinessColumn ? 10 : 9;
   const [orders, setOrders] = useState(initialOrders);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>(initialStatus);
   const [tenantFilter, setTenantFilter] = useState<string>(initialTenantId ?? ALL_CLIENTS);
+  const [sortFilter, setSortFilter] = useState<OrderSort>('date_desc');
+  const [loadedCount, setLoadedCount] = useState(initialOrders.length);
   const [hasMore, setHasMore] = useState(initialOrders.length === 25);
   const [isPending, startTransition] = useTransition();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const statusFilterRef = useRef(statusFilter);
   const tenantFilterRef = useRef(tenantFilter);
+  const sortFilterRef = useRef(sortFilter);
 
   const tenantMap = useMemo(() => new Map(tenants.map((t) => [t.id, t.business_name])), [tenants]);
 
@@ -434,6 +605,10 @@ export function OrdersView({
   useEffect(() => {
     tenantFilterRef.current = tenantFilter;
   }, [tenantFilter]);
+
+  useEffect(() => {
+    sortFilterRef.current = sortFilter;
+  }, [sortFilter]);
 
   useEffect(() => {
     if (realtimeAccessToken) void supabase.realtime.setAuth(realtimeAccessToken);
@@ -451,11 +626,18 @@ export function OrdersView({
         const tenantMatch = tenantFilterRef.current === ALL_CLIENTS || row.tenant_id === tenantFilterRef.current;
         if (!statusMatch || !tenantMatch) return; // Filtered out of the current view — no toast, no row.
         toast.success(`New order from ${row.customer_name || 'a customer'}`);
-        setOrders((prev) => (prev.some((o) => o.id === row.id) ? prev : [row, ...prev]));
+        setOrders((prev) =>
+          prev.some((o) => o.id === row.id) ? prev : sortOrders([row, ...prev], sortFilterRef.current),
+        );
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
         const row = payload.new as OrderRow;
-        setOrders((prev) => prev.map((o) => (o.id === row.id ? row : o)));
+        setOrders((prev) =>
+          sortOrders(
+            prev.map((o) => (o.id === row.id ? row : o)),
+            sortFilterRef.current,
+          ),
+        );
       })
       .subscribe();
 
@@ -469,8 +651,9 @@ export function OrdersView({
     const tenantId = tenantFilter === ALL_CLIENTS ? null : tenantFilter;
     startTransition(async () => {
       try {
-        const page = await getOrdersPageAction({ status: next, tenantId });
+        const page = await getOrdersPageAction({ status: next, tenantId, sort: sortFilter });
         setOrders(page.orders);
+        setLoadedCount(page.orders.length);
         setHasMore(page.hasMore);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to load orders.');
@@ -483,8 +666,9 @@ export function OrdersView({
     const tenantId = next === ALL_CLIENTS ? null : next;
     startTransition(async () => {
       try {
-        const page = await getOrdersPageAction({ status: statusFilter, tenantId });
+        const page = await getOrdersPageAction({ status: statusFilter, tenantId, sort: sortFilter });
         setOrders(page.orders);
+        setLoadedCount(page.orders.length);
         setHasMore(page.hasMore);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to load orders.');
@@ -492,14 +676,37 @@ export function OrdersView({
     });
   }
 
-  function handleLoadMore() {
-    const oldest = orders[orders.length - 1];
-    if (!oldest) return;
+  function handleSortChange(next: string) {
+    const sort = next as OrderSort;
+    setSortFilter(sort);
     const tenantId = tenantFilter === ALL_CLIENTS ? null : tenantFilter;
     startTransition(async () => {
       try {
-        const page = await getOrdersPageAction({ status: statusFilter, tenantId, before: oldest.created_at });
-        setOrders((prev) => [...prev, ...page.orders]);
+        const page = await getOrdersPageAction({ status: statusFilter, tenantId, sort });
+        setOrders(page.orders);
+        setLoadedCount(page.orders.length);
+        setHasMore(page.hasMore);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to sort orders.');
+      }
+    });
+  }
+
+  function handleLoadMore() {
+    const tenantId = tenantFilter === ALL_CLIENTS ? null : tenantFilter;
+    startTransition(async () => {
+      try {
+        const page = await getOrdersPageAction({
+          status: statusFilter,
+          tenantId,
+          sort: sortFilter,
+          offset: loadedCount,
+        });
+        setOrders((prev) => {
+          const seen = new Set(prev.map((order) => order.id));
+          return sortOrders([...prev, ...page.orders.filter((order) => !seen.has(order.id))], sortFilter);
+        });
+        setLoadedCount((count) => count + page.orders.length);
         setHasMore(page.hasMore);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to load more orders.');
@@ -513,6 +720,17 @@ export function OrdersView({
     setExpandedId(null);
   }
 
+  function handleOrderCancelled(orderId: string) {
+    setOrders((current) => {
+      if (statusFilter !== 'all' && statusFilter !== 'cancelled') {
+        return current.filter((order) => order.id !== orderId);
+      }
+      return current.map((order) => (order.id === orderId ? { ...order, status: 'cancelled' } : order));
+    });
+    setLoadedCount((count) => Math.max(0, count - (statusFilter !== 'all' && statusFilter !== 'cancelled' ? 1 : 0)));
+    setExpandedId(null);
+  }
+
   return (
     <div className="space-y-6 p-4 lg:p-6">
       <PageHeader
@@ -522,7 +740,7 @@ export function OrdersView({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             {STATUS_FILTERS.map((f) => (
               <Button
                 key={f.value}
@@ -562,104 +780,109 @@ export function OrdersView({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              disabled={isPending}
+              aria-label="Sort orders"
+              className="flex items-center gap-1.5 rounded-md border bg-card px-2.5 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 disabled:pointer-events-none disabled:opacity-50"
+            >
+              <ArrowDownUp className="size-3.5 shrink-0 text-muted-foreground" />
+              <span>{SORT_OPTIONS.find((option) => option.value === sortFilter)?.label}</span>
+              <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-52">
+              <DropdownMenuRadioGroup value={sortFilter} onValueChange={handleSortChange}>
+                {SORT_OPTIONS.map((option) => (
+                  <DropdownMenuRadioItem key={option.value} value={option.value}>
+                    {option.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <StatusLegend items={ORDER_STATUS_LEGEND} />
       </div>
 
-      <div className="rounded-xl bg-card ring-1 ring-foreground/10 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Customer</TableHead>
-              {showBusinessColumn && <TableHead className="hidden lg:table-cell">Business</TableHead>}
-              <TableHead className="hidden md:table-cell">Items</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="hidden lg:table-cell">Payment</TableHead>
-              <TableHead className="hidden lg:table-cell">Platform</TableHead>
-              <TableHead className="hidden lg:table-cell" title="Whether the business owner was alerted about this order">Owner alert</TableHead>
-              <TableHead className="hidden md:table-cell">Placed</TableHead>
-              <TableHead className="hidden text-right lg:table-cell">Chat</TableHead>
-              <TableHead className="text-right">Review</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {orders.map((o) => (
-              <Fragment key={o.id}>
-                <TableRow>
-                  <TableCell className="font-medium">
+      <div className="space-y-2.5">
+        {orders.map((o) => (
+          <article key={o.id} className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
+            <div className="p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
                     {/* Same #N shown to the customer in their own confirmation/status
                         messages (admin/orders/actions.ts's orderLabel) — lets staff
                         reference an order by the number the customer actually has. */}
                     {o.order_number != null && (
-                      <span className="mr-1.5 text-xs font-normal text-muted-foreground">#{o.order_number}</span>
+                      <span className="text-xs font-normal text-muted-foreground">#{o.order_number}</span>
                     )}
-                    {o.customer_name || '—'}
-                    {o.customer_phone && (
-                      <div className="text-xs font-normal text-muted-foreground">{o.customer_phone}</div>
-                    )}
-                    {/*
-                      Mobile-only recap of the columns hidden below md/lg. The
-                      table had ten columns, so on a phone the useful fields sat
-                      off-screen behind a horizontal scroll that was awkward to
-                      reach. Rather than make staff drag sideways, the essentials
-                      ride here under the customer name, and the row stays
-                      expandable for the rest.
-                    */}
-                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal text-muted-foreground md:hidden">
-                      <span className="truncate">{itemsSummary(o.items)}</span>
-                      <span aria-hidden>·</span>
-                      <span>{new Date(o.created_at).toLocaleDateString()}</span>
-                      {o.platform && (
-                        <>
-                          <span aria-hidden>·</span>
-                          <span className="capitalize">{o.platform}</span>
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                  {showBusinessColumn && (
-                    <TableCell className="hidden lg:table-cell">{tenantMap.get(o.tenant_id) ?? 'Unknown'}</TableCell>
-                  )}
-                  <TableCell className="hidden max-w-xs truncate md:table-cell">{itemsSummary(o.items)}</TableCell>
-                  <TableCell>
-                    <Badge variant={STATUS_BADGE[o.status]} className="capitalize">
-                      {o.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    <PaymentCell order={o} onDone={handleActionDone} />
-                  </TableCell>
-                  <TableCell className="hidden capitalize lg:table-cell">{o.platform ?? '—'}</TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    {o.owner_notified_at ? (
-                      <Badge variant="secondary">Sent</Badge>
-                    ) : (
-                      <Badge variant="outline">Pending</Badge>
-                    )}
-                  </TableCell>
-                  {/* Two lines, not one long "8/7/2026, 12:43:09 AM" string —
-                      that single line was another of the widest cells in the
-                      row (docs: orders row width). Stacking date over time
-                      trades width for height, which is what a table wants. */}
-                  <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
-                    {new Date(o.created_at).toLocaleDateString()}
-                    <div className="text-[11px]">
-                      {new Date(o.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden text-right lg:table-cell">
                     {o.session_id ? (
                       <Link
                         href={`${chatBasePath}?session=${o.session_id}`}
-                        className="text-xs text-primary underline underline-offset-2"
+                        aria-label={`Open chat with ${o.customer_name || o.customer_phone || 'customer'}`}
+                        className="group min-w-0 rounded-sm font-semibold underline-offset-2 outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        View chat
+                        <span className="break-words group-hover:underline">
+                          {o.customer_name || '—'}
+                          {o.customer_phone && (
+                            <span className="font-normal text-muted-foreground group-hover:text-primary">
+                              {' '}
+                              - {o.customer_phone}
+                            </span>
+                          )}
+                        </span>
                       </Link>
                     ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
+                      <span className="min-w-0 break-words font-semibold">
+                        {o.customer_name || '—'}
+                        {o.customer_phone && (
+                          <span className="font-normal text-muted-foreground"> - {o.customer_phone}</span>
+                        )}
+                      </span>
                     )}
-                  </TableCell>
-                  <TableCell className="text-right">
+                  </div>
+                </div>
+                <OrderStatusBadge status={o.status} />
+              </div>
+
+              {/*
+                Column stacks (not a flat grid row) so Owner alert + Platform sit
+                flush under Items even when Payment is taller.
+              */}
+              <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                {showBusinessColumn && (
+                  <OrderField label="Business" className="sm:col-span-2 xl:col-span-3">
+                    {tenantMap.get(o.tenant_id) ?? 'Unknown'}
+                  </OrderField>
+                )}
+                <div className="flex min-w-0 flex-col gap-2 sm:col-span-2 xl:col-span-1">
+                  <OrderField label="Items">{itemsSummary(o.items)}</OrderField>
+                  <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
+                    <OrderField label="Owner alert">
+                      {o.owner_notified_at ? (
+                        <Badge variant="secondary">Sent</Badge>
+                      ) : (
+                        <Badge variant="outline">Pending</Badge>
+                      )}
+                    </OrderField>
+                    <OrderField label="Platform">
+                      <OrderPlatform platform={o.platform} />
+                    </OrderField>
+                  </div>
+                </div>
+                <div className="flex min-w-0 flex-col gap-2">
+                  <OrderField label="Payment">
+                    <PaymentCell order={o} onDone={handleActionDone} />
+                  </OrderField>
+                  <OrderField
+                    label={
+                      <span className="inline-flex items-center gap-1">
+                        <Zap className="size-3 text-amber-500" aria-hidden />
+                        Action
+                      </span>
+                    }
+                  >
                     {o.status === 'pending' ? (
                       <Button
                         size="sm"
@@ -679,35 +902,47 @@ export function OrdersView({
                         {expandedId === o.id ? 'Close' : 'Rating'}
                       </Button>
                     ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
+                      <span className="text-xs text-muted-foreground">No action needed</span>
                     )}
-                  </TableCell>
-                </TableRow>
-                {expandedId === o.id && o.status === 'pending' && (
-                  <TableRow>
-                    <TableCell colSpan={columnCount} className="bg-muted/30 p-0">
-                      <PendingOrderDetail order={o} onDone={handleActionDone} />
-                    </TableCell>
-                  </TableRow>
-                )}
-                {expandedId === o.id && o.status === 'fulfilled' && o.review_rating !== null && (
-                  <TableRow>
-                    <TableCell colSpan={columnCount} className="bg-muted/30 p-0">
-                      <FulfilledOrderDetail order={o} />
-                    </TableCell>
-                  </TableRow>
-                )}
-              </Fragment>
-            ))}
-            {orders.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={columnCount} className="py-8 text-center text-muted-foreground">
-                  No orders yet.
-                </TableCell>
-              </TableRow>
+                  </OrderField>
+                </div>
+                <div className="flex min-w-0 flex-col gap-2 self-start">
+                  <OrderField label="Placed">
+                    <div className="space-y-1 text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <CalendarDays className="size-3.5 shrink-0" aria-hidden />
+                        {formatDate(o.created_at)}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-xs">
+                        <Clock className="size-3.5 shrink-0" aria-hidden />
+                        {formatTime(o.created_at)}
+                      </span>
+                    </div>
+                  </OrderField>
+                  {o.status !== 'fulfilled' && o.status !== 'cancelled' && (
+                    <CancelOrderButton order={o} onCancelled={handleOrderCancelled} />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {expandedId === o.id && o.status === 'pending' && (
+              <div className="border-t bg-muted/30">
+                <PendingOrderDetail order={o} onDone={handleActionDone} />
+              </div>
             )}
-          </TableBody>
-        </Table>
+            {expandedId === o.id && o.status === 'fulfilled' && o.review_rating !== null && (
+              <div className="border-t bg-muted/30">
+                <FulfilledOrderDetail order={o} />
+              </div>
+            )}
+          </article>
+        ))}
+        {orders.length === 0 && (
+          <div className="rounded-xl bg-card py-12 text-center text-sm text-muted-foreground ring-1 ring-foreground/10">
+            No orders yet.
+          </div>
+        )}
       </div>
 
       {hasMore && (

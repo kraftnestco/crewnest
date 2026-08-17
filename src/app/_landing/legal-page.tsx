@@ -23,7 +23,7 @@ export function LegalPage({
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-6 py-3">
           <Link href="/" className="flex items-center gap-2">
             <Logomark />
-            <span className="font-logo text-lg">CrewNest</span>
+            <span className="font-logo text-lg">ClerkNest</span>
           </Link>
           <Link href="/" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
             Back to home
@@ -41,7 +41,7 @@ export function LegalPage({
 
       <footer className="border-t border-border">
         <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-3 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:justify-between">
-          <p>© {new Date().getFullYear()} CrewNest</p>
+          <p>© {new Date().getFullYear()} ClerkNest</p>
           <div className="flex gap-4">
             <Link href="/security" className="hover:text-foreground">
               Security

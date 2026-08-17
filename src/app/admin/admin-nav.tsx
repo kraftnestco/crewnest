@@ -18,7 +18,7 @@ import { SidebarNav, MobileTabBar, type NavItem } from '@/components/app-nav';
  * sidebar and the mobile bottom tab bar. Overview is exact-match so it doesn't
  * stay lit on every /admin child route. Ordered daily-driver-first: with 9
  * items here, `MobileTabBar` shows the first four (Overview/Health/Clients/
- * Live Inbox) directly and collapses the rest — Orders, Appointments, CrewAI,
+ * Live Inbox) directly and collapses the rest — Orders, Appointments, ClerkAI,
  * Analytics, Settings — into its "More" menu (docs/27 §7A D-08), never off
  * the nav entirely.
  */
@@ -29,7 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/chat', label: 'Live Inbox', shortLabel: 'Inbox', icon: MessagesSquare },
   { href: '/admin/orders', label: 'Orders', icon: Package },
   { href: '/admin/appointments', label: 'Appointments', shortLabel: 'Bookings', icon: CalendarDays },
-  { href: '/admin/copilot', label: 'CrewAI', icon: Sparkles },
+  { href: '/admin/copilot', label: 'ClerkAI', icon: Sparkles },
   { href: '/admin/analytics', label: 'Analytics', icon: ChartNoAxesColumn },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];

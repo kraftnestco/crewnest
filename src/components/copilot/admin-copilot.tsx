@@ -132,7 +132,7 @@ export function AdminCopilot() {
       <div className="flex shrink-0 items-center gap-3 border-b px-4 py-3">
         <CopilotAvatar />
         <div className="min-w-0">
-          <p className="font-heading text-sm font-semibold leading-tight">CrewAI</p>
+          <p className="font-heading text-sm font-semibold leading-tight">ClerkAI</p>
           <p className="truncate text-xs text-muted-foreground">Ask about any client or customer across the agency</p>
         </div>
       </div>

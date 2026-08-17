@@ -1,4 +1,4 @@
-# CrewNest — Client Dashboard Content Inventory
+# ClerkNest — Client Dashboard Content Inventory
 
 Everything the **client dashboard** (`/dashboard`) contains, for redesign/mockup purposes. This is the
 **business owner's** view of their own single business — not the agency `/admin` view.
@@ -28,7 +28,7 @@ Also: a user can belong to **more than one business**, which adds a business swi
 
 ## 1. Global shell (present on every page)
 
-**Brand area** — CrewNest logo/wordmark, byline "By KraftNest Automations", and a badge showing the
+**Brand area** — ClerkNest logo/wordmark, byline "By KraftNest Automations", and a badge showing the
 **active business name**.
 
 **Business switcher** — only when the user belongs to multiple businesses.
@@ -56,7 +56,7 @@ upgrade request, low stock, system alert.
 **User area** — signed-in name/email, sign out.
 
 **Blocked state** — a user not yet linked to any business sees only: "Access pending / Your account
-isn't linked to a business yet. Ask your CrewNest contact to grant access." + Sign out.
+isn't linked to a business yet. Ask your ClerkNest contact to grant access." + Sign out.
 
 ---
 
@@ -70,7 +70,7 @@ exhausted: "You've used all of today's new-conversation slots. New customers won
 tomorrow." + "Upgrade for more". The exhausted state is an alarm state.
 
 **AI assistant upsell** (owners below Growth) — occupies the space where the Copilot would be: "Get
-your own AI assistant / On Growth, CrewAI helps you run {Business} — update your catalogue, hours, and
+your own AI assistant / On Growth, ClerkAI helps you run {Business} — update your catalogue, hours, and
 prices just by describing the change." + "See plans".
 
 **Needs attention** — four counters, each linking to the relevant page:
@@ -91,7 +91,7 @@ Zero-state: "All clear ✓". Counters at zero are visually de-emphasised.
 assistant is almost ready", with: "This is where your customer chats and orders will show up once
 conversations start coming in."
 
-**The Copilot ("CrewAI")** — for owners **on Growth or Pro** this *is* the home surface, with the stats above folded into
+**The Copilot ("ClerkAI")** — for owners **on Growth or Pro** this *is* the home surface, with the stats above folded into
 it. See §10.
 
 ---
@@ -194,7 +194,7 @@ on. Technical setup (API keys, tokens) is always handled by our team."
 
 ### Channels
 "Where your AI assistant talks to customers." — WhatsApp · Messenger · Instagram · Website chat, each
-connected or not. **Request a new channel**, listing what CrewNest needs from the owner, plus
+connected or not. **Request a new channel**, listing what ClerkNest needs from the owner, plus
 "Anything we should know? (optional)" — e.g. "our WhatsApp number is +92 300 1234567".
 
 ### Business details — a 9-step wizard with progress ("Step 3 of 9")
@@ -238,7 +238,7 @@ Low-stock triggers a notification that deep-links here.
 
 ---
 
-## 10. The Copilot — "CrewAI" *(owner only, Growth & Pro only)*
+## 10. The Copilot — "ClerkAI" *(owner only, Growth & Pro only)*
 
 A chat that edits the business in plain language. Tagline: "Describe a change in plain words and I'll
 draft it for you." Empty state: "How can I help with {Business}?" Input: "Tell me what changed…"
@@ -264,7 +264,7 @@ secrets, plan and billing, spend caps, account active state, data-retention sett
 
 ## 11. Billing *(owner only)*
 
-"Manage your CrewNest plan and payment method."
+"Manage your ClerkNest plan and payment method."
 
 **Payment-failed alert** — "Payment failed / We couldn't charge your card. Update your payment method
 to keep your plan active."

@@ -145,7 +145,7 @@ signature → 401; duplicate id → single reply.
 - **8.2 `app/api/chat/route.ts`** — `runtime='nodejs'`. Resolve tenant by public key, check origin
   allowlist + rate limit, run `aiOrchestrator`, return the reply (stream optional). Scope CORS to the
   origin.
-- **8.3 `public/embed/widget.js`** — self-contained launcher+panel; reads `data-crewnest-key`; POSTs
+- **8.3 `public/embed/widget.js`** — self-contained launcher+panel; reads `data-clerknest-key`; POSTs
   to `/api/chat`; persists `sessionKey`.
 **Done when:** a local test HTML with the script gets replies; a disallowed origin is rejected.
 

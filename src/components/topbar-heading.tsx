@@ -48,7 +48,7 @@ export function TopbarHeadingSlot() {
   const heading = ctx?.heading;
   if (!heading) return null;
   return (
-    <p className="hidden min-w-0 truncate py-0.5 font-hero-display text-2xl leading-tight lg:block">{heading.title}</p>
+    <p className="hidden min-w-0 truncate py-0.5 font-page-heading text-2xl leading-tight lg:block">{heading.title}</p>
   );
 }
 

@@ -3,8 +3,8 @@ import { LegalPage } from '@/app/_landing/legal-page';
 import { SUPPORT_EMAIL } from '@/lib/constants';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — CrewNest',
-  description: 'How CrewNest collects, uses, and protects data for businesses and their customers.',
+  title: 'Privacy Policy — ClerkNest',
+  description: 'How ClerkNest collects, uses, and protects data for businesses and their customers.',
 };
 
 
@@ -12,9 +12,9 @@ export default function PrivacyPage() {
   return (
     <LegalPage title="Privacy Policy" updated="July 23, 2026">
       <p>
-        CrewNest (&quot;we&quot;, &quot;us&quot;) provides businesses with an AI assistant that answers their
+        ClerkNest (&quot;we&quot;, &quot;us&quot;) provides businesses with an AI assistant that answers their
         customers across WhatsApp, Facebook Messenger, Instagram, and website chat. This policy explains what
-        data we handle, why, and the choices available to businesses using CrewNest (&quot;clients&quot;) and
+        data we handle, why, and the choices available to businesses using ClerkNest (&quot;clients&quot;) and
         their customers.
       </p>
 
@@ -22,7 +22,7 @@ export default function PrivacyPage() {
       <ul>
         <li>
           <strong>Account information</strong> — name, email address, and login credentials for people who sign
-          in to CrewNest.
+          in to ClerkNest.
         </li>
         <li>
           <strong>Business information</strong> — the catalogue, prices, hours, policies, and brand voice a
@@ -63,7 +63,7 @@ export default function PrivacyPage() {
       <p>
         Conversation and order data is retained so clients can serve their customers and keep business records.
         Clients can erase an individual customer&apos;s conversation data from their dashboard. To request
-        deletion of your data — as a client or as a customer of a business using CrewNest — contact us at{' '}
+        deletion of your data — as a client or as a customer of a business using ClerkNest — contact us at{' '}
         <a className="underline hover:text-foreground" href={`mailto:${SUPPORT_EMAIL}`}>
           {SUPPORT_EMAIL}
         </a>{' '}
@@ -73,7 +73,7 @@ export default function PrivacyPage() {
       <h2>Security</h2>
       <p>
         Access credentials and platform tokens are stored encrypted. Data is isolated per business, and access
-        is restricted to the business it belongs to and to CrewNest staff who operate the service.
+        is restricted to the business it belongs to and to ClerkNest staff who operate the service.
       </p>
 
       <h2>Changes</h2>

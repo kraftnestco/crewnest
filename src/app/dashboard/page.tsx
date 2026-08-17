@@ -1,19 +1,31 @@
+import type { ReactNode } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle2, ChevronRight, Rocket } from 'lucide-react';
+import {
+  BarChart3,
+  CheckCircle2,
+  ChevronRight,
+  MessageCircle,
+  MessagesSquare,
+  Rocket,
+  Sparkles,
+  Users,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { getTenantAttentionItems, getCrewCards } from '@/services/overview';
+import { getTenantAttentionItems, getClerkCards } from '@/services/overview';
 import { countSessionsToday } from '@/services/sessions';
 import { entitlementsFor, isLimited } from '@/lib/entitlements';
 import { PAYWALL_PLANS } from '@/services/demo/plans';
 import { formatRelativeTime } from '@/lib/relative-time';
 import { PageHeader } from '@/components/page-header';
 import { EmptyState } from '@/components/empty-state';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { BusinessCopilot } from '@/components/copilot/business-copilot';
-import { CrewStrip } from './crew-strip';
+import { ClerkStrip } from './clerk-strip';
+import { HomeIcon } from '@/components/home-icon';
 
 const CHANNEL_LABELS: Record<string, string> = {
   whatsapp: 'WhatsApp',
@@ -21,6 +33,77 @@ const CHANNEL_LABELS: Record<string, string> = {
   instagram: 'Instagram',
   web: 'Website chat',
 };
+
+function QuotaRing({ remaining, total }: { remaining: number; total: number }) {
+  const pct = total <= 0 ? 0 : Math.min(1, Math.max(0, remaining / total));
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  const offset = c * (1 - pct);
+
+  // The caption sits under the ring, not inside it — "Conversations left" can't
+  // fit within the stroke at any legible size.
+  return (
+    <div className="flex shrink-0 flex-col items-center gap-1" aria-hidden>
+      <div className="relative size-[4.5rem]">
+        <svg viewBox="0 0 64 64" className="size-full -rotate-90">
+          <circle
+            cx="32"
+            cy="32"
+            r={r}
+            fill="none"
+            strokeWidth="5"
+            className="stroke-muted"
+          />
+          <circle
+            cx="32"
+            cy="32"
+            r={r}
+            fill="none"
+            strokeWidth="5"
+            strokeLinecap="round"
+            strokeDasharray={c}
+            strokeDashoffset={offset}
+            className="stroke-primary transition-[stroke-dashoffset]"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-base font-semibold tabular-nums">
+            {remaining}/{total}
+          </span>
+        </div>
+      </div>
+      <span className="text-[0.65rem] whitespace-nowrap text-muted-foreground">Conversations left</span>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  icon,
+  tone = 'primary',
+  large = false,
+}: {
+  label: string;
+  value: ReactNode;
+  icon: LucideIcon;
+  tone?: 'primary' | 'success';
+  large?: boolean;
+}) {
+  return (
+    <Card className={large ? 'bg-[color-mix(in_oklch,var(--card),var(--primary)_6%)] ring-1 ring-primary/15' : undefined}>
+      <CardContent className="flex items-center gap-3 p-4">
+        <HomeIcon icon={icon} tone={tone} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className={large ? 'mt-0.5 text-4xl font-semibold tabular-nums' : 'mt-0.5 text-2xl font-semibold tabular-nums'}>
+            {value}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 /**
  * Client home (docs/14 §6, reshaped by docs/27 §7.1). One Home for every plan
@@ -119,11 +202,11 @@ export default async function DashboardHomePage() {
   // for everyone else.
   const showBookings = tenant?.business_type === 'service' && Boolean(tenant?.booking_enabled);
   const heroStat = showBookings
-    ? { label: 'Appointments booked this month', value: appointmentsThisMonth ?? 0 }
-    : { label: 'Orders this month', value: ordersThisMonth ?? 0 };
+    ? { label: 'Appointments booked this month', value: appointmentsThisMonth ?? 0, icon: BarChart3 }
+    : { label: 'Orders this month', value: ordersThisMonth ?? 0, icon: BarChart3 };
   const secondaryStats = [
-    { label: 'Customers answered this month', value: conversationsHandled30d ?? 0 },
-    { label: 'Chats happening today', value: activeConversations ?? 0 },
+    { label: 'Customers answered this month', value: conversationsHandled30d ?? 0, icon: Users },
+    { label: 'Chats happening today', value: activeConversations ?? 0, icon: MessageCircle },
   ];
   const hasActivity = heroStat.value > 0 || secondaryStats.some((s) => s.value > 0);
 
@@ -131,7 +214,7 @@ export default async function DashboardHomePage() {
 
   // docs/27 §7.5 — needs `showBookings`/`connectedChannels`, both only known
   // once the tenant row is back, so this can't join the query batch above.
-  const crewCards = await getCrewCards(activeTenantId, {
+  const clerkCards = await getClerkCards(activeTenantId, {
     hasChannels: connectedChannels.length > 0,
     showBookings,
   });
@@ -139,39 +222,53 @@ export default async function DashboardHomePage() {
   return (
     <div className="flex flex-col gap-6 p-4 lg:p-6">
       <PageHeader
-        title={`Welcome back${tenant ? `, ${tenant.business_name}` : ''}`}
+        title={`Welcome back${tenant ? `, ${tenant.business_name}` : ''} 👋`}
         description="Here's what's happening with your AI assistant."
       />
 
       {showQuotaBanner && (
         <div
-          className={`rounded-xl p-4 text-sm ring-1 ${
+          className={`flex items-center gap-3 rounded-xl p-4 ring-1 ${
             quotaRemaining === 0
               ? 'bg-destructive/10 text-destructive ring-destructive/20'
               : 'bg-card ring-foreground/10'
           }`}
         >
-          <span className="font-medium">{planLabel} plan:</span>{' '}
-          {quotaRemaining === 0
-            ? "You've used all of today's new-conversation slots. New customers won't get a reply until tomorrow."
-            : `${quotaRemaining} of ${dailyCap} new conversations left today.`}{' '}
-          <Link href="/dashboard/billing" className="underline underline-offset-2">
-            {quotaRemaining === 0 ? 'Upgrade for more' : 'See plans'}
-          </Link>
+          <HomeIcon icon={MessagesSquare} tone={quotaRemaining === 0 ? 'primary' : 'primary'} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">{planLabel} plan</p>
+            <p className={`mt-0.5 text-sm ${quotaRemaining === 0 ? '' : 'text-muted-foreground'}`}>
+              {quotaRemaining === 0
+                ? "You've used all of today's new-conversation slots. New customers won't get a reply until tomorrow."
+                : `${quotaRemaining} of ${dailyCap} new conversations left today.`}
+            </p>
+            <Link
+              href="/dashboard/billing"
+              className={`mt-1 inline-block text-sm underline-offset-2 hover:underline ${
+                quotaRemaining === 0 ? 'underline' : 'text-primary'
+              }`}
+            >
+              {quotaRemaining === 0 ? 'Upgrade for more →' : 'See plans →'}
+            </Link>
+          </div>
+          {quotaRemaining > 0 && <QuotaRing remaining={quotaRemaining} total={dailyCap} />}
         </div>
       )}
 
       {/* docs/27 §7.1/§7.2 — the needs-attention queue, always visible regardless
           of plan or role, one human sentence + one action per row. */}
       <div>
-        <h2 className="mb-2 font-heading text-sm font-semibold">Needs attention</h2>
         {attentionItems.items.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-xl bg-card p-4 text-sm text-muted-foreground ring-1 ring-foreground/10">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
-            Nothing needs you right now.
+          <div className="flex items-center gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+            <HomeIcon icon={CheckCircle2} tone="success" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Needs attention</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">Nothing needs you right now.</p>
+            </div>
           </div>
         ) : (
           <>
+            <h2 className="mb-2 font-heading text-sm font-semibold">Needs attention</h2>
             <Card>
               <CardContent className="divide-y p-0">
                 {attentionItems.items.map((item) => (
@@ -207,22 +304,25 @@ export default async function DashboardHomePage() {
       </div>
 
       {/* docs/27 §7.5 — one card per capability actually switched on, below the queue. */}
-      <CrewStrip cards={crewCards} now={now} />
+      <ClerkStrip cards={clerkCards} now={now} />
 
       {/* Owners below Growth see what the AI assistant is, rather than nothing
           where the Copilot would be — the upgrade path is the point of the tier. */}
       {canEditBusiness && !hasCopilot && (
-        <div className="rounded-xl bg-card p-4 text-sm ring-1 ring-foreground/10">
-          <p className="font-medium">Get your own AI assistant</p>
-          <p className="mt-1 text-muted-foreground">
-            On Growth, CrewAI helps you run {tenant?.business_name ?? 'your business'} — update your
-            catalogue, hours, and prices just by describing the change.
-          </p>
+        <div className="flex items-center gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+          <HomeIcon icon={Sparkles} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">Get your own AI assistant</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              On Growth, ClerkAI helps you run {tenant?.business_name ?? 'your business'} — update your
+              catalogue, hours, and prices just by describing the change.
+            </p>
+          </div>
           <Link
             href="/dashboard/billing"
-            className="mt-2 inline-block text-primary underline underline-offset-2"
+            className="shrink-0 rounded-lg border border-primary/40 px-3 py-1.5 text-sm text-primary transition-colors hover:bg-primary/10"
           >
-            See plans
+            See plans →
           </Link>
         </div>
       )}
@@ -250,34 +350,23 @@ export default async function DashboardHomePage() {
           />
         ) : (
           <div className="flex flex-col gap-4">
-            <Card className="bg-[color-mix(in_oklch,var(--card),var(--primary)_6%)] ring-1 ring-primary/15">
-              <CardHeader>
-                <CardTitle className="text-sm font-normal text-muted-foreground">{heroStat.label}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-4xl font-semibold tabular-nums">{heroStat.value}</p>
-              </CardContent>
-            </Card>
+            <StatCard
+              label={heroStat.label}
+              value={heroStat.value}
+              icon={heroStat.icon}
+              large
+            />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {secondaryStats.map((t) => (
-                <Card key={t.label}>
-                  <CardHeader>
-                    <CardTitle className="text-sm font-normal text-muted-foreground">{t.label}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-semibold tabular-nums">{t.value}</p>
-                  </CardContent>
-                </Card>
+                <StatCard key={t.label} label={t.label} value={t.value} icon={t.icon} />
               ))}
               {avgRating !== null && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm font-normal text-muted-foreground">
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">
                       Average rating ({ratings.length} review{ratings.length === 1 ? '' : 's'})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-semibold">
+                    </p>
+                    <p className="mt-0.5 text-2xl font-semibold">
                       {avgRating.toFixed(1)}/5{' '}
                       <span className="text-base text-amber-500">
                         {'★'.repeat(Math.round(avgRating))}

@@ -75,14 +75,14 @@ export async function AppTopbar({
               biggest consumer of a phone topbar's width — with it there, the
               business name in the switcher crushed to "Kraf…". Hidden on the
               narrowest screens; the mark alone still carries the brand. */}
-          <span className="hidden font-logo text-lg min-[420px]:inline lg:hidden">CrewNest</span>
+          <span className="hidden font-logo text-lg min-[420px]:inline lg:hidden">ClerkNest</span>
           {/* Portal indicator: only shown on the agency side. The client
               dashboard IS the business's own shell (not "the client view" of
               something else to the owner using it), and a business name
               already sits right next to this (the switcher/label below), so
               a literal "Client" pill was redundant chrome, not information. */}
           {accountKind === 'agency' && (
-            <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] font-medium text-primary">
+            <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] font-medium text-primary lg:hidden">
               Agency
             </span>
           )}

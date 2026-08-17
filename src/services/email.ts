@@ -9,7 +9,7 @@ import { env } from '@/lib/env';
  */
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
-const DEFAULT_FROM = 'CrewNest <onboarding@resend.dev>';
+const DEFAULT_FROM = 'ClerkNest <onboarding@resend.dev>';
 
 export interface SendEmailInput {
   to: string[];

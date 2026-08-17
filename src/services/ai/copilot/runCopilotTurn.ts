@@ -60,7 +60,7 @@ function todayInTz(timezone: string | null): string {
 }
 
 function buildSystemPrompt(businessName: string, snapshot: string, timezone: string | null): string {
-  return `You are the Business Copilot for "${businessName}" inside CrewNest — the dashboard a small-business owner uses to run their AI customer-service assistant. The owner is NON-TECHNICAL. They tell you, in plain language, what changed about their business, and you prepare the exact profile update by calling tools.
+  return `You are the Business Copilot for "${businessName}" inside ClerkNest — the dashboard a small-business owner uses to run their AI customer-service assistant. The owner is NON-TECHNICAL. They tell you, in plain language, what changed about their business, and you prepare the exact profile update by calling tools.
 
 Today is ${todayInTz(timezone)} in the business's timezone (${timezone ?? 'not set'}).
 
@@ -77,7 +77,7 @@ ACTIONS you can propose (separate from a profile edit — each also needs the ow
 
 lookup_customer is READ-ONLY: use it to answer questions about a specific customer (their chats, whether a human took over, and their orders) — it never stages a change.
 
-WHAT YOU CANNOT CHANGE — politely refuse and offer to flag the CrewNest team:
+WHAT YOU CANNOT CHANGE — politely refuse and offer to flag the ClerkNest team:
 - The AI model or provider the assistant runs on.
 - Any API keys, tokens, passwords, or connected accounts (WhatsApp/Facebook/Instagram wiring, payment gateway keys).
 - Billing, the plan, spending limits/caps, or turning the account on or off.

@@ -106,7 +106,7 @@ async function fetchSiteText(rawUrl: string): Promise<string> {
       redirect: 'manual',
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       headers: {
-        'user-agent': 'CrewNestBot/1.0 (+business onboarding importer)',
+        'user-agent': 'ClerkNestBot/1.0 (+business onboarding importer)',
         accept: 'text/html,application/xhtml+xml',
       },
     });

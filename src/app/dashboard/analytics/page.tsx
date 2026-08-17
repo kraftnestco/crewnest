@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/page-header';
-import { getVolume, getDeflection, getSentimentHealth, getCsat } from '@/services/analytics';
+import { AnalyticsInfoDialog } from '@/components/analytics-info-dialog';
+import { getVolume, getDeflection, getSentimentHealth, getCsat, getCommerceMetrics } from '@/services/analytics';
 import type { DateRange, SentimentBucket } from '@/services/analytics';
 
 /**
@@ -55,25 +56,53 @@ export default async function DashboardAnalyticsPage({
   const activeTenantId = resolveActiveTenant(ctx, cookieStore.get('cn_active_tenant')?.value);
   if (!activeTenantId) redirect('/dashboard');
 
-  // eslint-disable-next-line react-hooks/purity -- Server Component render runs once per request; wall-clock cutoff is intentional
   const to = new Date();
   const from = new Date(to.getTime() - selectedRange.days * 24 * 60 * 60 * 1000);
   const range: DateRange = { from: from.toISOString(), to: to.toISOString() };
 
-  const [volume, deflection, sentiment, csat] = await Promise.all([
+  const [volume, deflection, sentiment, csat, commerce] = await Promise.all([
     getVolume(activeTenantId, range),
     getDeflection(activeTenantId, range),
     getSentimentHealth(activeTenantId, range),
     getCsat(activeTenantId, range),
+    getCommerceMetrics(activeTenantId, range),
   ]);
 
   const headlineCards = [
-    { label: 'Conversations started', value: volume.conversationsStarted.toLocaleString() },
-    { label: 'Messages handled', value: volume.messagesHandled.toLocaleString() },
-    { label: 'Deflection rate', value: formatPercent(deflection.deflectionRate) },
+    {
+      label: 'Conversations started',
+      value: volume.conversationsStarted.toLocaleString(),
+      tone: 'bg-primary/20 ring-primary/35',
+    },
+    {
+      label: 'Messages handled',
+      value: volume.messagesHandled.toLocaleString(),
+      tone: 'bg-violet-500/20 ring-violet-500/35 dark:bg-violet-400/20 dark:ring-violet-400/35',
+    },
+    {
+      label: 'Deflection rate',
+      value: formatPercent(deflection.deflectionRate),
+      tone: 'bg-emerald-500/20 ring-emerald-500/35 dark:bg-emerald-400/20 dark:ring-emerald-400/35',
+    },
     {
       label: 'CSAT',
       value: csat.sufficientSample ? `${csat.averageRating!.toFixed(1)} / 5` : 'Not enough data yet',
+      tone: 'bg-amber-500/20 ring-amber-500/35 dark:bg-amber-400/20 dark:ring-amber-400/35',
+    },
+    {
+      label: 'Orders / bookings secured',
+      value: commerce.outcomesSecured.toLocaleString(),
+      tone: 'bg-sky-500/20 ring-sky-500/35 dark:bg-sky-400/20 dark:ring-sky-400/35',
+    },
+    {
+      label: 'Handoff rate',
+      value: formatPercent(deflection.deflectionRate === null ? null : 1 - deflection.deflectionRate),
+      tone: 'bg-orange-500/20 ring-orange-500/35 dark:bg-orange-400/20 dark:ring-orange-400/35',
+    },
+    {
+      label: 'Payment conversion',
+      value: formatPercent(commerce.paymentConversionRate),
+      tone: 'bg-teal-500/20 ring-teal-500/35 dark:bg-teal-400/20 dark:ring-teal-400/35',
     },
   ];
 
@@ -99,7 +128,7 @@ export default async function DashboardAnalyticsPage({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {headlineCards.map((c) => (
-          <Card key={c.label}>
+          <Card key={c.label} className={c.tone}>
             <CardHeader>
               <CardTitle className="text-sm font-normal text-muted-foreground">{c.label}</CardTitle>
             </CardHeader>
@@ -136,6 +165,7 @@ export default async function DashboardAnalyticsPage({
           )}
         </div>
       </div>
+      <AnalyticsInfoDialog audience="client" />
     </div>
   );
 }

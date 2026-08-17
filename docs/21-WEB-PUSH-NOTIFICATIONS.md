@@ -74,7 +74,7 @@ Therefore the subscribe UI has **three states**, not two:
 1. **Supported & installable now** (Android/desktop, or iOS already installed to home screen) →
    normal Enable/Disable toggle.
 2. **iOS Safari, not yet installed** → no dead toggle. Show the actual instruction: *"On iPhone,
-   add CrewNest to your Home Screen first (Share → Add to Home Screen), then turn this on."*
+   add ClerkNest to your Home Screen first (Share → Add to Home Screen), then turn this on."*
 3. **Genuinely unsupported browser** → a plain "not supported on this browser" line.
 
 Detection is capability-based (`'serviceWorker' in navigator && 'PushManager' in window`) plus a

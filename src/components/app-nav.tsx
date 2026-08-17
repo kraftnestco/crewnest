@@ -32,7 +32,7 @@ function isActivePath(pathname: string, item: NavItem): boolean {
   return item.exact ? pathname === item.href : pathname.startsWith(item.href);
 }
 
-/** Desktop sidebar nav — icon + label rows with an emerald active accent bar. */
+/** Desktop sidebar nav — icon + label rows with a rose active accent bar. */
 export function SidebarNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
 

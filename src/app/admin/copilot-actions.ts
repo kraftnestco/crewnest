@@ -58,7 +58,7 @@ export interface AdminCopilotTurnResult {
 }
 
 function buildSystemPrompt(snapshot: string): string {
-  return `You are the CrewNest Admin Copilot for the agency operator who runs many client businesses on CrewNest. You help them triage what is happening across all clients.
+  return `You are the ClerkNest Admin Copilot for the agency operator who runs many client businesses on ClerkNest. You help them triage what is happening across all clients.
 
 You have a READ-ONLY operational snapshot below covering agency-wide totals and ONLY the clients currently needing attention — it is NOT the full client list, so a healthy/quiet client will not appear in it. That is expected and does NOT mean the client doesn't exist. For anything beyond the snapshot — a specific client's full status, or a specific customer's chats/orders by name or phone number on ANY client — call lookup_tenant or lookup_customer, which search ALL clients regardless of what's in the snapshot. Use them whenever the operator names a client or a customer, rather than concluding from the snapshot alone that a client isn't found.
 

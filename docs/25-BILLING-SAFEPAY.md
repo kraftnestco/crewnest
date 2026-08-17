@@ -1,7 +1,7 @@
 # 25 — Local Billing (Safepay, Pakistan)
 
 Adds a **second SaaS-billing provider** alongside Stripe (docs/22), so Pakistani tenants can pay for
-CrewNest itself. Built 2026-08-06.
+ClerkNest itself. Built 2026-08-06.
 
 > **⏸️ STATUS: ON HOLD (2026-08-06).** Code-complete, migration `0045` applied and verified, but
 > **no payment has ever been processed** — blocked on creating real Stripe *and* Safepay merchant
@@ -10,7 +10,7 @@ CrewNest itself. Built 2026-08-06.
 > writing more code.**
 
 > **Not to be confused with docs/11.** Doc 11 is a *tenant's customer* paying for an order (COD /
-> manual transfer / gateway). This doc is **CrewNest charging its tenants** for the product. Different
+> manual transfer / gateway). This doc is **ClerkNest charging its tenants** for the product. Different
 > money, different tables, different providers.
 
 ---

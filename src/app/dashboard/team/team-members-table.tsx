@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { formatDate } from '@/lib/format-date';
 import type { TeamMember } from '@/services/teamMembers';
 import { changeMemberRoleAction, removeMemberAction } from './actions';
 
@@ -97,7 +98,7 @@ export function TeamMembersTable({
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(member.joinedAt).toLocaleDateString()}
+                    {formatDate(member.joinedAt)}
                   </TableCell>
                   <TableCell>
                     {manageable && (

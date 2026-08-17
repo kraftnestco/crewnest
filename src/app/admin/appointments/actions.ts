@@ -86,7 +86,7 @@ export async function cancelAppointmentAction(appointmentId: string): Promise<vo
     throw new Error('Only a booked appointment can be cancelled.');
   }
 
-  // CrewNest-side is the source of truth and goes first — it's what releases
+  // ClerkNest-side is the source of truth and goes first — it's what releases
   // the slot via the partial unique index (migration 0042).
   await appointmentService.setStatus(appointmentId, 'cancelled');
 
@@ -94,7 +94,7 @@ export async function cancelAppointmentAction(appointmentId: string): Promise<vo
   if (appointment.calcom_booking_uid) {
     const ok = await calcom.cancelBooking(appointment.calcom_booking_uid, 'Cancelled by the business');
     if (!ok) {
-      log.warn('[appointments] Cal.com cancel failed — CrewNest cancellation stands', { appointmentId });
+      log.warn('[appointments] Cal.com cancel failed — ClerkNest cancellation stands', { appointmentId });
     }
   }
 

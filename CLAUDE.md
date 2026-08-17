@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# CrewNest — Project Guide
+# ClerkNest — Project Guide
 
 Multi-tenant SaaS giving businesses "AI employees": an AI that answers customer messages across
 WhatsApp, Facebook/Instagram DMs, and website chat — grounded in each client's catalogue and brand
