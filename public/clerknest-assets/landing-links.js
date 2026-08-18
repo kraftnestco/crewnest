@@ -48,6 +48,18 @@
     }
   });
 
+  // Mobile drawer fallback: some bundled nav entries are rendered as button-ish
+  // elements instead of stable anchors. Force Sign in to open the auth route.
+  document.addEventListener("click", (event) => {
+    const target = event.target.closest("a, button, [role='button']");
+    if (!target) return;
+    const label = target.textContent?.trim().replace(/\s+/g, " ") ?? "";
+    if (label !== "Sign in") return;
+
+    event.preventDefault();
+    window.location.assign("/login?redirect=/dashboard");
+  });
+
   /*
     Header: fully transparent and unblurred at the top of the page, easing into
     its tinted/blurred state across the first NAV_FADE_DISTANCE of scroll. The
