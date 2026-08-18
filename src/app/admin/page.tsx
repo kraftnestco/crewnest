@@ -87,7 +87,7 @@ export default async function OverviewPage() {
             All clear ✓
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
             {NEEDS_ATTENTION_CARDS.map((c) => {
               const count = needsAttention[c.key];
               return (
@@ -114,7 +114,7 @@ export default async function OverviewPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {stats.map((s) => (
           <Card key={s.label}>
             <CardContent className="flex items-center gap-3 p-4">

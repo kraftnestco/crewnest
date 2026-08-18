@@ -102,20 +102,29 @@ export function InventoryPanel({
           available.
         </p>
       ) : (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span>{tracked.length} tracked</span>
-          {low > 0 && (
-            <>
-              <span aria-hidden>·</span>
-              <span className="text-pending-text">{low} low</span>
-            </>
-          )}
-          {out > 0 && (
-            <>
-              <span aria-hidden>·</span>
-              <span className="text-destructive">{out} out of stock</span>
-            </>
-          )}
+        <div className="grid grid-cols-3 gap-3">
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Tracked</p>
+              <p className="mt-0.5 text-2xl font-semibold tabular-nums">{tracked.length}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Low stock</p>
+              <p className={`mt-0.5 text-2xl font-semibold tabular-nums ${low > 0 ? 'text-pending-text' : ''}`}>
+                {low}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Out of stock</p>
+              <p className={`mt-0.5 text-2xl font-semibold tabular-nums ${out > 0 ? 'text-destructive' : ''}`}>
+                {out}
+              </p>
+            </CardContent>
+          </Card>
         </div>
       )}
 

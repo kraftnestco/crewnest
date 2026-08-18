@@ -139,7 +139,7 @@ export function AccountForm({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="grid gap-6 lg:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-normal text-muted-foreground">Profile</CardTitle>
@@ -205,7 +205,7 @@ export function AccountForm({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle className="text-sm font-normal text-muted-foreground">Notification preferences</CardTitle>
         </CardHeader>
@@ -218,8 +218,8 @@ export function AccountForm({
             <Switch checked={emailEnabled} onCheckedChange={handleToggleEmail} disabled={isSavingPrefs} />
           </div>
           <PushToggle vapidPublicKey={vapidPublicKey} />
-          <div className="max-w-md space-y-2.5 border-t pt-3">
-            <p className="text-xs font-medium text-muted-foreground">Notification types</p>
+          <div className="grid grid-cols-1 gap-2.5 border-t pt-3 sm:grid-cols-2">
+            <p className="text-xs font-medium text-muted-foreground sm:col-span-2">Notification types</p>
             {types.map((type) => (
               <div key={type} className="flex items-center justify-between gap-4">
                 <p className="text-sm">{TYPE_LABELS[type]}</p>

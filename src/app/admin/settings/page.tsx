@@ -1,7 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { env } from '@/lib/env';
 import { DEFAULT_LLM_MODEL, DEFAULT_LLM_PROVIDER, WIDGET_RATE_LIMIT } from '@/lib/constants';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/page-header';
@@ -31,21 +31,18 @@ export default async function SettingsPage() {
     <div className="space-y-6 p-4 lg:p-6">
       <PageHeader title="Settings" description="Agency-level configuration and access." />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-normal text-muted-foreground">System info</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {systemInfo.map((row) => (
-              <div key={row.label} className="flex flex-col gap-0.5">
-                <dt className="text-xs text-muted-foreground">{row.label}</dt>
-                <dd className="text-sm font-medium">{row.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {systemInfo.map((row) => (
+          <Card key={row.label}>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">{row.label}</p>
+              <p className="mt-1 truncate text-sm font-medium" title={row.value}>
+                {row.value}
+              </p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       <div>
         <h2 className="mb-2 font-heading text-sm font-semibold">Platform admins</h2>

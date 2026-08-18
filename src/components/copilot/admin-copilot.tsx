@@ -149,7 +149,7 @@ export function AdminCopilot() {
                   invite/restock for a named client — you approve every change before it happens.
                 </p>
               </div>
-              <div className="grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="grid w-full max-w-md grid-cols-2 gap-2">
                 {SUGGESTIONS.map(({ label, icon: Icon }) => (
                   <button
                     key={label}

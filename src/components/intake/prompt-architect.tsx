@@ -91,7 +91,7 @@ export function PromptArchitect({
 
       <div className="flex flex-col gap-2">
         <Label>How should your assistant sound?</Label>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2">
           {TONE_OPTIONS.map((opt) => (
             <button
               key={opt.value}

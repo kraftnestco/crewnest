@@ -38,7 +38,7 @@ export function ClerkStrip({ cards, now }: { cards: ClerkCard[]; now: number }) 
   return (
     <div>
       <h2 className="mb-2 font-heading text-sm font-semibold">Your clerks</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {cards.map((card) => {
           const { icon, tone } = CLERK_ICON[card.key];
           return (

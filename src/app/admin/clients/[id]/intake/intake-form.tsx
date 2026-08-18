@@ -89,7 +89,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
         </CardHeader>
         <CardContent className="space-y-3">
           <input type="hidden" name="business_type" value={businessType} />
-          <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {BUSINESS_TYPE_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -285,6 +285,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
         </CardContent>
       </Card>
 
+      <div className="grid gap-6 lg:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle>5. Customer example media</CardTitle>
@@ -331,6 +332,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       <Card>
         <CardHeader>
@@ -404,6 +406,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
         </CardContent>
       </Card>
 
+      <div className="grid gap-6 xl:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle>8. Business hours</CardTitle>
@@ -490,6 +493,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
             <>
               <div className="flex flex-col gap-2">
                 <Label>Accepted methods</Label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {PAYMENT_METHOD_OPTIONS.map((opt) => {
                   const selected = paymentMethods.includes(opt.value);
                   return (
@@ -511,6 +515,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
                     </button>
                   );
                 })}
+                </div>
                 {paymentMethods.map((m) => (
                   <input key={m} type="hidden" name="payment_methods" value={m} />
                 ))}
@@ -563,6 +568,7 @@ export function IntakeForm({ tenant }: { tenant: IntakeTenant }) {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 

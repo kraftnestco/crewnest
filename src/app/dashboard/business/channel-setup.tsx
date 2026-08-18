@@ -264,7 +264,7 @@ export function ChannelSetup({
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           {CHANNELS.map((c) => {
             const isConnected = connections[c.value];
             const isPendingSetup = !isConnected && pendingSet.has(c.value);

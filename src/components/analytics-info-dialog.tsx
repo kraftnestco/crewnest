@@ -35,20 +35,27 @@ export function AnalyticsInfoDialog({ audience }: { audience: 'client' | 'admin'
 
   return (
     <Dialog>
-      <DialogTrigger
-        render={
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            className="fixed right-5 bottom-5 z-30 rounded-full bg-card shadow-lg"
-            aria-label="Explain analytics"
-            title="Explain analytics"
-          />
-        }
-      >
-        <Info className="size-4" />
-      </DialogTrigger>
+      {/*
+        Viewport FAB — Button folds className through cva and drops `fixed`,
+        so the wrapper owns positioning. Offset clears the in-flow mobile tab
+        bar; desktop clears the w-56 sidebar.
+      */}
+      <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 z-30 lg:bottom-6 lg:left-[calc(14rem+1.5rem)]">
+        <DialogTrigger
+          render={
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="size-11 rounded-full bg-card shadow-lg"
+              aria-label="Explain analytics"
+              title="Explain analytics"
+            />
+          }
+        >
+          <Info className="size-4" />
+        </DialogTrigger>
+      </div>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">What these analytics mean</DialogTitle>

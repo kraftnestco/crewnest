@@ -349,14 +349,14 @@ export default async function DashboardHomePage() {
             hint="This is where your customer chats and orders will show up once conversations start coming in."
           />
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="grid gap-3">
             <StatCard
               label={heroStat.label}
               value={heroStat.value}
               icon={heroStat.icon}
               large
             />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
               {secondaryStats.map((t) => (
                 <StatCard key={t.label} label={t.label} value={t.value} icon={t.icon} />
               ))}
