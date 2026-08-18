@@ -163,8 +163,11 @@
         .cn-mobile-hero > .max-w-7xl {
           display: flex !important;
           flex-direction: column !important;
-          min-height: 100svh;
-          min-height: 100dvh;
+          flex: 1 1 auto !important;
+          min-height: 0 !important;
+          justify-content: flex-end !important;
+          padding-top: 5.5rem !important;
+          padding-bottom: 1.25rem !important;
         }
         .cn-mobile-hero .cn-hero-visual {
           display: none !important;
