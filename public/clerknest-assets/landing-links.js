@@ -143,4 +143,80 @@
 
   window.addEventListener("scroll", scheduleHeaderPaint, { passive: true });
   window.addEventListener("resize", scheduleHeaderPaint, { passive: true });
+
+  /*
+    Mobile hero reference polish (user-provided screenshot):
+    lock the first dark hero to the same visual rhythm (headline/CTAs/trust row)
+    while keeping desktop untouched.
+  */
+  const MOBILE_BREAKPOINT = 768;
+  const HERO_STYLE_ID = "cn-mobile-hero-ref";
+
+  const ensureHeroStyle = () => {
+    if (document.getElementById(HERO_STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = HERO_STYLE_ID;
+    style.textContent = `
+      @media (max-width: 768px) {
+        section.cn-mobile-hero-ref {
+          background: #0d0b09 !important;
+          overflow: hidden;
+        }
+        section.cn-mobile-hero-ref h1 {
+          font-size: clamp(3.2rem, 13vw, 4.25rem) !important;
+          line-height: 0.96 !important;
+          letter-spacing: -0.04em !important;
+          max-width: 9.2ch !important;
+          margin-bottom: 0.55rem !important;
+        }
+        section.cn-mobile-hero-ref p {
+          font-size: 1.14rem !important;
+          line-height: 1.38 !important;
+        }
+        section.cn-mobile-hero-ref .cn-mobile-cta-primary,
+        section.cn-mobile-hero-ref .cn-mobile-cta-secondary {
+          width: min(100%, 18rem) !important;
+          min-height: 3.7rem !important;
+          border-radius: 1rem !important;
+          font-size: 1.02rem !important;
+          font-weight: 700 !important;
+          letter-spacing: -0.01em !important;
+        }
+        section.cn-mobile-hero-ref .cn-mobile-cta-primary {
+          margin-top: 0.35rem !important;
+        }
+        section.cn-mobile-hero-ref .cn-mobile-trust {
+          margin-top: 1rem !important;
+          font-size: 0.93rem !important;
+          opacity: 0.98 !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  };
+
+  const labelOf = (el) => (el?.textContent?.trim().replace(/\s+/g, " ") ?? "");
+
+  const applyMobileHeroReference = () => {
+    if (window.innerWidth > MOBILE_BREAKPOINT) return;
+    const hero = document.querySelector("section[data-navtheme='dark']");
+    if (!hero) return;
+    hero.classList.add("cn-mobile-hero-ref");
+
+    const controls = Array.from(hero.querySelectorAll("a,button,[role='button']"));
+    for (const node of controls) {
+      const label = labelOf(node);
+      if (label === "Meet ClerkNest") node.classList.add("cn-mobile-cta-primary");
+      if (label === "See how it works") node.classList.add("cn-mobile-cta-secondary");
+    }
+
+    const textNodes = Array.from(hero.querySelectorAll("p,span,div"));
+    const trust = textNodes.find((n) => /Loved by 500\+ salons, boutiques & clinics/i.test(labelOf(n)));
+    if (trust) trust.classList.add("cn-mobile-trust");
+  };
+
+  ensureHeroStyle();
+  applyMobileHeroReference();
+  window.addEventListener("resize", applyMobileHeroReference, { passive: true });
+  new MutationObserver(applyMobileHeroReference).observe(document.body, { childList: true, subtree: true });
 })();
