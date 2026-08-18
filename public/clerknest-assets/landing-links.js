@@ -174,8 +174,8 @@
           flex: 1 1 auto !important;
           min-height: 0 !important;
         }
-        /* Badge + headline stay at the top; subcopy/CTAs/trust sit at the bottom. */
-        .cn-mobile-hero .cn-hero-copy > :nth-child(3) {
+        /* Badge, headline, and subtitle stay at the top; CTAs/trust sit at the bottom. */
+        .cn-mobile-hero .cn-hero-copy > :nth-child(4) {
           margin-top: auto !important;
         }
         .cn-mobile-hero .cn-hero-visual {
