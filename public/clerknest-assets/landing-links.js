@@ -181,6 +181,21 @@
         .cn-mobile-hero .cn-hero-visual {
           display: none !important;
         }
+        .cn-mobile-hero .hero-photo {
+          background-image: url("/clerknest-assets/mobilehero.png") !important;
+          background-size: cover !important;
+          background-position: center center !important;
+          background-repeat: no-repeat !important;
+        }
+        /* Portrait art is already dark; keep a light scrim so type stays readable. */
+        .cn-mobile-hero .hero-photo + div {
+          background: linear-gradient(
+            180deg,
+            rgba(13, 11, 9, 0.55) 0%,
+            rgba(13, 11, 9, 0.18) 45%,
+            rgba(13, 11, 9, 0.58) 100%
+          ) !important;
+        }
       }
     `;
     document.head.appendChild(style);
