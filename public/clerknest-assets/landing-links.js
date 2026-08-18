@@ -143,4 +143,74 @@
 
   window.addEventListener("scroll", scheduleHeaderPaint, { passive: true });
   window.addEventListener("resize", scheduleHeaderPaint, { passive: true });
+
+  /*
+    Mobile first fold: copy stays left and compact; the dashboard animation
+    shrinks into the right column instead of stacking full-width underneath.
+    `zoom` is used so the scaled visual actually gives layout space back
+    (transform-scale would leave a huge empty hole).
+  */
+  const HERO_LAYOUT_ID = "cn-mobile-hero-layout";
+
+  const ensureHeroLayoutStyle = () => {
+    if (document.getElementById(HERO_LAYOUT_ID)) return;
+    const style = document.createElement("style");
+    style.id = HERO_LAYOUT_ID;
+    style.textContent = `
+      @media (max-width: 1023px) {
+        .cn-mobile-hero > .max-w-7xl {
+          display: grid !important;
+          grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+          align-items: start;
+          column-gap: 0.35rem;
+          padding-left: 0.9rem !important;
+          padding-right: 0.35rem !important;
+        }
+        .cn-mobile-hero .cn-hero-copy {
+          max-width: none !important;
+          min-width: 0;
+        }
+        .cn-mobile-hero .cn-hero-copy h1 {
+          font-size: 1.28rem !important;
+          line-height: 1.12 !important;
+          margin-bottom: 0.4rem !important;
+        }
+        .cn-mobile-hero .cn-hero-copy p {
+          font-size: 0.7rem !important;
+          line-height: 1.35 !important;
+          max-width: 100% !important;
+        }
+        .cn-mobile-hero .cn-hero-copy .flex.flex-col {
+          align-items: flex-start !important;
+        }
+        .cn-mobile-hero .cn-hero-copy a {
+          width: fit-content !important;
+          padding: 0.42rem 0.75rem !important;
+          font-size: 0.7rem !important;
+        }
+        .cn-mobile-hero .cn-hero-visual {
+          margin-top: 0.5rem !important;
+          justify-self: end;
+          overflow: hidden;
+          zoom: 0.36;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  };
+
+  const applyHeroLayout = () => {
+    const hero = document.querySelector("section[data-navtheme='dark']");
+    if (!hero) return;
+    hero.classList.add("cn-mobile-hero");
+    const inner = hero.querySelector(".max-w-7xl");
+    if (!inner || inner.children.length < 2) return;
+    inner.children[0].classList.add("cn-hero-copy");
+    inner.children[1].classList.add("cn-hero-visual");
+  };
+
+  ensureHeroLayoutStyle();
+  applyHeroLayout();
+  window.addEventListener("resize", applyHeroLayout, { passive: true });
+  new MutationObserver(applyHeroLayout).observe(document.body, { childList: true, subtree: true });
 })();
