@@ -45,21 +45,23 @@ export function ClerkStrip({ cards, now }: { cards: ClerkCard[]; now: number }) 
             <Link
               key={card.key}
               href={card.href}
-              className="flex items-center gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10 transition-colors hover:ring-foreground/20"
+              className="flex min-w-0 items-start gap-2.5 overflow-hidden rounded-xl bg-card p-3 ring-1 ring-foreground/10 transition-colors hover:ring-foreground/20 sm:gap-3 sm:p-4"
             >
-              <HomeIcon icon={icon} tone={tone} />
+              <HomeIcon icon={icon} tone={tone} className="size-9 sm:size-10" />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-start justify-between gap-1">
                   <span className="text-sm font-medium">{card.name}</span>
-                  <StatusPill tone={STATE_TONE[card.state]}>{STATE_LABEL[card.state]}</StatusPill>
+                  <ChevronRight className="mt-0.5 hidden size-4 shrink-0 text-muted-foreground sm:block" aria-hidden />
                 </div>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                <StatusPill tone={STATE_TONE[card.state]} className="mt-1">
+                  {STATE_LABEL[card.state]}
+                </StatusPill>
+                <p className="mt-1 line-clamp-2 text-xs leading-snug text-muted-foreground">
                   {card.outcome
                     ? `${card.outcome} — ${formatRelativeTime(card.timestamp as string, now)}`
                     : STATE_FALLBACK[card.state as Exclude<ClerkCard['state'], 'active'>]}
                 </p>
               </div>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
             </Link>
           );
         })}

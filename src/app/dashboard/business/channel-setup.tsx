@@ -269,7 +269,7 @@ export function ChannelSetup({
             const isConnected = connections[c.value];
             const isPendingSetup = !isConnected && pendingSet.has(c.value);
             return (
-              <div key={c.value} className="flex items-start gap-2.5 rounded-lg border border-input px-3 py-2.5">
+              <div key={c.value} className="flex min-w-0 items-start gap-2.5 overflow-hidden rounded-lg border border-input px-3 py-2.5">
                 {isConnected ? (
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                 ) : isPendingSetup ? (
@@ -278,17 +278,17 @@ export function ChannelSetup({
                   <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
                     <PlatformBadge
                       platform={CHANNEL_BADGE[c.value]}
-                      className="size-5 rounded-md shadow-none"
+                      className="size-5 shrink-0 rounded-md shadow-none"
                       iconClassName="size-3"
                     />
                     <span className="text-sm font-medium">{c.label}</span>
                     {isConnected && <StatusPill tone="success">Connected</StatusPill>}
                     {isPendingSetup && <StatusPill tone="pending">Setting up</StatusPill>}
                   </div>
-                  <p className="text-xs text-muted-foreground">{c.hint}</p>
+                  <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{c.hint}</p>
                   {/*
                     Replaces the flat "Requested" badge with a visible
                     three-step tracker so an owner can tell, from the screen

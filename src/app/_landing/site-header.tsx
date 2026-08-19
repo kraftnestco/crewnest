@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Menu, Sparkles, LogIn } from 'lucide-react';
+import { Menu, Sparkles, LogIn, UserPlus } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -85,11 +85,9 @@ export function SiteHeader() {
             primitive already proven for the dashboard's mobile "More" tab
             and business switcher — no Sheet component exists in this repo
             and the doc explicitly says not to add a dependency for this.
-            Carries the four section anchors plus Try it free / Sign in, so
-            every header destination is reachable even though the two CTA
-            buttons also stay directly visible (removing an always-visible
-            "Try it free" button to bury it in a menu would cost conversions
-            for no benefit — the menu adds reach, it doesn't replace them).
+            Carries the four section anchors plus Try it free / Sign up /
+            Sign in, so every header destination is reachable even though the
+            CTA buttons also stay directly visible.
           */}
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -109,6 +107,10 @@ export function SiteHeader() {
                 <Sparkles className="size-4" />
                 Try it free
               </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/signup" />}>
+                <UserPlus className="size-4" />
+                Sign up
+              </DropdownMenuItem>
               <DropdownMenuItem render={<Link href="/login?redirect=/dashboard" />}>
                 <LogIn className="size-4" />
                 Sign in
@@ -118,7 +120,10 @@ export function SiteHeader() {
           <Link href="/try" className={cn(buttonVariants({ size: 'sm' }))}>
             Try it free
           </Link>
-          <Link href="/login?redirect=/dashboard" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
+          <Link href="/signup" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
+            Sign up
+          </Link>
+          <Link href="/login?redirect=/dashboard" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
             <span className="sm:hidden">Sign in</span>
             <span className="hidden sm:inline">Client login</span>
           </Link>

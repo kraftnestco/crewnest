@@ -2,37 +2,65 @@
 
 import { useSyncExternalStore } from 'react';
 import { useTheme } from 'next-themes';
-import { Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, Sun } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const subscribeNever = () => () => {};
 
 /**
- * One-tap light/dark switch — deliberately a plain toggle, not a menu, so
- * non-technical users never face a "system vs light vs dark" decision.
+ * Light / dark / system. `theme` is the stored choice; `resolvedTheme` is
+ * what is actually painted (system follows the OS).
  */
 export function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
-  // Theme is only known client-side; render a stable placeholder until mounted
-  // so the server and first client render never disagree. useSyncExternalStore's
-  // getServerSnapshot always returns false, matching the SSR/first-paint render;
-  // the client snapshot is true from the very first client render onward — no
-  // setState-in-effect needed for what is fundamentally a static after-mount flag.
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const mounted = useSyncExternalStore(
     subscribeNever,
     () => true,
     () => false,
   );
 
-  const isDark = mounted && resolvedTheme === 'dark';
+  const icon = !mounted ? (
+    <Sun className="h-4 w-4" />
+  ) : resolvedTheme === 'dark' ? (
+    <Moon className="h-4 w-4" />
+  ) : (
+    <Sun className="h-4 w-4" />
+  );
 
   return (
-    <button
-      type="button"
-      onClick={() => setTheme(isDark ? 'light' : 'dark')}
-      className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-    >
-      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        aria-label="Theme"
+        title="Theme"
+      >
+        {icon}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-36">
+        <DropdownMenuRadioGroup
+          value={mounted ? (theme ?? 'system') : 'system'}
+          onValueChange={setTheme}
+        >
+          <DropdownMenuRadioItem value="light">
+            <Sun className="size-4" />
+            Light
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="dark">
+            <Moon className="size-4" />
+            Dark
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="system">
+            <Monitor className="size-4" />
+            System
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

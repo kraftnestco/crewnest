@@ -2,6 +2,8 @@
   const destinations = new Map([
     ["ClerkNest", "/"],
     ["Sign in", "/login?redirect=/dashboard"],
+    ["Sign up", "/signup"],
+    ["Signup", "/signup"],
     ["Meet ClerkNest", "/try"],
     ["Build My AI Employee", "/try"],
     ["Hand over the night shift", "/try"],
@@ -24,17 +26,48 @@
     });
   };
 
+  const SIGNUP_MARK = "data-cn-signup";
+
+  const injectSignup = () => {
+    document.querySelectorAll("a, button").forEach((el) => {
+      if (el.hasAttribute(SIGNUP_MARK)) return;
+      const label = el.textContent?.trim().replace(/\s+/g, " ") ?? "";
+      if (label !== "Sign in") return;
+      const parent = el.parentElement;
+      if (!parent || parent.querySelector(`[${SIGNUP_MARK}]`)) return;
+
+      const signup = document.createElement("a");
+      signup.setAttribute(SIGNUP_MARK, "1");
+      signup.href = "/signup";
+      signup.className = el.className;
+      signup.textContent = "Sign up";
+      parent.insertBefore(signup, el);
+    });
+  };
+
   connectLinks();
+  injectSignup();
   const root = document.getElementById("root");
   if (root && root.childElementCount === 0) {
     const observer = new MutationObserver(() => {
       if (root.childElementCount > 0) {
         connectLinks();
+        injectSignup();
         observer.disconnect();
       }
     });
     observer.observe(root, { childList: true });
   }
+  let injectTicking = false;
+  new MutationObserver(() => {
+    if (injectTicking) return;
+    injectTicking = true;
+    requestAnimationFrame(() => {
+      injectTicking = false;
+      connectLinks();
+      injectSignup();
+    });
+  }).observe(document.body, { childList: true, subtree: true });
 
   document.addEventListener("click", (event) => {
     const button = event.target.closest("button");
@@ -49,11 +82,16 @@
   });
 
   // Mobile drawer fallback: some bundled nav entries are rendered as button-ish
-  // elements instead of stable anchors. Force Sign in to open the auth route.
+  // elements instead of stable anchors. Force Sign in / Sign up to the auth routes.
   document.addEventListener("click", (event) => {
     const target = event.target.closest("a, button, [role='button']");
     if (!target) return;
     const label = target.textContent?.trim().replace(/\s+/g, " ") ?? "";
+    if (label === "Sign up" || label === "Signup") {
+      event.preventDefault();
+      window.location.assign("/signup");
+      return;
+    }
     if (label !== "Sign in") return;
 
     event.preventDefault();

@@ -309,7 +309,7 @@ export default async function DashboardHomePage() {
       {/* Owners below Growth see what the AI assistant is, rather than nothing
           where the Copilot would be — the upgrade path is the point of the tier. */}
       {canEditBusiness && !hasCopilot && (
-        <div className="flex items-center gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+        <div className="flex flex-col gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10 sm:flex-row sm:items-center">
           <HomeIcon icon={Sparkles} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">Get your own AI assistant</p>
@@ -320,7 +320,7 @@ export default async function DashboardHomePage() {
           </div>
           <Link
             href="/dashboard/billing"
-            className="shrink-0 rounded-lg border border-primary/40 px-3 py-1.5 text-sm text-primary transition-colors hover:bg-primary/10"
+            className="shrink-0 self-start rounded-lg border border-primary/40 px-3 py-1.5 text-sm text-primary transition-colors hover:bg-primary/10 sm:self-center"
           >
             See plans →
           </Link>

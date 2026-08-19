@@ -6,22 +6,24 @@ import { usePathname } from 'next/navigation';
 /**
  * Class-based theme switching (docs: UI overhaul, Phase U1).
  *
- * Auth signup is always dark. App dashboards start dark for users without a
- * saved preference, while next-themes persists an explicit light/dark choice
- * in localStorage. Public and login routes retain their light default.
+ * Auth pages always follow the OS (a separate storage key so a dashboard
+ * light/dark choice never leaks onto login/signup). Dashboards default to
+ * dark until the user picks light, dark, or system. Public marketing stays
+ * light.
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isSignup = pathname.startsWith('/signup');
+  const isAuth = pathname.startsWith('/login') || pathname.startsWith('/signup');
   const isAppDashboard = pathname.startsWith('/dashboard') || pathname.startsWith('/admin');
-  const routeThemeScope = isSignup ? 'signup' : isAppDashboard ? 'app' : 'public';
+  const routeThemeScope = isAuth ? 'auth' : isAppDashboard ? 'app' : 'public';
 
   return (
     <NextThemesProvider
       key={routeThemeScope}
       attribute="class"
-      defaultTheme={isAppDashboard ? 'dark' : 'light'}
-      forcedTheme={isSignup ? 'dark' : undefined}
+      enableSystem
+      defaultTheme={isAuth ? 'system' : isAppDashboard ? 'dark' : 'light'}
+      storageKey={isAuth ? 'cn-theme-auth' : 'theme'}
       disableTransitionOnChange
     >
       {children}
