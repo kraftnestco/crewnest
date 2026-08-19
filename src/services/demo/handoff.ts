@@ -8,9 +8,11 @@ import type { DemoTenantInput } from './schema';
  * any in-memory state. Same tab throughout, so sessionStorage survives it.
  */
 export const DEMO_HANDOFF_KEY = 'clerknest_demo_handoff';
+export const BILLING_COUNTRY_KEY = 'clerknest_billing_country';
 
 export interface DemoHandoff {
   demoTenant: DemoTenantInput;
   planId: string;
   email: string;
+  billingCountry?: string;
 }

@@ -661,6 +661,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      meta_deletion_requests: {
+        Row: {
+          confirmation_code: string;
+          facebook_user_id: string;
+          status: string;
+          created_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          confirmation_code: string;
+          facebook_user_id: string;
+          status?: string;
+          created_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          confirmation_code?: string;
+          facebook_user_id?: string;
+          status?: string;
+          created_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [];
+      };
       webhook_events: {
         Row: {
           id: string;

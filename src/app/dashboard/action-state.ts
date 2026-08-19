@@ -11,6 +11,13 @@ export interface RequestPlatformSetupState {
 
 export const initialRequestPlatformSetupState: RequestPlatformSetupState = { error: null, success: false };
 
+export interface EnableWidgetState {
+  error: string | null;
+  success: boolean;
+}
+
+export const initialEnableWidgetState: EnableWidgetState = { error: null, success: false };
+
 /** Mirrors the `platform` DB enum (Database['public']['Enums']['platform'], minus 'voice') so the
  *  request UI can reuse the same labels/colors as the inbox. */
 export const PLATFORM_CHANNEL_VALUES = ['whatsapp', 'facebook', 'instagram', 'web'] as const;

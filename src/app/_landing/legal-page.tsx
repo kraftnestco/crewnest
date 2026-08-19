@@ -49,6 +49,9 @@ export function LegalPage({
             <Link href="/privacy" className="hover:text-foreground">
               Privacy policy
             </Link>
+            <Link href="/privacy/data-deletion" className="hover:text-foreground">
+              Data deletion
+            </Link>
             <Link href="/terms" className="hover:text-foreground">
               Terms of service
             </Link>

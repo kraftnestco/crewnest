@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/format-date';
 import { PageHeader } from '@/components/page-header';
+import { pruneRequestedPlatforms } from '@/lib/channels';
 import { EditClientDialog } from './edit-client-dialog';
 import { InviteClientDialog } from './[id]/invite/invite-client-dialog';
 import { NewClientDialog } from './new-client-dialog';
@@ -61,7 +62,9 @@ export default async function ClientsPage() {
             {(tenants ?? []).map((t) => (
               <TableRow key={t.id}>
                 <TableCell className="font-medium">
-                  {t.business_name}
+                  <Link href={`/admin/clients/${t.id}`} className="underline-offset-2 hover:underline">
+                    {t.business_name}
+                  </Link>
                   {t.slug && <span className="ml-2 text-xs text-muted-foreground">/{t.slug}</span>}
                 </TableCell>
                 <TableCell>
@@ -70,7 +73,12 @@ export default async function ClientsPage() {
                     {t.meta_page_id && <Badge variant="secondary">Messenger</Badge>}
                     {t.instagram_id && <Badge variant="secondary">Instagram</Badge>}
                     {t.widget_public_key && <Badge variant="secondary">Web</Badge>}
-                    {t.requested_platforms.length > 0 && (
+                    {pruneRequestedPlatforms(t.requested_platforms, {
+                      whatsapp: Boolean(t.whatsapp_phone_number_id),
+                      facebook: Boolean(t.meta_page_id),
+                      instagram: Boolean(t.instagram_id),
+                      web: Boolean(t.widget_public_key),
+                    }).length > 0 && (
                       <Badge
                         variant="outline"
                         className="border-amber-500 text-amber-600"
@@ -81,7 +89,15 @@ export default async function ClientsPage() {
                             : '')
                         }
                       >
-                        Setup requested: {t.requested_platforms.map((p) => CHANNEL_LABELS[p] ?? p).join(', ')}
+                        Setup requested:{' '}
+                        {pruneRequestedPlatforms(t.requested_platforms, {
+                          whatsapp: Boolean(t.whatsapp_phone_number_id),
+                          facebook: Boolean(t.meta_page_id),
+                          instagram: Boolean(t.instagram_id),
+                          web: Boolean(t.widget_public_key),
+                        })
+                          .map((p) => CHANNEL_LABELS[p] ?? p)
+                          .join(', ')}
                       </Badge>
                     )}
                   </div>

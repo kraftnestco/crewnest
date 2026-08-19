@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PAYWALL_PLANS } from '@/services/demo/plans';
 import { SignupVerifyForm } from './signup-verify-form';
+import { BILLING_COUNTRY_KEY, DEMO_HANDOFF_KEY, type DemoHandoff } from '@/services/demo/handoff';
+import { SIGNUP_COUNTRY_OPTIONS, normalizeBillingCountry } from '@/lib/signup-country';
 
 /**
  * Self-serve signup (docs: "try it for your business" plan, Phase C) — the
@@ -24,6 +26,7 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
   const [pending, setPending] = useState(false);
   const [googlePending, setGooglePending] = useState(false);
   const [awaitingCode, setAwaitingCode] = useState(false);
+  const [country, setCountry] = useState('PK');
 
   const plan = PAYWALL_PLANS.find((p) => p.id === planId);
 
@@ -39,6 +42,13 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
       setError('Passwords do not match.');
       return;
     }
+
+    const billingCountry = normalizeBillingCountry(country);
+    if (!billingCountry) {
+      setError('Select the country you operate in.');
+      return;
+    }
+    persistBillingCountry(billingCountry);
 
     setPending(true);
     const { data, error: signUpError } = await supabase.auth.signUp({
@@ -61,8 +71,26 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
     setAwaitingCode(true);
   }
 
+  function persistBillingCountry(billingCountry: string) {
+    sessionStorage.setItem(BILLING_COUNTRY_KEY, billingCountry);
+    try {
+      const raw = sessionStorage.getItem(DEMO_HANDOFF_KEY);
+      if (!raw) return;
+      const handoff = JSON.parse(raw) as DemoHandoff;
+      sessionStorage.setItem(DEMO_HANDOFF_KEY, JSON.stringify({ ...handoff, billingCountry }));
+    } catch {
+      // Handoff is optional — Google-from-login still stores the country key above.
+    }
+  }
+
   async function handleGoogle() {
     setError(null);
+    const billingCountry = normalizeBillingCountry(country);
+    if (!billingCountry) {
+      setError('Select the country you operate in.');
+      return;
+    }
+    persistBillingCountry(billingCountry);
     setGooglePending(true);
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -123,6 +151,26 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
           />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="signup-country">Country</Label>
+          <select
+            id="signup-country"
+            required
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+          >
+            {SIGNUP_COUNTRY_OPTIONS.map((opt) => (
+              <option key={opt.code} value={opt.code}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Pakistan bills through Safepay. Everywhere else uses Stripe once checkout is live.
+          </p>
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}

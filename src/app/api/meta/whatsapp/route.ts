@@ -9,22 +9,10 @@ import {
 import { entitlementsFor } from '@/lib/entitlements';
 import { env } from '@/lib/env';
 import { createServiceClient } from '@/lib/supabase/service';
-import { buildAuthorizeUrl, META_OAUTH_STATE_COOKIE } from '@/services/meta/oauth';
+import { buildWhatsAppAuthorizeUrl, META_WHATSAPP_OAUTH_STATE_COOKIE } from '@/services/meta/oauth';
 
 export const runtime = 'nodejs';
 
-/**
- * OAuth initiate (docs/27 §5 C2). Opened in a popup by the "Connect with
- * Facebook" button in channel-setup.tsx. `tenantId` arrives as a query
- * param — same trust level as requestPlatformSetupAction's bound arg
- * (dashboard/actions.ts): a client-supplied value that is verified against
- * the caller's own session before it's trusted for anything.
- *
- * tenantId is then carried forward ONLY via the httpOnly state cookie set
- * below, never via a query param Meta round-trips — so a forged callback
- * URL can't land a token on someone else's tenant. Meta's own `state` gets
- * just the CSRF nonce.
- */
 export async function GET(req: NextRequest) {
   const tenantId = new URL(req.url).searchParams.get('tenantId');
   if (!tenantId) return new Response('Missing tenantId', { status: 400 });
@@ -58,21 +46,18 @@ export async function GET(req: NextRequest) {
     instagramId: tenant.instagram_id,
     widgetPublicKey: tenant.widget_public_key,
   });
-  const adding: Array<'facebook' | 'instagram'> = [];
-  if (!flags.facebook) adding.push('facebook');
-  if (!flags.instagram) adding.push('instagram');
   const maxChannels = entitlementsFor(tenant.plan).maxChannels;
-  if (wouldExceedChannelLimit(flags, adding, maxChannels)) {
+  if (wouldExceedChannelLimit(flags, ['whatsapp'], maxChannels)) {
     return new Response(channelLimitMessage(maxChannels), { status: 403 });
   }
 
   const nonce = randomBytes(16).toString('hex');
-  const res = NextResponse.redirect(buildAuthorizeUrl(nonce));
-  res.cookies.set(META_OAUTH_STATE_COOKIE, `${nonce}:${tenantId}`, {
+  const res = NextResponse.redirect(buildWhatsAppAuthorizeUrl(nonce));
+  res.cookies.set(META_WHATSAPP_OAUTH_STATE_COOKIE, `${nonce}:${tenantId}`, {
     httpOnly: true,
     secure: true,
     sameSite: 'lax',
-    path: '/api/meta/connect',
+    path: '/api/meta/whatsapp',
     maxAge: 600,
   });
   return res;

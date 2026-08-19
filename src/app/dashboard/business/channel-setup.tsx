@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useMemo, useState } from 'react';
+import { useActionState, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -8,12 +8,17 @@ import { Check, CheckCircle2, CircleDashed, ShieldCheck } from 'lucide-react';
 import { PlatformBadge, type PlatformId } from '@/app/_landing/platform-icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { StatusPill } from '@/components/status-pill';
 import { cn } from '@/lib/utils';
-import { requestPlatformSetupAction } from '../actions';
-import { initialRequestPlatformSetupState, type PlatformChannel } from '../action-state';
+import { enableWidgetAction, requestPlatformSetupAction, rotateWidgetKeyAction } from '../actions';
+import {
+  initialEnableWidgetState,
+  initialRequestPlatformSetupState,
+  type PlatformChannel,
+} from '../action-state';
 
 const CHANNEL_BADGE: Record<PlatformChannel, PlatformId> = {
   whatsapp: 'whatsapp',
@@ -22,9 +27,6 @@ const CHANNEL_BADGE: Record<PlatformChannel, PlatformId> = {
   web: 'web',
 };
 
-// docs/27 §5 C1 — "3–5 business days" was a vague range; owners want a date.
-// No new backend field for this: we compute it from the existing
-// `platform_setup_requested_at` timestamp, skipping weekends.
 const ETA_BUSINESS_DAYS = 5;
 
 function addBusinessDays(from: Date, days: number): Date {
@@ -40,13 +42,6 @@ function addBusinessDays(from: Date, days: number): Date {
 
 const SETUP_STEPS = ['Requested', "We're connecting", 'Live'] as const;
 
-/**
- * The data model only has one timestamp per tenant (`platform_setup_requested_at`)
- * and a boolean per channel (`connections`) — no separate "we've started" flag.
- * So the tracker's middle step is treated as reached the moment a request lands:
- * that's when our team's queue actually picks it up, not a later milestone we'd
- * need a new column to detect (C1 is explicitly no-backend-work).
- */
 function SetupTracker({ requestedAt }: { requestedAt: string }) {
   const eta = formatEtaDate(addBusinessDays(new Date(requestedAt), ETA_BUSINESS_DAYS));
   return (
@@ -130,15 +125,18 @@ const CHANNELS: ChannelInfo[] = [
   },
 ];
 
-/**
- * docs/27 §5 C2 — one OAuth grant covers both Messenger and Instagram (a
- * Page's linked IG account comes back in the same callback), so this is a
- * single button rather than one per channel. Opens the initiate route in a
- * popup; the callback route posts the result back via `window.postMessage`
- * and closes itself, which is why this listens on `message` rather than
- * awaiting the `window.open` call directly.
- */
-function MetaConnectButton({ tenantId }: { tenantId: string }) {
+function openConnectPopup(url: string, name: string, onBlocked: () => void): void {
+  const popup = window.open(url, name, 'width=600,height=700');
+  if (!popup) {
+    onBlocked();
+    return;
+  }
+  const poll = window.setInterval(() => {
+    if (popup.closed) window.clearInterval(poll);
+  }, 500);
+}
+
+function MetaConnectButton({ tenantId, reconnect }: { tenantId: string; reconnect?: boolean }) {
   const router = useRouter();
   const [isConnecting, setIsConnecting] = useState(false);
 
@@ -160,32 +158,157 @@ function MetaConnectButton({ tenantId }: { tenantId: string }) {
 
   function connect() {
     setIsConnecting(true);
-    const popup = window.open(
-      `/api/meta/connect?tenantId=${encodeURIComponent(tenantId)}`,
-      'meta-connect',
-      'width=600,height=700',
-    );
-    if (!popup) {
+    openConnectPopup(`/api/meta/connect?tenantId=${encodeURIComponent(tenantId)}`, 'meta-connect', () => {
       setIsConnecting(false);
       toast.error('Please allow popups to connect Facebook & Instagram.');
-      return;
-    }
-    // No message ever arrives if the owner just closes the popup without
-    // finishing (declining is the only case Meta itself round-trips to us) —
-    // this is what un-sticks the button in that case.
-    const poll = window.setInterval(() => {
-      if (popup.closed) {
-        window.clearInterval(poll);
-        setIsConnecting(false);
-      }
-    }, 500);
+    });
+    window.setTimeout(() => setIsConnecting(false), 120_000);
   }
 
   return (
     <Button type="button" size="sm" variant="outline" onClick={connect} disabled={isConnecting}>
-      {isConnecting ? 'Connecting…' : 'Connect with Facebook'}
+      {isConnecting ? 'Connecting…' : reconnect ? 'Reconnect' : 'Connect with Facebook'}
     </Button>
   );
+}
+
+function WhatsAppConnectButton({ tenantId, reconnect }: { tenantId: string; reconnect?: boolean }) {
+  const router = useRouter();
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (!event.data || event.data.type !== 'whatsapp-connected') return;
+      setIsConnecting(false);
+      if (event.data.ok) {
+        toast.success('WhatsApp connected.');
+        router.refresh();
+      } else {
+        toast.error(event.data.error ?? 'Connection failed.');
+      }
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [router]);
+
+  function connect() {
+    setIsConnecting(true);
+    openConnectPopup(`/api/meta/whatsapp?tenantId=${encodeURIComponent(tenantId)}`, 'whatsapp-connect', () => {
+      setIsConnecting(false);
+      toast.error('Please allow popups to connect WhatsApp.');
+    });
+    window.setTimeout(() => setIsConnecting(false), 120_000);
+  }
+
+  return (
+    <Button type="button" size="sm" variant="outline" onClick={connect} disabled={isConnecting}>
+      {isConnecting ? 'Connecting…' : reconnect ? 'Reconnect' : 'Connect WhatsApp'}
+    </Button>
+  );
+}
+
+function widgetSnippet(appUrl: string, key: string): string {
+  return `<script src="${appUrl.replace(/\/$/, '')}/embed/widget.js" data-clerknest-key="${key}" defer></script>`;
+}
+
+function WidgetSetup({
+  tenantId,
+  appUrl,
+  widgetPublicKey,
+  widgetAllowedOrigins,
+}: {
+  tenantId: string;
+  appUrl: string;
+  widgetPublicKey: string | null;
+  widgetAllowedOrigins: string[];
+}) {
+  const router = useRouter();
+  const boundAction = enableWidgetAction.bind(null, tenantId);
+  const [state, formAction, isPending] = useActionState(boundAction, initialEnableWidgetState);
+  const [rotating, startRotate] = useTransition();
+  const defaultDomain = widgetAllowedOrigins[0]?.replace(/^https?:\/\//, '') ?? '';
+
+  useEffect(() => {
+    if (state.success) {
+      toast.success('Website chat is ready. Copy the snippet onto your site.');
+      router.refresh();
+    }
+  }, [state, router]);
+
+  function copySnippet() {
+    if (!widgetPublicKey) return;
+    void navigator.clipboard.writeText(widgetSnippet(appUrl, widgetPublicKey));
+    toast.success('Snippet copied.');
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border border-input px-3 py-2.5">
+      <div>
+        <p className="text-sm font-medium">Website chat</p>
+        <p className="text-xs text-muted-foreground">
+          Enter your domain, turn the widget on, then paste one line of code on your site.
+        </p>
+      </div>
+      <form action={formAction} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <Label htmlFor="widget-domain">Website domain</Label>
+          <Input
+            id="widget-domain"
+            name="domain"
+            required
+            defaultValue={defaultDomain}
+            placeholder="acme.com"
+          />
+        </div>
+        <Button type="submit" size="sm" disabled={isPending}>
+          {isPending ? 'Saving…' : widgetPublicKey ? 'Update domain' : 'Enable widget'}
+        </Button>
+      </form>
+      {state.error && <p className="text-sm text-destructive">{state.error}</p>}
+      {widgetPublicKey && (
+        <div className="space-y-2">
+          <Label htmlFor="widget-snippet">Embed snippet</Label>
+          <textarea
+            id="widget-snippet"
+            readOnly
+            rows={3}
+            className="w-full rounded-md border border-input bg-muted/40 p-2 font-mono text-xs"
+            value={widgetSnippet(appUrl, widgetPublicKey)}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={copySnippet}>
+              Copy snippet
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={rotating}
+              onClick={() => {
+                startRotate(async () => {
+                  const result = await rotateWidgetKeyAction(tenantId);
+                  if (result.error) toast.error(result.error);
+                  else {
+                    toast.success('New widget key generated. Update the snippet on your site.');
+                    router.refresh();
+                  }
+                });
+              }}
+            >
+              {rotating ? 'Rotating…' : 'Rotate key'}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function isPendingNameStatus(status: string | null): boolean {
+  if (!status) return false;
+  const upper = status.toUpperCase();
+  return upper.includes('PENDING') && !upper.includes('APPROVED');
 }
 
 export function ChannelSetup({
@@ -194,30 +317,32 @@ export function ChannelSetup({
   requestedPlatforms,
   platformSetupNotes,
   platformSetupRequestedAt,
+  widgetPublicKey,
+  widgetAllowedOrigins,
+  appUrl,
+  whatsappNameStatus,
 }: {
   tenantId: string;
   connections: Record<PlatformChannel, boolean>;
   requestedPlatforms: string[];
   platformSetupNotes: string | null;
   platformSetupRequestedAt: string | null;
+  widgetPublicKey: string | null;
+  widgetAllowedOrigins: string[];
+  appUrl: string;
+  whatsappNameStatus: string | null;
 }) {
   const boundAction = requestPlatformSetupAction.bind(null, tenantId);
   const [state, formAction, isPending] = useActionState(boundAction, initialRequestPlatformSetupState);
   const [selected, setSelected] = useState<PlatformChannel[]>([]);
   const [notes, setNotes] = useState('');
 
-  const notConnected = useMemo(() => CHANNELS.filter((c) => !connections[c.value]), [connections]);
-  // Messenger/Instagram self-serve via OAuth (docs/27 §5 C2) now; only
-  // WhatsApp and Website chat still go through the concierge request form.
-  const oauthChannels = useMemo(
-    () => notConnected.filter((c) => c.value === 'facebook' || c.value === 'instagram'),
-    [notConnected],
+  const pendingSet = useMemo(
+    () => new Set(requestedPlatforms.filter((p) => !connections[p as PlatformChannel])),
+    [requestedPlatforms, connections],
   );
-  const conciergeChannels = useMemo(
-    () => notConnected.filter((c) => c.value !== 'facebook' && c.value !== 'instagram'),
-    [notConnected],
-  );
-  const pendingSet = useMemo(() => new Set(requestedPlatforms), [requestedPlatforms]);
+
+  const messengerNeedsConnect = !connections.facebook || !connections.instagram;
 
   useEffect(() => {
     if (state.success) {
@@ -240,12 +365,6 @@ export function ChannelSetup({
         <CardDescription>Where your AI assistant talks to customers.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        {/*
-          docs/27 §5 C1 — the strongest selling point in the product was
-          buried in a paragraph under the form. Promoted to a bordered
-          callout at the top of the screen, with a link to /security that
-          explains it in full instead of a one-line aside.
-        */}
         <div className="flex items-start gap-3 rounded-xl border border-primary/25 bg-primary/5 p-3.5">
           <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
           <div className="min-w-0">
@@ -253,9 +372,8 @@ export function ChannelSetup({
               You never need to share passwords or API keys with us.
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              For WhatsApp, you add us as a Partner on your own Meta Business Manager. For Messenger
-              and Instagram, you connect directly through Meta&apos;s own login. Both are permissions
-              you grant and can revoke — never a password shared with us.{' '}
+              Messenger, Instagram, and WhatsApp connect through Meta&apos;s own login. Website chat is a
+              snippet you paste yourself.{' '}
               <Link href="/security" className="text-primary underline underline-offset-2">
                 See exactly what we can and can&apos;t see
               </Link>
@@ -287,18 +405,16 @@ export function ChannelSetup({
                     <span className="text-sm font-medium">{c.label}</span>
                     {isConnected && <StatusPill tone="success">Connected</StatusPill>}
                     {isPendingSetup && <StatusPill tone="pending">Setting up</StatusPill>}
+                    {c.value === 'whatsapp' && isConnected && isPendingNameStatus(whatsappNameStatus) && (
+                      <StatusPill tone="pending">Name pending</StatusPill>
+                    )}
                   </div>
                   <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{c.hint}</p>
-                  {/*
-                    Replaces the flat "Requested" badge with a visible
-                    three-step tracker so an owner can tell, from the screen
-                    alone, what stage they're at and when it completes.
-                    `platformSetupRequestedAt` is tenant-wide (one column),
-                    not per-channel, so every channel currently in the
-                    pending set shares it — accurate as long as a tenant's
-                    outstanding requests were all made together, which the
-                    single multi-select form below always does.
-                  */}
+                  {c.value === 'whatsapp' && isConnected && isPendingNameStatus(whatsappNameStatus) && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Meta is still reviewing the WhatsApp display name. Replies in an open chat still work.
+                    </p>
+                  )}
                   {isPendingSetup && platformSetupRequestedAt && (
                     <SetupTracker requestedAt={platformSetupRequestedAt} />
                   )}
@@ -308,56 +424,71 @@ export function ChannelSetup({
           })}
         </div>
 
-        {oauthChannels.length > 0 && (
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-input px-3 py-2.5">
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Connect Facebook &amp; Instagram</p>
-              <p className="text-xs text-muted-foreground">One click, via Meta — no Partner request needed.</p>
-            </div>
-            <MetaConnectButton tenantId={tenantId} />
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-input px-3 py-2.5">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              {messengerNeedsConnect ? 'Connect Facebook & Instagram' : 'Facebook & Instagram'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {messengerNeedsConnect
+                ? 'One click, via Meta — no Partner request needed.'
+                : 'Already connected. Reconnect if messages stop after a password change.'}
+            </p>
           </div>
-        )}
+          <MetaConnectButton tenantId={tenantId} reconnect={!messengerNeedsConnect} />
+        </div>
 
-        {conciergeChannels.length > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-input px-3 py-2.5">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">{connections.whatsapp ? 'WhatsApp' : 'Connect WhatsApp'}</p>
+            <p className="text-xs text-muted-foreground">
+              {connections.whatsapp
+                ? 'Already connected. Reconnect if Meta revoked access.'
+                : 'Meta window: confirm the business, phone number, and display name.'}
+            </p>
+          </div>
+          <WhatsAppConnectButton tenantId={tenantId} reconnect={connections.whatsapp} />
+        </div>
+
+        <WidgetSetup
+          tenantId={tenantId}
+          appUrl={appUrl}
+          widgetPublicKey={widgetPublicKey}
+          widgetAllowedOrigins={widgetAllowedOrigins}
+        />
+
+        {!connections.whatsapp && (
           <form action={formAction} className="space-y-3 border-t border-border pt-4">
             <div>
-              <p className="text-sm font-medium">Request a new channel</p>
+              <p className="text-sm font-medium">Can&apos;t finish WhatsApp yourself?</p>
               <p className="text-xs text-muted-foreground">
-                {conciergeChannels.some((c) => c.value === 'whatsapp')
-                  ? "For WhatsApp we'll ask you to add us as a Partner on your Meta Business Manager, then send exact steps once you request setup below."
-                  : "Send us what we need and we'll get it connected."}
+                Ask us to set it up the old way. We&apos;ll need your WhatsApp Business number.
                 {platformSetupNotes ? ` Last note: "${platformSetupNotes}"` : ''}
               </p>
             </div>
 
-            <div className="flex flex-col gap-2">
-              {conciergeChannels.map((c) => (
-                <label
-                  key={c.value}
-                  className={`flex cursor-pointer flex-col gap-0.5 rounded-lg border px-3 py-2 text-left transition-colors ${
-                    selected.includes(c.value) ? 'border-primary bg-primary/5' : 'border-input'
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      name="platforms"
-                      value={c.value}
-                      checked={selected.includes(c.value)}
-                      onChange={() => toggle(c.value)}
-                      className="h-3.5 w-3.5"
-                    />
-                    <PlatformBadge
-                      platform={CHANNEL_BADGE[c.value]}
-                      className="size-5 rounded-md shadow-none"
-                      iconClassName="size-3"
-                    />
-                    <span className="text-sm font-medium">{c.label}</span>
-                  </span>
-                  <span className="pl-5 text-xs text-muted-foreground">We&apos;ll need: {c.needFromYou}</span>
-                </label>
-              ))}
-            </div>
+            <label
+              className={`flex cursor-pointer flex-col gap-0.5 rounded-lg border px-3 py-2 text-left transition-colors ${
+                selected.includes('whatsapp') ? 'border-primary bg-primary/5' : 'border-input'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="platforms"
+                  value="whatsapp"
+                  checked={selected.includes('whatsapp')}
+                  onChange={() => toggle('whatsapp')}
+                  className="h-3.5 w-3.5"
+                />
+                <PlatformBadge
+                  platform="whatsapp"
+                  className="size-5 rounded-md shadow-none"
+                  iconClassName="size-3"
+                />
+                <span className="text-sm font-medium">Ask ClerkNest to set up WhatsApp</span>
+              </span>
+            </label>
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="notes">Anything we should know? (optional)</Label>

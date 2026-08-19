@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { provisionTenantAction } from '../provision-actions';
 import { createCheckoutSessionAction } from '@/app/dashboard/billing/actions';
-import { DEMO_HANDOFF_KEY, type DemoHandoff } from '@/services/demo/handoff';
+import { DEMO_HANDOFF_KEY, BILLING_COUNTRY_KEY, type DemoHandoff } from '@/services/demo/handoff';
 // Shared allow-list (lib/entitlements.ts) rather than a local copy — a private
 // duplicate here silently skipped checkout for any newly added paid tier.
 import { isPaidPlanId } from '@/lib/entitlements';
@@ -47,7 +47,13 @@ export function CompleteClient() {
         return;
       }
 
-      const result = await provisionTenantAction({ demoTenant: handoff.demoTenant, planId: handoff.planId });
+      const billingCountry =
+        handoff.billingCountry ?? sessionStorage.getItem(BILLING_COUNTRY_KEY) ?? null;
+      const result = await provisionTenantAction({
+        demoTenant: handoff.demoTenant,
+        planId: handoff.planId,
+        billingCountry,
+      });
       if (cancelled) return;
 
       if (result.error) {
@@ -57,6 +63,7 @@ export function CompleteClient() {
       }
 
       sessionStorage.removeItem(DEMO_HANDOFF_KEY);
+      sessionStorage.removeItem(BILLING_COUNTRY_KEY);
 
       // docs/22-BILLING-STRIPE.md §4: a paid-plan selection now goes straight
       // to real Stripe Checkout instead of landing on a "we'll email you"

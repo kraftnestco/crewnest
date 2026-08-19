@@ -11,6 +11,7 @@ import { ingestTenantKnowledge } from '@/services/knowledge';
 import * as tenantsService from '@/services/tenants';
 import type { DemoTenantInput } from '@/services/demo/schema';
 import { isPlanId } from '@/lib/entitlements';
+import { normalizeBillingCountry } from '@/lib/signup-country';
 import type { Json } from '@/types/database';
 import { log } from '@/lib/log';
 
@@ -36,6 +37,7 @@ export interface ProvisionTenantResult {
 export async function provisionTenantAction(input: {
   demoTenant: DemoTenantInput;
   planId: string;
+  billingCountry?: string | null;
 }): Promise<ProvisionTenantResult> {
   const ctx = await getCallerContext();
   if (!ctx) return { error: 'You need to be signed in to continue.', tenantId: null, planStatus: null };
@@ -84,6 +86,7 @@ export async function provisionTenantAction(input: {
       // Safepay's `<tenantId>:<planId>` reference), not through this row.
       plan: 'free',
       plan_status: isFree ? null : 'pending_upgrade',
+      billing_country: normalizeBillingCountry(input.billingCountry),
     })
     .select('id')
     .single();

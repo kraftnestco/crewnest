@@ -13,21 +13,20 @@ import { setTenantSecret } from '@/lib/secrets';
 import { createServiceClient } from '@/lib/supabase/service';
 import { metaPopupResponse } from '@/services/meta/popupClose';
 import {
-  exchangeCodeForToken,
   exchangeForLongLivedToken,
-  fetchInstagramAccountId,
-  fetchManagedPages,
-  META_OAUTH_STATE_COOKIE,
+  exchangeWhatsAppCodeForToken,
+  fetchWhatsAppPhoneAsset,
+  META_WHATSAPP_OAUTH_STATE_COOKIE,
 } from '@/services/meta/oauth';
 
 export const runtime = 'nodejs';
-export const maxDuration = 30; // several sequential Graph API round-trips
+export const maxDuration = 30;
 
 function popupResponse(ok: boolean, error?: string) {
   return metaPopupResponse(
-    { type: 'meta-connected', ok, error },
-    META_OAUTH_STATE_COOKIE,
-    '/api/meta/connect',
+    { type: 'whatsapp-connected', ok, error },
+    META_WHATSAPP_OAUTH_STATE_COOKIE,
+    '/api/meta/whatsapp',
   );
 }
 
@@ -41,26 +40,28 @@ export async function GET(req: NextRequest) {
     return popupResponse(false, 'Connection was cancelled.');
   }
 
-  const cookieValue = req.cookies.get(META_OAUTH_STATE_COOKIE)?.value;
+  const cookieValue = req.cookies.get(META_WHATSAPP_OAUTH_STATE_COOKIE)?.value;
   const [nonce, tenantId] = cookieValue?.split(':') ?? [];
   if (!code || !state || !nonce || !tenantId || nonce !== state) {
     return popupResponse(false, 'Invalid connection attempt. Please try again.');
   }
 
   try {
-    const shortLivedToken = await exchangeCodeForToken(code);
-    const longLivedUserToken = await exchangeForLongLivedToken(shortLivedToken);
-    const pages = await fetchManagedPages(longLivedUserToken);
-
-    // Managing more than one Page per tenant is out of scope for this pass
-    // (docs/27 §5 C2 — buildable portion only) — `tenants` has a single
-    // meta_page_id column, so the first Page returned wins.
-    const page = pages[0];
-    if (!page) {
-      return popupResponse(false, "No Facebook Page found. Make sure you're an admin of a Page and try again.");
+    const shortLivedToken = await exchangeWhatsAppCodeForToken(code);
+    let accessToken = shortLivedToken;
+    try {
+      accessToken = await exchangeForLongLivedToken(shortLivedToken);
+    } catch {
+      // Embedded Signup sometimes mints a token that cannot be exchanged; use the original.
     }
 
-    const instagramId = await fetchInstagramAccountId(page.id, page.accessToken);
+    const asset = await fetchWhatsAppPhoneAsset(accessToken);
+    if (!asset) {
+      return popupResponse(
+        false,
+        'No WhatsApp Business number found. Finish WhatsApp setup in Meta and try again.',
+      );
+    }
 
     const svc = createServiceClient();
     const { data: tenant, error: loadError } = await svc
@@ -78,27 +79,19 @@ export async function GET(req: NextRequest) {
       instagramId: tenant.instagram_id,
       widgetPublicKey: tenant.widget_public_key,
     });
-    const adding: Array<'facebook' | 'instagram'> = [];
-    if (!current.facebook) adding.push('facebook');
-    if (instagramId && !current.instagram) adding.push('instagram');
     const maxChannels = entitlementsFor(tenant.plan).maxChannels;
-    if (wouldExceedChannelLimit(current, adding, maxChannels)) {
+    if (wouldExceedChannelLimit(current, ['whatsapp'], maxChannels)) {
       return popupResponse(false, channelLimitMessage(maxChannels));
     }
 
-    const metaTokenSecretId = await setTenantSecret(`tenant:${tenantId}:meta`, page.accessToken);
-    const nextFlags = {
-      ...current,
-      facebook: true,
-      instagram: Boolean(instagramId) || current.instagram,
-    };
+    const whatsappTokenSecretId = await setTenantSecret(`tenant:${tenantId}:whatsapp`, accessToken);
+    const nextFlags = { ...current, whatsapp: true };
 
     const { error } = await svc
       .from('tenants')
       .update({
-        meta_page_id: page.id,
-        instagram_id: instagramId ?? tenant.instagram_id,
-        meta_token_secret_id: metaTokenSecretId,
+        whatsapp_phone_number_id: asset.phoneNumberId,
+        whatsapp_token_secret_id: whatsappTokenSecretId,
         requested_platforms: pruneRequestedPlatforms(tenant.requested_platforms, nextFlags),
       })
       .eq('id', tenantId);
@@ -109,11 +102,11 @@ export async function GET(req: NextRequest) {
     revalidatePath(`/admin/clients/${tenantId}`);
     return popupResponse(true);
   } catch (err) {
-    log.error('[meta connect] OAuth callback failed', {
+    log.error('[whatsapp connect] OAuth callback failed', {
       tenantId,
       error: err instanceof Error ? err.message : 'unknown',
     });
-    Sentry.captureException(err, { tags: { flow: 'meta-oauth-connect', tenantId } });
-    return popupResponse(false, 'Something went wrong connecting your account. Please try again.');
+    Sentry.captureException(err, { tags: { flow: 'whatsapp-oauth-connect', tenantId } });
+    return popupResponse(false, 'Something went wrong connecting WhatsApp. Please try again.');
   }
 }

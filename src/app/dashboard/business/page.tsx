@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation';
 import { Store } from 'lucide-react';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { env } from '@/lib/env';
+import { getTenantSecret } from '@/lib/secrets';
+import { fetchWhatsAppNameStatus } from '@/services/meta/oauth';
 import { PageHeader } from '@/components/page-header';
 import { ChannelSetup } from './channel-setup';
 import { BusinessIntake } from './business-intake';
@@ -24,18 +27,27 @@ export default async function DashboardBusinessPage() {
   const { data: tenant } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, system_prompt, catalog_data, catalog_freeform_text, custom_orders_enabled, custom_orders_require_approval, custom_order_instructions, media_handling, voice_handling, business_type, booking_link, booking_enabled, booking_mode, booking_own_link, booking_duration_minutes, booking_lead_time_minutes, booking_max_days_ahead, knowledge_base, business_hours, timezone, payments_enabled, payment_methods, payment_instructions, default_currency, prepaid_required, whatsapp_phone_number_id, meta_page_id, instagram_id, widget_public_key, requested_platforms, platform_setup_notes, platform_setup_requested_at, intake_completed_at',
+      'id, business_name, system_prompt, catalog_data, catalog_freeform_text, custom_orders_enabled, custom_orders_require_approval, custom_order_instructions, media_handling, voice_handling, business_type, booking_link, booking_enabled, booking_mode, booking_own_link, booking_duration_minutes, booking_lead_time_minutes, booking_max_days_ahead, knowledge_base, business_hours, timezone, payments_enabled, payment_methods, payment_instructions, default_currency, prepaid_required, whatsapp_phone_number_id, meta_page_id, instagram_id, widget_public_key, widget_allowed_origins, requested_platforms, platform_setup_notes, platform_setup_requested_at, intake_completed_at, whatsapp_token_secret_id',
     )
     .eq('id', activeTenantId)
     .single();
 
   if (!tenant) redirect('/dashboard');
 
+  let whatsappNameStatus: string | null = null;
+  if (tenant.whatsapp_phone_number_id && tenant.whatsapp_token_secret_id) {
+    const token = await getTenantSecret(tenant.whatsapp_token_secret_id);
+    if (token) {
+      const name = await fetchWhatsAppNameStatus(tenant.whatsapp_phone_number_id, token);
+      whatsappNameStatus = name?.nameStatus ?? null;
+    }
+  }
+
   return (
     <div className="space-y-8 p-4 lg:p-6">
       <PageHeader
         title="My Business"
-        description={`Tell your AI assistant about ${tenant.business_name} and manage which channels it talks to customers on. Technical setup (API keys, tokens) is always handled by our team.`}
+        description={`Tell your AI assistant about ${tenant.business_name} and connect the channels it talks to customers on.`}
       />
 
       <ChannelSetup
@@ -49,6 +61,10 @@ export default async function DashboardBusinessPage() {
         requestedPlatforms={tenant.requested_platforms}
         platformSetupNotes={tenant.platform_setup_notes}
         platformSetupRequestedAt={tenant.platform_setup_requested_at}
+        widgetPublicKey={tenant.widget_public_key}
+        widgetAllowedOrigins={tenant.widget_allowed_origins ?? []}
+        appUrl={env.NEXT_PUBLIC_APP_URL}
+        whatsappNameStatus={whatsappNameStatus}
       />
 
       <div className="border-t pt-8">

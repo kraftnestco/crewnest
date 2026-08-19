@@ -1,5 +1,6 @@
 'use server';
 
+import { randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
@@ -7,8 +8,19 @@ import { assertTenantAccess, getCallerContext } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { notify } from '@/services/notifications';
 import * as tenants from '@/services/tenants';
-import { entitlementsFor, isLimited } from '@/lib/entitlements';
-import { PLATFORM_CHANNEL_VALUES, type PlatformChannel, type RequestPlatformSetupState } from './action-state';
+import { entitlementsFor } from '@/lib/entitlements';
+import {
+  channelFlagsFromIds,
+  channelLimitMessage,
+  pruneRequestedPlatforms,
+  wouldExceedChannelLimit,
+} from '@/lib/channels';
+import {
+  PLATFORM_CHANNEL_VALUES,
+  type EnableWidgetState,
+  type PlatformChannel,
+  type RequestPlatformSetupState,
+} from './action-state';
 
 /** Switches the active tenant for a multi-membership caller. Validated server-side against ctx.memberships. */
 export async function setActiveTenantAction(formData: FormData): Promise<void> {
@@ -69,32 +81,14 @@ export async function requestPlatformSetupAction(
   // not just this request in isolation.
   const tenantForLimit = await tenants.getById(tenantId);
   const entitlements = entitlementsFor(tenantForLimit?.plan);
-  if (isLimited(entitlements.maxChannels)) {
-    const connectedCount = tenantForLimit
-      ? [
-          tenantForLimit.whatsappPhoneNumberId,
-          tenantForLimit.metaPageId,
-          tenantForLimit.instagramId,
-          tenantForLimit.widgetPublicKey,
-        ].filter(Boolean).length
-      : 0;
-    // Requests for channels that are ALREADY connected shouldn't count twice.
-    const alreadyConnected = new Set<PlatformChannel>();
-    if (tenantForLimit?.whatsappPhoneNumberId) alreadyConnected.add('whatsapp');
-    if (tenantForLimit?.metaPageId) alreadyConnected.add('facebook');
-    if (tenantForLimit?.instagramId) alreadyConnected.add('instagram');
-    if (tenantForLimit?.widgetPublicKey) alreadyConnected.add('web');
-    const newChannels = requestedPlatforms.filter((p) => !alreadyConnected.has(p));
-
-    if (connectedCount + newChannels.length > entitlements.maxChannels) {
-      return {
-        error:
-          entitlements.maxChannels === 1
-            ? 'Your plan includes one channel at a time. Upgrade to connect more.'
-            : `Your plan includes up to ${entitlements.maxChannels} channels. Upgrade to connect more.`,
-        success: false,
-      };
-    }
+  const flags = channelFlagsFromIds({
+    whatsappPhoneNumberId: tenantForLimit?.whatsappPhoneNumberId,
+    metaPageId: tenantForLimit?.metaPageId,
+    instagramId: tenantForLimit?.instagramId,
+    widgetPublicKey: tenantForLimit?.widgetPublicKey,
+  });
+  if (wouldExceedChannelLimit(flags, requestedPlatforms, entitlements.maxChannels)) {
+    return { error: channelLimitMessage(entitlements.maxChannels), success: false };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -125,5 +119,109 @@ export async function requestPlatformSetupAction(
 
   revalidatePath('/dashboard/business');
   revalidatePath('/admin/clients');
+  return { error: null, success: true };
+}
+
+function originsFromDomain(raw: string): string[] | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`);
+    if (!url.hostname || url.hostname.includes(' ')) return null;
+    return [`${url.protocol}//${url.host}`];
+  } catch {
+    return null;
+  }
+}
+
+function newWidgetKey(): string {
+  return `pk_live_${randomBytes(16).toString('hex')}`;
+}
+
+async function requireOwner(tenantId: string): Promise<{ error: string } | { ok: true }> {
+  const ctx = await getCallerContext();
+  if (!ctx) return { error: 'Unauthorized.' };
+  try {
+    assertTenantAccess(ctx, tenantId);
+  } catch {
+    return { error: 'Forbidden: tenant not accessible.' };
+  }
+  if (!ctx.isPlatformAdmin && !ctx.memberships.some((m) => m.tenantId === tenantId && m.role === 'tenant_admin')) {
+    return { error: 'Forbidden: only a business owner may manage channels.' };
+  }
+  return { ok: true };
+}
+
+/**
+ * Self-serve website chat: mint (or keep) a public widget key and lock it to
+ * the owner's domain. Never returns or logs the key from a secret store — it
+ * is a public embed id, the same `pk_live_` value the admin create flow already
+ * showed once.
+ */
+export async function enableWidgetAction(
+  tenantId: string,
+  _prev: EnableWidgetState,
+  formData: FormData,
+): Promise<EnableWidgetState> {
+  const gate = await requireOwner(tenantId);
+  if ('error' in gate) return { error: gate.error, success: false };
+
+  const origins = originsFromDomain(String(formData.get('domain') ?? ''));
+  if (!origins) return { error: 'Enter a website domain, like acme.com.', success: false };
+
+  const tenant = await tenants.getById(tenantId);
+  if (!tenant) return { error: 'Tenant not found.', success: false };
+
+  const flags = channelFlagsFromIds({
+    whatsappPhoneNumberId: tenant.whatsappPhoneNumberId,
+    metaPageId: tenant.metaPageId,
+    instagramId: tenant.instagramId,
+    widgetPublicKey: tenant.widgetPublicKey,
+  });
+  const maxChannels = entitlementsFor(tenant.plan).maxChannels;
+  if (wouldExceedChannelLimit(flags, ['web'], maxChannels)) {
+    return { error: channelLimitMessage(maxChannels), success: false };
+  }
+
+  const widgetPublicKey = tenant.widgetPublicKey ?? newWidgetKey();
+  const nextFlags = { ...flags, web: true };
+  const supabase = await createSupabaseServerClient();
+  const { data: current } = await supabase
+    .from('tenants')
+    .select('requested_platforms')
+    .eq('id', tenantId)
+    .maybeSingle();
+  const { error } = await supabase
+    .from('tenants')
+    .update({
+      widget_public_key: widgetPublicKey,
+      widget_allowed_origins: origins,
+      requested_platforms: pruneRequestedPlatforms(current?.requested_platforms, nextFlags),
+    })
+    .eq('id', tenantId);
+
+  if (error) return { error: error.message, success: false };
+
+  revalidatePath('/dashboard/business');
+  revalidatePath('/admin/clients');
+  revalidatePath(`/admin/clients/${tenantId}`);
+  return { error: null, success: true };
+}
+
+export async function rotateWidgetKeyAction(tenantId: string): Promise<EnableWidgetState> {
+  const gate = await requireOwner(tenantId);
+  if ('error' in gate) return { error: gate.error, success: false };
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from('tenants')
+    .update({ widget_public_key: newWidgetKey() })
+    .eq('id', tenantId)
+    .not('widget_public_key', 'is', null);
+  if (error) return { error: error.message, success: false };
+
+  revalidatePath('/dashboard/business');
+  revalidatePath('/admin/clients');
+  revalidatePath(`/admin/clients/${tenantId}`);
   return { error: null, success: true };
 }

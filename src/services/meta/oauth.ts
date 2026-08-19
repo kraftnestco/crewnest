@@ -111,3 +111,117 @@ export async function fetchInstagramAccountId(pageId: string, pageAccessToken: s
   });
   return data.instagram_business_account?.id ?? null;
 }
+
+export const META_WHATSAPP_OAUTH_STATE_COOKIE = 'cn_wa_oauth_state';
+
+const WA_OAUTH_SCOPES = [
+  'whatsapp_business_management',
+  'whatsapp_business_messaging',
+  'business_management',
+].join(',');
+
+export function whatsappRedirectUri(): string {
+  return `${env.NEXT_PUBLIC_APP_URL}/api/meta/whatsapp/callback`;
+}
+
+export function buildWhatsAppAuthorizeUrl(state: string): string {
+  if (!env.META_APP_ID) throw new Error('META_APP_ID is not configured.');
+  const url = new URL(`${OAUTH_DIALOG_BASE}/${env.META_GRAPH_VERSION}/dialog/oauth`);
+  url.searchParams.set('client_id', env.META_APP_ID);
+  url.searchParams.set('redirect_uri', whatsappRedirectUri());
+  url.searchParams.set('state', state);
+  url.searchParams.set('response_type', 'code');
+  if (env.META_WHATSAPP_CONFIG_ID) {
+    url.searchParams.set('config_id', env.META_WHATSAPP_CONFIG_ID);
+    url.searchParams.set('override_default_response_type', 'true');
+    url.searchParams.set(
+      'extras',
+      JSON.stringify({ setup: {}, featureType: 'whatsapp_embedded_signup', sessionInfoVersion: '2' }),
+    );
+  } else {
+    url.searchParams.set('scope', WA_OAUTH_SCOPES);
+  }
+  return url.toString();
+}
+
+export async function exchangeWhatsAppCodeForToken(code: string): Promise<string> {
+  if (!env.META_APP_ID) throw new Error('META_APP_ID is not configured.');
+  const data = await graphGet<{ access_token: string }>('/oauth/access_token', {
+    client_id: env.META_APP_ID,
+    client_secret: env.META_APP_SECRET,
+    redirect_uri: whatsappRedirectUri(),
+    code,
+  });
+  return data.access_token;
+}
+
+export interface WhatsAppPhoneAsset {
+  phoneNumberId: string;
+  wabaId: string;
+  verifiedName: string | null;
+  nameStatus: string | null;
+}
+
+async function graphPost(path: string, params: Record<string, string>): Promise<void> {
+  const url = new URL(`${META_GRAPH_BASE}/${env.META_GRAPH_VERSION}${path}`);
+  const res = await fetch(url.toString(), { method: 'POST', body: new URLSearchParams(params) });
+  const body = (await res.json()) as GraphErrorBody;
+  if (!res.ok || body.error) {
+    throw new Error(`Meta Graph POST ${path} failed: ${body.error?.message ?? res.status}`);
+  }
+}
+
+/**
+ * Resolves a WhatsApp Cloud API phone number from a user/system token minted
+ * by Embedded Signup or WhatsApp scopes. First WABA + first phone number wins
+ * (same single-destination model as tenants.whatsapp_phone_number_id).
+ */
+export async function fetchWhatsAppPhoneAsset(userToken: string): Promise<WhatsAppPhoneAsset | null> {
+  const businesses = await graphGet<{ data?: Array<{ id: string }> }>('/me/businesses', {
+    access_token: userToken,
+    fields: 'id',
+  }).catch(() => ({ data: [] as Array<{ id: string }> }));
+
+  for (const business of businesses.data ?? []) {
+    const wabas = await graphGet<{ data?: Array<{ id: string }> }>(`/${business.id}/owned_whatsapp_business_accounts`, {
+      access_token: userToken,
+    }).catch(() => ({ data: [] as Array<{ id: string }> }));
+
+    for (const waba of wabas.data ?? []) {
+      const phones = await graphGet<{
+        data?: Array<{ id: string; verified_name?: string; name_status?: string }>;
+      }>(`/${waba.id}/phone_numbers`, { access_token: userToken }).catch(() => ({ data: [] }));
+
+      const phone = phones.data?.[0];
+      if (!phone) continue;
+
+      await graphPost(`/${waba.id}/subscribed_apps`, { access_token: userToken }).catch(() => {
+        // Already subscribed, or the token cannot subscribe — messaging may still work.
+      });
+
+      return {
+        phoneNumberId: phone.id,
+        wabaId: waba.id,
+        verifiedName: phone.verified_name ?? null,
+        nameStatus: phone.name_status ?? null,
+      };
+    }
+  }
+
+  return null;
+}
+
+export async function fetchWhatsAppNameStatus(
+  phoneNumberId: string,
+  accessToken: string,
+): Promise<{ verifiedName: string | null; nameStatus: string | null } | null> {
+  try {
+    const data = await graphGet<{ verified_name?: string; name_status?: string }>(`/${phoneNumberId}`, {
+      access_token: accessToken,
+      fields: 'verified_name,name_status',
+    });
+    return { verifiedName: data.verified_name ?? null, nameStatus: data.name_status ?? null };
+  } catch {
+    return null;
+  }
+}

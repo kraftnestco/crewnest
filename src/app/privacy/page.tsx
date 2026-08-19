@@ -67,7 +67,12 @@ export default function PrivacyPage() {
         <a className="underline hover:text-foreground" href={`mailto:${SUPPORT_EMAIL}`}>
           {SUPPORT_EMAIL}
         </a>{' '}
-        and we will process the request within 30 days.
+        and we will process the request within 30 days. Facebook users who requested deletion through Meta
+        can check status at the{' '}
+        <a className="underline hover:text-foreground" href="/privacy/data-deletion">
+          data deletion page
+        </a>
+        .
       </p>
 
       <h2>Security</h2>
