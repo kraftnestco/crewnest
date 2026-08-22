@@ -28,6 +28,7 @@ const OAUTH_DIALOG_BASE = 'https://www.facebook.com';
 // Manager access, add it back deliberately — don't let it regress here.
 const OAUTH_SCOPES = [
   'pages_show_list',
+  'pages_read_engagement', // required to read a Page's instagram_business_account field
   'pages_messaging',
   'pages_manage_metadata',
   'instagram_basic',
