@@ -95,7 +95,15 @@ export async function GET(req: NextRequest) {
         requested_platforms: pruneRequestedPlatforms(tenant.requested_platforms, nextFlags),
       })
       .eq('id', tenantId);
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (error.code === '23505') {
+        return popupResponse(
+          false,
+          'That WhatsApp number is already connected to a different ClerkNest workspace. Disconnect it there first, or connect a different number.',
+        );
+      }
+      throw new Error(error.message);
+    }
 
     revalidatePath('/dashboard/business');
     revalidatePath('/admin/clients');

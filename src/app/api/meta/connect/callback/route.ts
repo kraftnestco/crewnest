@@ -102,7 +102,18 @@ export async function GET(req: NextRequest) {
         requested_platforms: pruneRequestedPlatforms(tenant.requested_platforms, nextFlags),
       })
       .eq('id', tenantId);
-    if (error) throw new Error(error.message);
+    if (error) {
+      // meta_page_id has a unique index (tenants_meta_page_id_uidx) — one Page
+      // can only ever route to one tenant, so a second workspace trying to
+      // claim an already-connected Page hits this, not a generic DB error.
+      if (error.code === '23505') {
+        return popupResponse(
+          false,
+          'That Facebook Page (or its linked Instagram account) is already connected to a different ClerkNest workspace. Disconnect it there first, or connect a different Page.',
+        );
+      }
+      throw new Error(error.message);
+    }
 
     revalidatePath('/dashboard/business');
     revalidatePath('/admin/clients');
@@ -114,10 +125,6 @@ export async function GET(req: NextRequest) {
       error: err instanceof Error ? err.message : 'unknown',
     });
     Sentry.captureException(err, { tags: { flow: 'meta-oauth-connect', tenantId } });
-    // TEMP diagnostic: surface the real Graph/DB error instead of a generic
-    // message so we can see what's failing without prod log access. Revert
-    // to the generic copy once the Facebook/Instagram connect flow is confirmed working.
-    const detail = err instanceof Error ? err.message : 'unknown error';
-    return popupResponse(false, `Connect failed: ${detail}`);
+    return popupResponse(false, 'Something went wrong connecting your account. Please try again.');
   }
 }
