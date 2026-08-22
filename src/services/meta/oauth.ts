@@ -17,13 +17,21 @@ import { META_GRAPH_BASE } from '@/lib/constants';
  * → page tokens → linked IG account) is the stable part.
  */
 const OAUTH_DIALOG_BASE = 'https://www.facebook.com';
+// Deliberately NO 'business_management' here. That scope is what makes Meta's
+// dialog insert a "Choose the Businesses you want to access" step, which
+// requires the owner to already have (or create) a Meta Business Portfolio
+// before Connect can finish — a hard blocker for a "few clicks, under a
+// minute" self-serve flow, and unrelated to what these permissions actually
+// need: fetchManagedPages (/me/accounts) and fetchInstagramAccountId
+// (/{pageId}?fields=instagram_business_account) only require the pages_*/
+// instagram_* scopes below. If a future feature genuinely needs Business
+// Manager access, add it back deliberately — don't let it regress here.
 const OAUTH_SCOPES = [
   'pages_show_list',
   'pages_messaging',
   'pages_manage_metadata',
   'instagram_basic',
   'instagram_manage_messages',
-  'business_management',
 ].join(',');
 
 /** Name of the short-lived httpOnly cookie carrying the CSRF nonce + tenantId between initiate and callback. */
