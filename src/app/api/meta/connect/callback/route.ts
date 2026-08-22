@@ -114,6 +114,10 @@ export async function GET(req: NextRequest) {
       error: err instanceof Error ? err.message : 'unknown',
     });
     Sentry.captureException(err, { tags: { flow: 'meta-oauth-connect', tenantId } });
-    return popupResponse(false, 'Something went wrong connecting your account. Please try again.');
+    // TEMP diagnostic: surface the real Graph/DB error instead of a generic
+    // message so we can see what's failing without prod log access. Revert
+    // to the generic copy once the Facebook/Instagram connect flow is confirmed working.
+    const detail = err instanceof Error ? err.message : 'unknown error';
+    return popupResponse(false, `Connect failed: ${detail}`);
   }
 }
