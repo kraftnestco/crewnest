@@ -17,7 +17,7 @@ import { log } from '@/lib/log';
  */
 export async function fetchProfile(
   externalUserId: string,
-  tenant: Pick<Tenant, 'id' | 'metaTokenSecretId' | 'whatsappTokenSecretId'>,
+  tenant: Pick<Tenant, 'id' | 'metaTokenSecretId' | 'whatsappTokenSecretId' | 'instagramTokenSecretId'>,
 ): Promise<{ name: string | null; avatarUrl: string | null } | null> {
   try {
     const token = await getMetaToken(tenant, 'meta');

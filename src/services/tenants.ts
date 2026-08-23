@@ -26,6 +26,7 @@ function mapTenant(row: TenantRow): Tenant {
     openaiKeySecretId: row.openai_key_secret_id,
     metaTokenSecretId: row.meta_token_secret_id,
     whatsappTokenSecretId: row.whatsapp_token_secret_id,
+    instagramTokenSecretId: row.instagram_token_secret_id,
     widgetPublicKey: row.widget_public_key,
     widgetAllowedOrigins: row.widget_allowed_origins,
     isActive: row.is_active,

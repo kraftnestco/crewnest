@@ -115,12 +115,17 @@ export async function getEmbeddingKey(
   return { key: env.MASTER_OPENAI_KEY, usedByok: false };
 }
 
-/** Resolve the Meta channel token (page / whatsapp) for outbound sends. */
+/** Resolve the Meta channel token (page / whatsapp / standalone instagram) for outbound sends. */
 export async function getMetaToken(
-  tenant: Pick<Tenant, 'metaTokenSecretId' | 'whatsappTokenSecretId'>,
-  channel: 'meta' | 'whatsapp',
+  tenant: Pick<Tenant, 'metaTokenSecretId' | 'whatsappTokenSecretId' | 'instagramTokenSecretId'>,
+  channel: 'meta' | 'whatsapp' | 'instagram',
 ): Promise<string | null> {
-  const secretId = channel === 'whatsapp' ? tenant.whatsappTokenSecretId : tenant.metaTokenSecretId;
+  const secretId =
+    channel === 'whatsapp'
+      ? tenant.whatsappTokenSecretId
+      : channel === 'instagram'
+        ? tenant.instagramTokenSecretId
+        : tenant.metaTokenSecretId;
   if (!secretId) return null;
   return getTenantSecret(secretId);
 }

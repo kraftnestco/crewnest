@@ -12,6 +12,16 @@ import { ENTITLEMENTS } from './entitlements';
 export const META_GRAPH_BASE = 'https://graph.facebook.com';
 
 /**
+ * Instagram API with Instagram Login — a genuinely separate set of hosts from
+ * META_GRAPH_BASE above, not just a path prefix: the authorize dialog lives on
+ * instagram.com, the first token exchange on api.instagram.com, and everything
+ * after (long-lived exchange, profile, messaging) on graph.instagram.com.
+ */
+export const INSTAGRAM_OAUTH_DIALOG_BASE = 'https://www.instagram.com';
+export const INSTAGRAM_API_BASE = 'https://api.instagram.com';
+export const INSTAGRAM_GRAPH_BASE = 'https://graph.instagram.com';
+
+/**
  * The one address ClerkNest shows a visitor/customer anywhere in the app —
  * previously an independent literal in privacy/page.tsx AND terms/page.tsx,
  * which could silently drift out of sync with each other (and with the auth

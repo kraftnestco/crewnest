@@ -27,6 +27,15 @@ const schema = z.object({
   // Optional — WhatsApp Embedded Signup configuration id from the Meta app's
   // WhatsApp product. Unset ⇒ Connect WhatsApp uses standard OAuth scopes instead.
   META_WHATSAPP_CONFIG_ID: z.string().optional(),
+  // Optional — "Instagram API with Instagram Login" (Meta App > Instagram >
+  // API setup with Instagram login). A DIFFERENT app id/secret pair from
+  // META_APP_ID/META_APP_SECRET above, even though it's configured inside the
+  // same Meta App dashboard entry — Meta issues Instagram-specific OAuth
+  // client credentials for this product. Powers "Connect with Instagram"
+  // (no Facebook Page required). Unset ⇒ that button's initiate route
+  // refuses loudly; the Facebook-Page-linked Instagram path is unaffected.
+  INSTAGRAM_APP_ID: z.string().optional(),
+  INSTAGRAM_APP_SECRET: z.string().optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().default('http://localhost:3000'),
   // Optional — email fan-out (docs/14 §3.4, Stage O7) is a no-op until this is set.
   RESEND_API_KEY: z.string().optional(),

@@ -115,7 +115,7 @@ const CHANNELS: ChannelInfo[] = [
     value: 'instagram',
     label: 'Instagram',
     hint: 'Customers DM your Instagram account.',
-    needFromYou: 'Your Instagram handle, and Partner access on Meta Business Manager.',
+    needFromYou: 'Your Instagram professional account login — no Facebook Page needed.',
   },
   {
     value: 'web',
@@ -204,6 +204,43 @@ function WhatsAppConnectButton({ tenantId, reconnect }: { tenantId: string; reco
   return (
     <Button type="button" size="sm" variant="outline" onClick={connect} disabled={isConnecting}>
       {isConnecting ? 'Connecting…' : reconnect ? 'Reconnect' : 'Connect WhatsApp'}
+    </Button>
+  );
+}
+
+/** Standalone Instagram (Meta's Instagram Business Login) — no Facebook Page required, unlike MetaConnectButton above. */
+function InstagramConnectButton({ tenantId, reconnect }: { tenantId: string; reconnect?: boolean }) {
+  const router = useRouter();
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (!event.data || event.data.type !== 'instagram-connected') return;
+      setIsConnecting(false);
+      if (event.data.ok) {
+        toast.success(event.data.note ?? 'Instagram connected.');
+        router.refresh();
+      } else {
+        toast.error(event.data.error ?? 'Connection failed.');
+      }
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [router]);
+
+  function connect() {
+    setIsConnecting(true);
+    openConnectPopup(`/api/meta/instagram?tenantId=${encodeURIComponent(tenantId)}`, 'instagram-connect', () => {
+      setIsConnecting(false);
+      toast.error('Please allow popups to connect Instagram.');
+    });
+    window.setTimeout(() => setIsConnecting(false), 120_000);
+  }
+
+  return (
+    <Button type="button" size="sm" variant="outline" onClick={connect} disabled={isConnecting}>
+      {isConnecting ? 'Connecting…' : reconnect ? 'Reconnect' : 'Connect with Instagram'}
     </Button>
   );
 }
@@ -342,7 +379,10 @@ export function ChannelSetup({
     [requestedPlatforms, connections],
   );
 
-  const messengerNeedsConnect = !connections.facebook || !connections.instagram;
+  // Instagram has its own standalone Connect row below now, so this one only
+  // tracks Facebook/Messenger itself — Instagram riding along on that OAuth
+  // grant is a bonus, not something that gates this button's wording.
+  const messengerNeedsConnect = !connections.facebook;
 
   useEffect(() => {
     if (state.success) {
@@ -436,6 +476,20 @@ export function ChannelSetup({
             </p>
           </div>
           <MetaConnectButton tenantId={tenantId} reconnect={!messengerNeedsConnect} />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-input px-3 py-2.5">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              {connections.instagram ? 'Instagram' : 'Connect Instagram directly'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {connections.instagram
+                ? 'Already connected. Reconnect if messages stop after a password change.'
+                : "Only want Instagram, not Messenger? Connect it on its own — no Facebook Page needed."}
+            </p>
+          </div>
+          <InstagramConnectButton tenantId={tenantId} reconnect={connections.instagram} />
         </div>
 
         <div className="flex items-center justify-between gap-3 rounded-lg border border-input px-3 py-2.5">

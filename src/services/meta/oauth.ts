@@ -1,6 +1,11 @@
 import 'server-only';
 import { env } from '@/lib/env';
-import { META_GRAPH_BASE } from '@/lib/constants';
+import {
+  INSTAGRAM_API_BASE,
+  INSTAGRAM_GRAPH_BASE,
+  INSTAGRAM_OAUTH_DIALOG_BASE,
+  META_GRAPH_BASE,
+} from '@/lib/constants';
 
 /**
  * Facebook Login for Business — the OAuth half of Meta onboarding (docs/27
@@ -233,4 +238,120 @@ export async function fetchWhatsAppNameStatus(
   } catch {
     return null;
   }
+}
+
+/**
+ * "Connect with Instagram" — Meta's newer Instagram API with Instagram Login.
+ * Deliberately NOT graph.facebook.com/dialog/oauth: this product lives on its
+ * own hosts (instagram.com / api.instagram.com / graph.instagram.com), uses
+ * its own INSTAGRAM_APP_ID/SECRET (not META_APP_ID/SECRET), and its own
+ * `instagram_business_*` scopes — but the inbound webhook payload shape and
+ * signature verification are unchanged (see services/meta/parse.ts), so no
+ * new webhook route is needed, only this connect flow and a send-path branch
+ * in services/meta/send.ts.
+ */
+export const META_INSTAGRAM_OAUTH_STATE_COOKIE = 'cn_ig_oauth_state';
+
+const INSTAGRAM_OAUTH_SCOPES = [
+  'instagram_business_basic',
+  'instagram_business_manage_messages',
+].join(',');
+
+export function instagramRedirectUri(): string {
+  return `${env.NEXT_PUBLIC_APP_URL}/api/meta/instagram/callback`;
+}
+
+export function buildInstagramAuthorizeUrl(state: string): string {
+  if (!env.INSTAGRAM_APP_ID) throw new Error('INSTAGRAM_APP_ID is not configured.');
+  const url = new URL(`${INSTAGRAM_OAUTH_DIALOG_BASE}/oauth/authorize`);
+  url.searchParams.set('client_id', env.INSTAGRAM_APP_ID);
+  url.searchParams.set('redirect_uri', instagramRedirectUri());
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('scope', INSTAGRAM_OAUTH_SCOPES);
+  url.searchParams.set('state', state);
+  return url.toString();
+}
+
+/** `path` is unversioned (`/access_token`, `/refresh_access_token`) — that's how Meta's own docs show these two utility endpoints. */
+async function instagramGraphGetUnversioned<T>(path: string, params: Record<string, string>): Promise<T> {
+  const url = new URL(`${INSTAGRAM_GRAPH_BASE}${path}`);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  const res = await fetch(url.toString());
+  const body = (await res.json()) as T & GraphErrorBody;
+  if (!res.ok || body.error) {
+    throw new Error(`Instagram Graph ${path} failed: ${body.error?.message ?? res.status}`);
+  }
+  return body;
+}
+
+/** `path` is a resource path (`/me`, `/{ig-id}/messages`) — these DO take a version, per Meta's own examples. */
+async function instagramGraphGet<T>(path: string, params: Record<string, string>): Promise<T> {
+  const url = new URL(`${INSTAGRAM_GRAPH_BASE}/${env.META_GRAPH_VERSION}${path}`);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  const res = await fetch(url.toString());
+  const body = (await res.json()) as T & GraphErrorBody;
+  if (!res.ok || body.error) {
+    throw new Error(`Instagram Graph ${path} failed: ${body.error?.message ?? res.status}`);
+  }
+  return body;
+}
+
+/** Authorization code → short-lived Instagram USER token. Note: api.instagram.com, a POST, and form-encoded — unlike every other exchange in this file. */
+export async function exchangeInstagramCodeForToken(
+  code: string,
+): Promise<{ accessToken: string; userId: string }> {
+  if (!env.INSTAGRAM_APP_ID || !env.INSTAGRAM_APP_SECRET) {
+    throw new Error('INSTAGRAM_APP_ID/INSTAGRAM_APP_SECRET are not configured.');
+  }
+  const res = await fetch(`${INSTAGRAM_API_BASE}/oauth/access_token`, {
+    method: 'POST',
+    body: new URLSearchParams({
+      client_id: env.INSTAGRAM_APP_ID,
+      client_secret: env.INSTAGRAM_APP_SECRET,
+      grant_type: 'authorization_code',
+      redirect_uri: instagramRedirectUri(),
+      code,
+    }),
+  });
+  const body = (await res.json()) as GraphErrorBody & { access_token?: string; user_id?: string | number };
+  if (!res.ok || body.error || !body.access_token || body.user_id === undefined) {
+    throw new Error(`Instagram token exchange failed: ${body.error?.message ?? res.status}`);
+  }
+  return { accessToken: body.access_token, userId: String(body.user_id) };
+}
+
+/** Short-lived (~1h) Instagram USER token → long-lived (~60d) one. graph.instagram.com, GET, unlike the Facebook-side exchange above. */
+export async function exchangeForLongLivedInstagramToken(shortLivedToken: string): Promise<string> {
+  if (!env.INSTAGRAM_APP_SECRET) throw new Error('INSTAGRAM_APP_SECRET is not configured.');
+  const data = await instagramGraphGetUnversioned<{ access_token: string }>('/access_token', {
+    grant_type: 'ig_exchange_token',
+    client_secret: env.INSTAGRAM_APP_SECRET,
+    access_token: shortLivedToken,
+  });
+  return data.access_token;
+}
+
+export interface InstagramProfile {
+  id: string;
+  username: string | null;
+}
+
+/** The connected professional account's own id/username — id is what webhook entry[].id and outbound {IG_ID}/messages both key on. */
+export async function fetchInstagramProfile(accessToken: string): Promise<InstagramProfile> {
+  const data = await instagramGraphGet<{ user_id?: string; username?: string }>('/me', {
+    fields: 'user_id,username',
+    access_token: accessToken,
+  });
+  if (!data.user_id) throw new Error('Instagram /me did not return a user_id.');
+  return { id: data.user_id, username: data.username ?? null };
+}
+
+/** Subscribes this account's token to receive `messages` webhook events. Best-effort — see fetchWhatsAppPhoneAsset's subscribed_apps call for the same pattern. */
+export async function subscribeInstagramWebhook(accessToken: string): Promise<void> {
+  const url = new URL(`${INSTAGRAM_GRAPH_BASE}/${env.META_GRAPH_VERSION}/me/subscribed_apps`);
+  url.searchParams.set('subscribed_fields', 'messages');
+  url.searchParams.set('access_token', accessToken);
+  await fetch(url.toString(), { method: 'POST' }).catch(() => {
+    // Non-fatal — messaging may still work if the account was already subscribed.
+  });
 }

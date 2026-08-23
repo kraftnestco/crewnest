@@ -91,6 +91,7 @@ export type Database = {
           openai_key_secret_id: string | null;
           meta_token_secret_id: string | null;
           whatsapp_token_secret_id: string | null;
+          instagram_token_secret_id: string | null;
           widget_public_key: string | null;
           widget_allowed_origins: string[];
           is_active: boolean;
@@ -159,6 +160,7 @@ export type Database = {
           openai_key_secret_id?: string | null;
           meta_token_secret_id?: string | null;
           whatsapp_token_secret_id?: string | null;
+          instagram_token_secret_id?: string | null;
           widget_public_key?: string | null;
           widget_allowed_origins?: string[];
           is_active?: boolean;
@@ -227,6 +229,7 @@ export type Database = {
           openai_key_secret_id?: string | null;
           meta_token_secret_id?: string | null;
           whatsapp_token_secret_id?: string | null;
+          instagram_token_secret_id?: string | null;
           widget_public_key?: string | null;
           widget_allowed_origins?: string[];
           is_active?: boolean;

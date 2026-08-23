@@ -39,6 +39,8 @@ export interface Tenant {
   openaiKeySecretId: string | null;
   metaTokenSecretId: string | null;
   whatsappTokenSecretId: string | null;
+  /** Instagram User access token from standalone "Connect with Instagram" (no Facebook Page) — a different token type/API host from metaTokenSecretId. Null when Instagram is only connected via the Facebook-Page-linked flow. */
+  instagramTokenSecretId: string | null;
   widgetPublicKey: string | null;
   widgetAllowedOrigins: string[];
   isActive: boolean;

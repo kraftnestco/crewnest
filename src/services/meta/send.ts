@@ -1,6 +1,6 @@
 import 'server-only';
 import { env } from '@/lib/env';
-import { META_GRAPH_BASE } from '@/lib/constants';
+import { INSTAGRAM_GRAPH_BASE, META_GRAPH_BASE } from '@/lib/constants';
 import { getMetaToken } from '@/lib/secrets';
 import type { Platform, Tenant } from '@/types/domain';
 
@@ -72,7 +72,30 @@ export async function sendText(args: {
     return { ok: res.ok, status: res.status };
   }
 
-  // Messenger (facebook) and Instagram both post to {page_id}/messages with the page token.
+  // Instagram connected standalone (no Facebook Page — "Connect with
+  // Instagram", Instagram Business Login) sends via graph.instagram.com with
+  // an Instagram User token, keyed on the IG account id itself, not a Page.
+  if (platform === 'instagram' && tenant.instagramTokenSecretId) {
+    const token = await getMetaToken(tenant, 'instagram');
+    if (!token || !tenant.instagramId) {
+      throw new Error(`No Instagram token/id for tenant ${tenant.id}`);
+    }
+    const url = `${INSTAGRAM_GRAPH_BASE}/${version}/${tenant.instagramId}/messages`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipient: { id: to },
+        message: { text },
+      }),
+    });
+    if (!res.ok) await throwForFailedResponse(res);
+    return { ok: res.ok, status: res.status };
+  }
+
+  // Messenger (facebook), and Instagram when connected via the Facebook-Page-
+  // linked flow instead of standalone above, both post to {page_id}/messages
+  // with the page token.
   const token = await getMetaToken(tenant, 'meta');
   if (!token || !tenant.metaPageId) {
     throw new Error(`No Meta page token/id for tenant ${tenant.id}`);

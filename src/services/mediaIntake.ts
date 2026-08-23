@@ -52,6 +52,7 @@ export async function processInboundMedia(
     | 'llmProvider'
     | 'metaTokenSecretId'
     | 'whatsappTokenSecretId'
+    | 'instagramTokenSecretId'
     | 'openaiKeySecretId'
   >,
   session: Pick<ChatSession, 'id' | 'platform'>,

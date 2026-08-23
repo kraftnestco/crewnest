@@ -30,7 +30,7 @@ import { log } from '@/lib/log';
  */
 export async function download(
   attachment: InboundAttachment,
-  tenant: Pick<Tenant, 'id' | 'metaTokenSecretId' | 'whatsappTokenSecretId'>,
+  tenant: Pick<Tenant, 'id' | 'metaTokenSecretId' | 'whatsappTokenSecretId' | 'instagramTokenSecretId'>,
   sessionId: string,
   platform: Platform,
 ): Promise<{ storagePath: string; mimeType: string } | null> {
@@ -84,7 +84,7 @@ const MAX_BYTES_BY_KIND: Record<AttachmentKind, number> = {
 
 async function fetchAttachmentBytes(
   attachment: InboundAttachment,
-  tenant: Pick<Tenant, 'metaTokenSecretId' | 'whatsappTokenSecretId'>,
+  tenant: Pick<Tenant, 'metaTokenSecretId' | 'whatsappTokenSecretId' | 'instagramTokenSecretId'>,
   platform: Platform,
 ): Promise<{ bytes: Uint8Array; mimeType: string | null } | null> {
   const maxBytes = MAX_BYTES_BY_KIND[attachment.kind];

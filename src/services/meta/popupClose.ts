@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 export interface MetaPopupMessage {
-  type: 'meta-connected' | 'whatsapp-connected';
+  type: 'meta-connected' | 'whatsapp-connected' | 'instagram-connected';
   ok: boolean;
   error?: string;
   /** Success-path caveat, e.g. "Facebook connected, Instagram needs an upgrade." */
