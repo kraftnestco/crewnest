@@ -13,7 +13,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { StatusPill } from '@/components/status-pill';
 import { cn } from '@/lib/utils';
-import { enableWidgetAction, requestPlatformSetupAction, rotateWidgetKeyAction } from '../actions';
+import {
+  disconnectChannelAction,
+  enableWidgetAction,
+  requestPlatformSetupAction,
+  rotateWidgetKeyAction,
+} from '../actions';
 import {
   initialEnableWidgetState,
   initialRequestPlatformSetupState,
@@ -245,6 +250,75 @@ function InstagramConnectButton({ tenantId, reconnect }: { tenantId: string; rec
   );
 }
 
+/**
+ * Two-step (click-to-confirm, no modal) disconnect for a connected channel.
+ * Reused across Facebook/Instagram/WhatsApp/Website chat rows below — the
+ * `extraWarning` prop covers the one cross-channel case (Facebook taking a
+ * bundled Instagram connection down with it).
+ */
+function DisconnectButton({
+  tenantId,
+  channel,
+  label,
+  extraWarning,
+}: {
+  tenantId: string;
+  channel: PlatformChannel;
+  label: string;
+  extraWarning?: string;
+}) {
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  function disconnect() {
+    startTransition(async () => {
+      const result = await disconnectChannelAction(tenantId, channel);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(`${label} disconnected.`);
+        setConfirming(false);
+        router.refresh();
+      }
+    });
+  }
+
+  if (confirming) {
+    return (
+      <div className="flex flex-col items-end gap-1.5">
+        <div className="flex items-center gap-2">
+          <Button type="button" size="sm" variant="destructive" onClick={disconnect} disabled={isPending}>
+            {isPending ? 'Disconnecting…' : 'Confirm disconnect'}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setConfirming(false)}
+            disabled={isPending}
+          >
+            Cancel
+          </Button>
+        </div>
+        {extraWarning && <p className="max-w-[220px] text-right text-[11px] text-destructive">{extraWarning}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+      onClick={() => setConfirming(true)}
+    >
+      Disconnect
+    </Button>
+  );
+}
+
 function widgetSnippet(appUrl: string, key: string): string {
   return `<script src="${appUrl.replace(/\/$/, '')}/embed/widget.js" data-clerknest-key="${key}" defer></script>`;
 }
@@ -335,6 +409,7 @@ function WidgetSetup({
             >
               {rotating ? 'Rotating…' : 'Rotate key'}
             </Button>
+            <DisconnectButton tenantId={tenantId} channel="web" label="Website chat" />
           </div>
         </div>
       )}
@@ -358,6 +433,7 @@ export function ChannelSetup({
   widgetAllowedOrigins,
   appUrl,
   whatsappNameStatus,
+  instagramBundledWithFacebook,
 }: {
   tenantId: string;
   connections: Record<PlatformChannel, boolean>;
@@ -368,6 +444,8 @@ export function ChannelSetup({
   widgetAllowedOrigins: string[];
   appUrl: string;
   whatsappNameStatus: string | null;
+  /** True when Instagram is only reachable via the Facebook Page token (no standalone token) — see instagramTokenSecretId's docstring in types/domain.ts. Disconnecting Facebook takes this Instagram connection down too. */
+  instagramBundledWithFacebook: boolean;
 }) {
   const boundAction = requestPlatformSetupAction.bind(null, tenantId);
   const [state, formAction, isPending] = useActionState(boundAction, initialRequestPlatformSetupState);
@@ -475,7 +553,21 @@ export function ChannelSetup({
                 : 'Already connected. Reconnect if messages stop after a password change.'}
             </p>
           </div>
-          <MetaConnectButton tenantId={tenantId} reconnect={!messengerNeedsConnect} />
+          <div className="flex shrink-0 items-center gap-2">
+            <MetaConnectButton tenantId={tenantId} reconnect={!messengerNeedsConnect} />
+            {connections.facebook && (
+              <DisconnectButton
+                tenantId={tenantId}
+                channel="facebook"
+                label="Facebook"
+                extraWarning={
+                  connections.instagram && instagramBundledWithFacebook
+                    ? 'This will also disconnect Instagram (it rides on the same Facebook connection).'
+                    : undefined
+                }
+              />
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-between gap-3 rounded-lg border border-input px-3 py-2.5">
@@ -489,7 +581,12 @@ export function ChannelSetup({
                 : "Only want Instagram, not Messenger? Connect it on its own — no Facebook Page needed."}
             </p>
           </div>
-          <InstagramConnectButton tenantId={tenantId} reconnect={connections.instagram} />
+          <div className="flex shrink-0 items-center gap-2">
+            <InstagramConnectButton tenantId={tenantId} reconnect={connections.instagram} />
+            {connections.instagram && (
+              <DisconnectButton tenantId={tenantId} channel="instagram" label="Instagram" />
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-between gap-3 rounded-lg border border-input px-3 py-2.5">
@@ -501,7 +598,12 @@ export function ChannelSetup({
                 : 'Meta window: confirm the business, phone number, and display name.'}
             </p>
           </div>
-          <WhatsAppConnectButton tenantId={tenantId} reconnect={connections.whatsapp} />
+          <div className="flex shrink-0 items-center gap-2">
+            <WhatsAppConnectButton tenantId={tenantId} reconnect={connections.whatsapp} />
+            {connections.whatsapp && (
+              <DisconnectButton tenantId={tenantId} channel="whatsapp" label="WhatsApp" />
+            )}
+          </div>
         </div>
 
         <WidgetSetup

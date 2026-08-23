@@ -9,6 +9,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { notify } from '@/services/notifications';
 import * as tenants from '@/services/tenants';
 import { entitlementsFor } from '@/lib/entitlements';
+import { deleteTenantSecret } from '@/lib/secrets';
+import { log } from '@/lib/log';
+import type { Database } from '@/types/database';
 import {
   channelFlagsFromIds,
   channelLimitMessage,
@@ -17,6 +20,7 @@ import {
 } from '@/lib/channels';
 import {
   PLATFORM_CHANNEL_VALUES,
+  type DisconnectChannelState,
   type EnableWidgetState,
   type PlatformChannel,
   type RequestPlatformSetupState,
@@ -224,4 +228,84 @@ export async function rotateWidgetKeyAction(tenantId: string): Promise<EnableWid
   revalidatePath('/admin/clients');
   revalidatePath(`/admin/clients/${tenantId}`);
   return { error: null, success: true };
+}
+
+/**
+ * Disconnects one channel, freeing its plan slot (lib/channels.ts) and best-effort
+ * deleting its Vault secret (the tenant-row column is the only reference to it —
+ * see deleteTenantSecret's docstring). Row-level RLS (tenants_update_self, 0018)
+ * already lets a tenant_admin write any column on their own row, so this uses the
+ * same RLS-respecting server client as enableWidgetAction/rotateWidgetKeyAction
+ * above, not the service-role client the unauthenticated OAuth callbacks use.
+ */
+export async function disconnectChannelAction(
+  tenantId: string,
+  channel: PlatformChannel,
+): Promise<DisconnectChannelState> {
+  const gate = await requireOwner(tenantId);
+  if ('error' in gate) return { error: gate.error };
+
+  const tenant = await tenants.getById(tenantId);
+  if (!tenant) return { error: 'Tenant not found.' };
+
+  const update: Database['public']['Tables']['tenants']['Update'] = {};
+  const secretsToDelete: string[] = [];
+
+  switch (channel) {
+    case 'facebook': {
+      if (!tenant.metaPageId) return { error: 'Facebook is not connected.' };
+      update.meta_page_id = null;
+      update.meta_token_secret_id = null;
+      if (tenant.metaTokenSecretId) secretsToDelete.push(tenant.metaTokenSecretId);
+      // Instagram riding on the Facebook Page token (no standalone token of its
+      // own — see instagramTokenSecretId's docstring in types/domain.ts) can't
+      // send/receive once the Page connection is gone, so take it down too.
+      if (tenant.instagramId && !tenant.instagramTokenSecretId) {
+        update.instagram_id = null;
+      }
+      break;
+    }
+    case 'instagram': {
+      if (!tenant.instagramId) return { error: 'Instagram is not connected.' };
+      update.instagram_id = null;
+      update.instagram_token_secret_id = null;
+      if (tenant.instagramTokenSecretId) secretsToDelete.push(tenant.instagramTokenSecretId);
+      break;
+    }
+    case 'whatsapp': {
+      if (!tenant.whatsappPhoneNumberId) return { error: 'WhatsApp is not connected.' };
+      update.whatsapp_phone_number_id = null;
+      update.whatsapp_token_secret_id = null;
+      if (tenant.whatsappTokenSecretId) secretsToDelete.push(tenant.whatsappTokenSecretId);
+      break;
+    }
+    case 'web': {
+      if (!tenant.widgetPublicKey) return { error: 'Website chat is not enabled.' };
+      update.widget_public_key = null;
+      update.widget_allowed_origins = [];
+      break;
+    }
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from('tenants').update(update).eq('id', tenantId);
+  if (error) return { error: error.message };
+
+  for (const secretId of secretsToDelete) {
+    try {
+      await deleteTenantSecret(secretId);
+    } catch (err) {
+      // The tenant row is already detached from this secret — an orphaned Vault
+      // row is a cleanup nit, not a reason to report the disconnect as failed.
+      log.warn('[disconnect] failed to delete orphaned vault secret', {
+        secretId,
+        error: err instanceof Error ? err.message : 'unknown',
+      });
+    }
+  }
+
+  revalidatePath('/dashboard/business');
+  revalidatePath('/admin/clients');
+  revalidatePath(`/admin/clients/${tenantId}`);
+  return { error: null };
 }

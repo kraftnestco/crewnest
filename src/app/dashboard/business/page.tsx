@@ -27,7 +27,7 @@ export default async function DashboardBusinessPage() {
   const { data: tenant } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, system_prompt, catalog_data, catalog_freeform_text, custom_orders_enabled, custom_orders_require_approval, custom_order_instructions, media_handling, voice_handling, business_type, booking_link, booking_enabled, booking_mode, booking_own_link, booking_duration_minutes, booking_lead_time_minutes, booking_max_days_ahead, knowledge_base, business_hours, timezone, payments_enabled, payment_methods, payment_instructions, default_currency, prepaid_required, whatsapp_phone_number_id, meta_page_id, instagram_id, widget_public_key, widget_allowed_origins, requested_platforms, platform_setup_notes, platform_setup_requested_at, intake_completed_at, whatsapp_token_secret_id',
+      'id, business_name, system_prompt, catalog_data, catalog_freeform_text, custom_orders_enabled, custom_orders_require_approval, custom_order_instructions, media_handling, voice_handling, business_type, booking_link, booking_enabled, booking_mode, booking_own_link, booking_duration_minutes, booking_lead_time_minutes, booking_max_days_ahead, knowledge_base, business_hours, timezone, payments_enabled, payment_methods, payment_instructions, default_currency, prepaid_required, whatsapp_phone_number_id, meta_page_id, instagram_id, instagram_token_secret_id, widget_public_key, widget_allowed_origins, requested_platforms, platform_setup_notes, platform_setup_requested_at, intake_completed_at, whatsapp_token_secret_id',
     )
     .eq('id', activeTenantId)
     .single();
@@ -65,6 +65,7 @@ export default async function DashboardBusinessPage() {
         widgetAllowedOrigins={tenant.widget_allowed_origins ?? []}
         appUrl={env.NEXT_PUBLIC_APP_URL}
         whatsappNameStatus={whatsappNameStatus}
+        instagramBundledWithFacebook={Boolean(tenant.instagram_id) && !tenant.instagram_token_secret_id}
       />
 
       <div className="border-t pt-8">
