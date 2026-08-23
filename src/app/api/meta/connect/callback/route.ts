@@ -23,9 +23,9 @@ import {
 export const runtime = 'nodejs';
 export const maxDuration = 30; // several sequential Graph API round-trips
 
-function popupResponse(ok: boolean, error?: string) {
+function popupResponse(ok: boolean, error?: string, note?: string) {
   return metaPopupResponse(
-    { type: 'meta-connected', ok, error },
+    { type: 'meta-connected', ok, error, note },
     META_OAUTH_STATE_COOKIE,
     '/api/meta/connect',
   );
@@ -78,26 +78,41 @@ export async function GET(req: NextRequest) {
       instagramId: tenant.instagram_id,
       widgetPublicKey: tenant.widget_public_key,
     });
-    const adding: Array<'facebook' | 'instagram'> = [];
-    if (!current.facebook) adding.push('facebook');
-    if (instagramId && !current.instagram) adding.push('instagram');
     const maxChannels = entitlementsFor(tenant.plan).maxChannels;
-    if (wouldExceedChannelLimit(current, adding, maxChannels)) {
+
+    // Facebook is the thing the owner actually clicked "Connect" for — if it
+    // alone doesn't fit the plan, stop before saving anything.
+    if (!current.facebook && wouldExceedChannelLimit(current, ['facebook'], maxChannels)) {
       return popupResponse(false, channelLimitMessage(maxChannels));
+    }
+
+    // Instagram is best-effort: Meta's OAuth dialog hands it back bundled
+    // with Facebook whether the owner wants it counted separately or not
+    // (docs/27 §5 C2). If adding it on top of Facebook would exceed the
+    // plan, connect Facebook alone and tell the owner why, instead of
+    // blocking the whole flow over a channel they may not even use.
+    let addInstagram = Boolean(instagramId) && !current.instagram;
+    let instagramSkippedNote: string | undefined;
+    if (addInstagram) {
+      const flagsAfterFacebook = { ...current, facebook: true };
+      if (wouldExceedChannelLimit(flagsAfterFacebook, ['instagram'], maxChannels)) {
+        addInstagram = false;
+        instagramSkippedNote = `Facebook connected. Instagram wasn't enabled — ${channelLimitMessage(maxChannels)}`;
+      }
     }
 
     const metaTokenSecretId = await setTenantSecret(`tenant:${tenantId}:meta`, page.accessToken);
     const nextFlags = {
       ...current,
       facebook: true,
-      instagram: Boolean(instagramId) || current.instagram,
+      instagram: addInstagram || current.instagram,
     };
 
     const { error } = await svc
       .from('tenants')
       .update({
         meta_page_id: page.id,
-        instagram_id: instagramId ?? tenant.instagram_id,
+        instagram_id: addInstagram ? instagramId : tenant.instagram_id,
         meta_token_secret_id: metaTokenSecretId,
         requested_platforms: pruneRequestedPlatforms(tenant.requested_platforms, nextFlags),
       })
@@ -118,7 +133,7 @@ export async function GET(req: NextRequest) {
     revalidatePath('/dashboard/business');
     revalidatePath('/admin/clients');
     revalidatePath(`/admin/clients/${tenantId}`);
-    return popupResponse(true);
+    return popupResponse(true, undefined, instagramSkippedNote);
   } catch (err) {
     log.error('[meta connect] OAuth callback failed', {
       tenantId,

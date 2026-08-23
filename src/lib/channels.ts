@@ -35,17 +35,16 @@ export function newChannelsAmong(flags: ChannelFlags, adding: readonly ChannelId
 }
 
 /**
- * How many plan "slots" a connect action consumes. One Facebook Login grant
- * covers Messenger + linked Instagram together (docs/27 §5 C2) — that pair
- * counts as ONE slot, not two, so free-plan owners can complete Connect.
+ * How many plan "slots" a connect action consumes. Facebook (Messenger) and
+ * Instagram each count as their OWN slot, even though a single Facebook
+ * Login grant can hand back both at once (docs/27 §5 C2) — a business
+ * decision, not a technical constraint: each platform is a distinct paid
+ * channel. Callers that discover both from one OAuth grant (the connect
+ * callback) are responsible for deciding which one(s) to actually save when
+ * only some of them fit the plan — see connect/callback/route.ts.
  */
 export function newChannelSlotsAmong(flags: ChannelFlags, adding: readonly ChannelId[]): number {
-  const fresh = newChannelsAmong(flags, adding);
-  if (fresh.length === 0) return 0;
-  if (fresh.includes('facebook') && fresh.includes('instagram')) {
-    return fresh.length - 1;
-  }
-  return fresh.length;
+  return newChannelsAmong(flags, adding).length;
 }
 
 export function wouldExceedChannelLimit(

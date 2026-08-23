@@ -58,11 +58,14 @@ export async function GET(req: NextRequest) {
     instagramId: tenant.instagram_id,
     widgetPublicKey: tenant.widget_public_key,
   });
-  const adding: Array<'facebook' | 'instagram'> = [];
-  if (!flags.facebook) adding.push('facebook');
-  if (!flags.instagram) adding.push('instagram');
+  // Only pre-check Facebook itself here — whether the chosen Page even has a
+  // linked Instagram account isn't known until the OAuth round-trip
+  // completes, so that check happens in the callback instead (where, if
+  // Instagram alone would exceed the plan, Facebook still connects and
+  // Instagram is skipped with an explanatory note rather than blocking the
+  // whole flow over a channel the owner may not even have).
   const maxChannels = entitlementsFor(tenant.plan).maxChannels;
-  if (wouldExceedChannelLimit(flags, adding, maxChannels)) {
+  if (!flags.facebook && wouldExceedChannelLimit(flags, ['facebook'], maxChannels)) {
     return new Response(channelLimitMessage(maxChannels), { status: 403 });
   }
 

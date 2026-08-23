@@ -146,7 +146,7 @@ function MetaConnectButton({ tenantId, reconnect }: { tenantId: string; reconnec
       if (!event.data || event.data.type !== 'meta-connected') return;
       setIsConnecting(false);
       if (event.data.ok) {
-        toast.success('Facebook & Instagram connected.');
+        toast.success(event.data.note ?? 'Facebook & Instagram connected.');
         router.refresh();
       } else {
         toast.error(event.data.error ?? 'Connection failed.');

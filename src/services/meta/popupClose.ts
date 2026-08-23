@@ -4,6 +4,8 @@ export interface MetaPopupMessage {
   type: 'meta-connected' | 'whatsapp-connected';
   ok: boolean;
   error?: string;
+  /** Success-path caveat, e.g. "Facebook connected, Instagram needs an upgrade." */
+  note?: string;
 }
 
 /**

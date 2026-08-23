@@ -30,8 +30,9 @@ describe('channel cap', () => {
     expect(wouldExceedChannelLimit(flags, ['web'], 1)).toBe(false);
   });
 
-  it('treats Messenger + Instagram OAuth as one slot on free', () => {
-    expect(wouldExceedChannelLimit(empty, ['facebook', 'instagram'], 1)).toBe(false);
+  it('counts Messenger + Instagram as two separate slots on free', () => {
+    expect(wouldExceedChannelLimit(empty, ['facebook', 'instagram'], 1)).toBe(true);
+    expect(wouldExceedChannelLimit(empty, ['facebook'], 1)).toBe(false);
   });
 
   it('allows reconnect of an already-connected channel', () => {
