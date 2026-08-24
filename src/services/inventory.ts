@@ -18,6 +18,8 @@ export interface InventoryItem {
   name: string;
   description: string | null;
   price: string | null;
+  /** Per-unit cost of goods (COGS). null = not tracked. */
+  unitCost: number | null;
   /** null = not tracked (treated as always available); >= 0 = units on hand. */
   stock: number | null;
 }
@@ -48,6 +50,13 @@ export interface DecrementResult {
   changed: boolean;
 }
 
+export interface IncrementResult {
+  /** The catalogue with matched, tracked items incremented. */
+  catalog: Json;
+  /** True when any item's stock actually changed. */
+  changed: boolean;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -67,6 +76,15 @@ function readPrice(raw: unknown): string | null {
   return null;
 }
 
+/** Coerce unit_cost / cost into a non-negative number, or null when unset. */
+export function readUnitCost(raw: unknown): number | null {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return Math.max(0, raw);
+  if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) {
+    return Math.max(0, Number(raw));
+  }
+  return null;
+}
+
 /**
  * Normalise `catalog_data` (the array-of-items shape) into inventory rows. Items
  * without a usable name are skipped; a non-array catalogue (legacy object form)
@@ -81,6 +99,7 @@ export function readInventory(catalogData: unknown): InventoryItem[] {
       name: raw.name,
       description: typeof raw.description === 'string' ? raw.description : null,
       price: readPrice(raw.price),
+      unitCost: readUnitCost(raw.unit_cost ?? raw.cost),
       stock: readStock(raw.stock),
     });
   }
@@ -111,6 +130,27 @@ export function setStockInCatalog(catalogData: unknown, name: string, stock: num
   });
   // Controlled boundary: the input came from a Json column, so the transformed
   // array is still JSON-serialisable.
+  return next as unknown as Json;
+}
+
+/**
+ * Set per-unit cost on a catalogue item (`unit_cost` in JSON). Pass null to
+ * clear tracking. Exact name match, same semantics as setStockInCatalog.
+ */
+export function setUnitCostInCatalog(catalogData: unknown, name: string, unitCost: number | null): Json {
+  if (!Array.isArray(catalogData)) return (catalogData as Json) ?? [];
+  const target = name.trim().toLowerCase();
+  const next = catalogData.map((raw) => {
+    if (!isRecord(raw) || typeof raw.name !== 'string' || raw.name.trim().toLowerCase() !== target) return raw;
+    const copy: Record<string, unknown> = { ...raw };
+    if (unitCost === null) {
+      delete copy.unit_cost;
+      delete copy.cost;
+    } else {
+      copy.unit_cost = Math.max(0, unitCost);
+    }
+    return copy;
+  });
   return next as unknown as Json;
 }
 
@@ -156,4 +196,39 @@ export function applyOrderDecrements(catalogData: unknown, lines: OrderLine[]): 
   });
 
   return { catalog: next as unknown as Json, events, changed };
+}
+
+/**
+ * Revert a previously-applied order decrement by adding each ordered quantity
+ * back to tracked stock items (same name matching semantics as decrements).
+ *
+ * Used when a confirmed order is cancelled, so Inventory stays consistent with
+ * the final order state.
+ */
+export function applyOrderIncrements(catalogData: unknown, lines: OrderLine[]): IncrementResult {
+  if (!Array.isArray(catalogData)) {
+    return { catalog: (catalogData as Json) ?? [], changed: false };
+  }
+
+  const wanted = new Map<string, number>();
+  for (const line of lines) {
+    const key = line.name.trim().toLowerCase();
+    if (!key || !Number.isFinite(line.qty) || line.qty <= 0) continue;
+    wanted.set(key, (wanted.get(key) ?? 0) + Math.floor(line.qty));
+  }
+  if (wanted.size === 0) return { catalog: catalogData as Json, changed: false };
+
+  let changed = false;
+  const next = catalogData.map((raw) => {
+    if (!isRecord(raw) || typeof raw.name !== 'string') return raw;
+    const qty = wanted.get(raw.name.trim().toLowerCase());
+    const current = readStock(raw.stock);
+    if (qty === undefined || current === null) return raw;
+    const updated = current + qty;
+    if (updated === current) return raw;
+    changed = true;
+    return { ...raw, stock: updated };
+  });
+
+  return { catalog: next as unknown as Json, changed };
 }

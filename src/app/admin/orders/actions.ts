@@ -7,7 +7,7 @@ import * as tenants from '@/services/tenants';
 import * as sessions from '@/services/sessions';
 import { sendTemplate, sendText } from '@/services/meta/send';
 import * as media from '@/services/meta/media';
-import { applyOrderStockEffects } from '@/services/inventoryStore';
+import { applyOrderStockEffects, revertOrderStockEffects } from '@/services/inventoryStore';
 import type { Database } from '@/types/database';
 import type { OrderAttachment, OrderItem, Tenant } from '@/types/domain';
 import { orderRef } from '@/lib/orderRef';
@@ -16,6 +16,7 @@ import { log } from '@/lib/log';
 export type OrderRow = Database['public']['Tables']['orders']['Row'];
 export type OrderStatus = Database['public']['Enums']['order_status'];
 export type OrderSort = 'date_desc' | 'date_asc' | 'price_asc' | 'price_desc';
+export type OrderRange = 'all' | '7d' | '30d' | '90d';
 
 const PAGE_SIZE = 25;
 
@@ -115,6 +116,7 @@ export interface GetOrdersPageInput {
   offset?: number;
   status?: OrderStatus | 'all';
   sort?: OrderSort;
+  range?: OrderRange;
   /**
    * Agency-only client filter (docs: admin orders client filter, mirrors the
    * notification bell's dropdown). Narrows an already-visible RLS result set —
@@ -144,6 +146,12 @@ export async function getOrdersPageAction(input: GetOrdersPageInput): Promise<Ge
   }
   if (input.tenantId) {
     query = query.eq('tenant_id', input.tenantId);
+  }
+  if (input.range && input.range !== 'all') {
+    const now = Date.now();
+    const days = input.range === '7d' ? 7 : input.range === '30d' ? 30 : 90;
+    const from = new Date(now - days * 24 * 60 * 60 * 1000).toISOString();
+    query = query.gte('created_at', from);
   }
 
   switch (input.sort ?? 'date_desc') {
@@ -339,6 +347,24 @@ export async function cancelOrderAction(orderId: string, reason: string): Promis
 
   const notes = [order.notes, `Cancelled by business: ${trimmedReason}`].filter(Boolean).join('\n');
   await orderService.reject(orderId, notes);
+
+  // Confirmed orders consume tracked stock; pending orders do not. Roll stock
+  // back on a confirmed->cancelled transition so Inventory reflects reality.
+  if (order.status === 'confirmed') {
+    try {
+      const fullOrder = await orderService.getById(orderId);
+      const items = (fullOrder?.items ?? []) as OrderItem[];
+      await revertOrderStockEffects(
+        order.tenant_id,
+        items.map((i) => ({ name: i.name, qty: i.qty })),
+      );
+    } catch (err) {
+      log.error('[orders] stock rollback failed (cancel)', {
+        orderId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   const tenant = await tenants.getById(order.tenant_id);
   const noun = orderNoun(tenant);

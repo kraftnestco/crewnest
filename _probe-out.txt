@@ -1,0 +1,4 @@
+﻿--- occurrence 0 at 6950672
+"center justify-center text-white ring-2 ring-[#16100F]`,children:(0,C.jsx)(e.Icon,{size:11})},e.key))}),(0,C.jsx)(`p`,{className:`text-ivory/85 text-xs font-bold uppercase tracking-[.16em]`,children:`Social Media Automation Platform`})]})]}),(0,C.jsxs)(`div`,{className:`reveal w-full mt-12 lg:mt-0 lg:justify-self-end relative`,style:{transitionDelay:`140ms`},children:[(0,C.jsx)(De,{}),(0,C.jsxs)(`div`,{className:`hidden xl:flex "
+landing-links status 200 len 71581
+has quietMobile true

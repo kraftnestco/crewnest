@@ -71,7 +71,7 @@ export interface Tenant {
   paymentKeySecretId: string | null;
   defaultCurrency: string;
   prepaidRequired: boolean;
-  /** App-validated tier id ('free'/'starter'/'growth'/'pro') — not a DB enum. Limits live in lib/entitlements.ts. */
+  /** App-validated tier id ('free'/'starter'/'growth'/'pro'/'enterprise') — not a DB enum. Limits live in lib/entitlements.ts. */
   plan: string;
   /** Non-null only while a self-serve paid selection awaits agency activation (docs Phase C). */
   planStatus: string | null;

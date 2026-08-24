@@ -1,0 +1,16 @@
+﻿Desktop first-view demo panel backup (pre bubble-only)
+
+What was live through v32:
+- Glass ClerkNest Dashboard overlay (chat + live orders + activity + footer stats)
+- Floating bubble-deco pills (Order #1047, Booked)
+- CSS: see desktop-dashboard-glass-v32.css
+
+v33+: dashboard HTML still mounts from the bundle but is hidden via
+data-cn-dashboard-hidden; transparent ManyChat bubbles replace it
+([data-cn-desktop-bubbles]) with the same functionality showcase as chips:
+catalogue, order #, paid/confirm, handoff, owner reply, availability,
+booking+deposit, website inbox, lead qualified.
+
+To restore the glass dashboard: remove desktop bubble injection in
+ensureMobileChatBubbles, stop hiding .cn-hero-visual children, and
+re-apply the glass CSS from desktop-dashboard-glass-v32.css.

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { assertTenantAccess, getCallerContext } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { readInventory, setStockInCatalog } from '@/services/inventory';
+import { readInventory, setStockInCatalog, setUnitCostInCatalog } from '@/services/inventory';
 import { log } from '@/lib/log';
 
 /**
@@ -81,6 +81,7 @@ export async function setItemStockAction(
   }
 
   revalidatePath('/dashboard/inventory');
+  revalidatePath('/dashboard/finance');
   return { error: null, success: true };
 }
 
@@ -120,5 +121,38 @@ export async function restockItemAction(
   }
 
   revalidatePath('/dashboard/inventory');
+  revalidatePath('/dashboard/finance');
+  return { error: null, success: true };
+}
+
+/** Set per-unit cost on a catalogue item, or clear with null. */
+export async function setItemUnitCostAction(
+  tenantId: string,
+  name: string,
+  unitCost: number | null,
+): Promise<InventoryActionResult> {
+  const denied = await assertTenantAdmin(tenantId);
+  if (denied) return denied;
+
+  const trimmed = name.trim();
+  if (!trimmed) return { error: 'Item name is required.', success: false };
+  if (unitCost !== null && (!Number.isFinite(unitCost) || unitCost < 0)) {
+    return { error: 'Unit cost must be zero or positive.', success: false };
+  }
+
+  const read = await readCatalog(tenantId);
+  if ('error' in read) return { error: read.error, success: false };
+
+  const next = setUnitCostInCatalog(read.catalog, trimmed, unitCost);
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from('tenants').update({ catalog_data: next }).eq('id', tenantId);
+  if (error) {
+    log.error('[inventory] set unit cost failed', { tenantId, error: error.message });
+    return { error: error.message, success: false };
+  }
+
+  revalidatePath('/dashboard/inventory');
+  revalidatePath('/dashboard/finance');
   return { error: null, success: true };
 }

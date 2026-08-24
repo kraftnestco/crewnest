@@ -69,9 +69,6 @@ export function TryDemo() {
   const [paywallOpen, setPaywallOpen] = useState(false);
 
   function handleSelectPlan(plan: PlanOption) {
-    // The 'blocked' phase never ran parseDemoIntakeFormData (that only happens
-    // on a successful /api/demo/start), so build it here from what's already
-    // been collected rather than requiring another round trip.
     const tenant = demoTenant ?? (pendingFormData ? parseDemoIntakeFormData(pendingFormData, businessName.trim() || 'Your business') : null);
     if (!tenant) return;
     const handoff: DemoHandoff = { demoTenant: tenant, planId: plan.id, email };

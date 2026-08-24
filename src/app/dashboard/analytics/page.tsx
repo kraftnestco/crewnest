@@ -1,11 +1,12 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { PlatformBadge, type PlatformId } from '@/app/_landing/platform-icons';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/page-header';
 import { AnalyticsInfoDialog } from '@/components/analytics-info-dialog';
-import { getVolume, getDeflection, getSentimentHealth, getCsat, getCommerceMetrics } from '@/services/analytics';
+import { getVolume, getDeflection, getSentimentHealth, getCsat, getCommerceMetrics, getPlatformBreakdown, getEcommerceMetrics } from '@/services/analytics';
 import type { DateRange, SentimentBucket } from '@/services/analytics';
 
 /**
@@ -37,9 +38,33 @@ const SENTIMENT_COLORS: Record<SentimentBucket, string> = {
   cancellation_risk: 'bg-purple-500',
   clear: 'bg-emerald-500',
 };
+const PLATFORM_BADGE: Record<string, PlatformId> = {
+  whatsapp: 'whatsapp',
+  facebook: 'messenger',
+  instagram: 'instagram',
+  web: 'web',
+};
+const PLATFORM_LABEL: Record<string, string> = {
+  whatsapp: 'WhatsApp',
+  facebook: 'Messenger',
+  instagram: 'Instagram',
+  web: 'Website chat',
+};
 
 function formatPercent(rate: number | null): string {
   return rate === null ? 'No data' : `${(rate * 100).toFixed(1)}%`;
+}
+
+function formatMoney(amount: number, currency: string | null): string {
+  const code = currency && currency.length === 3 ? currency.toUpperCase() : null;
+  if (code) {
+    try {
+      return new Intl.NumberFormat(undefined, { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(amount);
+    } catch {
+      // fall through
+    }
+  }
+  return amount.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
 export default async function DashboardAnalyticsPage({
@@ -60,15 +85,54 @@ export default async function DashboardAnalyticsPage({
   const from = new Date(to.getTime() - selectedRange.days * 24 * 60 * 60 * 1000);
   const range: DateRange = { from: from.toISOString(), to: to.toISOString() };
 
-  const [volume, deflection, sentiment, csat, commerce] = await Promise.all([
+  const [volume, deflection, sentiment, csat, commerce, platformBreakdown, ecommerce] = await Promise.all([
     getVolume(activeTenantId, range),
     getDeflection(activeTenantId, range),
     getSentimentHealth(activeTenantId, range),
     getCsat(activeTenantId, range),
     getCommerceMetrics(activeTenantId, range),
+    getPlatformBreakdown(activeTenantId, range),
+    getEcommerceMetrics(activeTenantId, range),
   ]);
 
+  const money = ecommerce.primaryCurrency;
+
   const headlineCards = [
+    {
+      label: 'Revenue earned',
+      value: formatMoney(ecommerce.revenuePaid, money),
+      tone: 'bg-primary/20 ring-primary/35',
+    },
+    {
+      label: 'Net profit',
+      value: formatMoney(ecommerce.netProfit, money),
+      tone: 'bg-emerald-500/20 ring-emerald-500/35 dark:bg-emerald-400/20 dark:ring-emerald-400/35',
+    },
+    {
+      label: 'COGS',
+      value: formatMoney(ecommerce.cogs, money),
+      tone: 'bg-rose-500/20 ring-rose-500/35 dark:bg-rose-400/20 dark:ring-rose-400/35',
+    },
+    {
+      label: 'Expenses',
+      value: formatMoney(ecommerce.operatingExpenses, money),
+      tone: 'bg-orange-500/20 ring-orange-500/35 dark:bg-orange-400/20 dark:ring-orange-400/35',
+    },
+    {
+      label: 'Avg order value',
+      value: ecommerce.averageOrderValue === null ? '—' : formatMoney(ecommerce.averageOrderValue, money),
+      tone: 'bg-sky-500/20 ring-sky-500/35 dark:bg-sky-400/20 dark:ring-sky-400/35',
+    },
+    {
+      label: 'Gross sales',
+      value: formatMoney(ecommerce.grossSales, money),
+      tone: 'bg-violet-500/20 ring-violet-500/35 dark:bg-violet-400/20 dark:ring-violet-400/35',
+    },
+    {
+      label: 'Awaiting payment',
+      value: formatMoney(ecommerce.pendingPaymentAmount, money),
+      tone: 'bg-amber-500/20 ring-amber-500/35 dark:bg-amber-400/20 dark:ring-amber-400/35',
+    },
     {
       label: 'Conversations started',
       value: volume.conversationsStarted.toLocaleString(),
@@ -137,6 +201,30 @@ export default async function DashboardAnalyticsPage({
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      <div>
+        <h2 className="mb-2 font-heading text-sm font-semibold">Performance by platform</h2>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {platformBreakdown.map((row) => (
+            <Card key={row.platform}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">
+                  <span className="inline-flex items-center gap-2">
+                    <PlatformBadge platform={PLATFORM_BADGE[row.platform]} className="size-6 rounded-lg shadow-none" iconClassName="size-3" />
+                    {PLATFORM_LABEL[row.platform]}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <p className="text-muted-foreground">Conversations: {row.conversationsStarted}</p>
+                <p>Response rate: {formatPercent(row.responseRate)}</p>
+                <p>Performance: {formatPercent(row.performanceRate)}</p>
+                <p>Conversion: {formatPercent(row.conversionRate)}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       <div>

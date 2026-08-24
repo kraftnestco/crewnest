@@ -53,7 +53,7 @@ export function HeroSection({ channels }: { channels: PlatformId[] }) {
       */}
       <HeroVisual variant={variant} className="mt-8 lg:col-start-2 lg:row-start-1 lg:row-span-5 lg:mt-0" />
       <p className="max-w-xl text-lg text-muted-foreground text-balance lg:col-start-1 lg:row-start-3">
-        An AI employee that answers WhatsApp, Facebook, Instagram, and web chat — takes orders and
+        An AI employee that answers WhatsApp, Facebook, Instagram, and web chat, takes orders and
         bookings, grounded in your catalogue, with a human one tap away.
       </p>
       <div

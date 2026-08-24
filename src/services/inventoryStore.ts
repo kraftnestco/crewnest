@@ -1,7 +1,7 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
 import { notifyBoth } from './notifications';
-import { applyOrderDecrements, type OrderLine } from './inventory';
+import { applyOrderDecrements, applyOrderIncrements, type OrderLine } from './inventory';
 import type { Tenant } from '@/types/domain';
 
 /**
@@ -54,4 +54,22 @@ export async function applyOrderStockEffects(
     agency: { title: `Stock alert — ${tenant.businessName}`, body, link: '/admin/clients' },
     tenant: { title: 'Stock running low', body, link: '/dashboard/inventory' },
   });
+}
+
+/**
+ * Reverse tracked stock for a cancelled confirmed order.
+ *
+ * No low-stock/out-of-stock notification fan-out on rollback — this is an
+ * internal consistency correction, not a customer-driven stock movement.
+ */
+export async function revertOrderStockEffects(tenantId: string, lines: OrderLine[]): Promise<void> {
+  const svc = createServiceClient();
+  const { data, error } = await svc.from('tenants').select('catalog_data').eq('id', tenantId).single();
+  if (error || !data) throw error ?? new Error('Tenant not found for stock rollback.');
+
+  const { catalog, changed } = applyOrderIncrements(data.catalog_data, lines);
+  if (!changed) return;
+
+  const { error: updErr } = await svc.from('tenants').update({ catalog_data: catalog }).eq('id', tenantId);
+  if (updErr) throw updErr;
 }

@@ -15,6 +15,7 @@ import { LOW_STOCK_THRESHOLD, type InventoryItem } from '@/services/inventory';
 import {
   restockItemAction,
   setItemStockAction,
+  setItemUnitCostAction,
   type InventoryActionResult,
 } from './inventory-actions';
 
@@ -98,11 +99,10 @@ export function InventoryPanel({
       {tracked.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Stock tracking is optional. Set a count on any item below and your assistant will stop taking
-          orders once it sells out, and nudge you to restock. Leave an item untracked to keep it always
-          available.
+          orders once it sells out, and nudge you to restock. Add a unit cost to track true profit in Finance.
         </p>
       ) : (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Card>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Tracked</p>
@@ -141,6 +141,13 @@ export function InventoryPanel({
               onRestock={() =>
                 run(item.name, () => restockItemAction(tenantId, item.name, RESTOCK_STEP), `Added ${RESTOCK_STEP}.`)
               }
+              onSetCost={(cost) =>
+                run(
+                  item.name,
+                  () => setItemUnitCostAction(tenantId, item.name, cost),
+                  cost === null ? 'Cost cleared.' : 'Unit cost updated.',
+                )
+              }
             />
           ))}
         </CardContent>
@@ -154,21 +161,27 @@ function InventoryRow({
   busy,
   onSet,
   onRestock,
+  onSetCost,
 }: {
   item: InventoryItem;
   busy: boolean;
   onSet: (stock: number | null) => void;
   onRestock: () => void;
+  onSetCost: (cost: number | null) => void;
 }) {
   const [value, setValue] = useState(item.stock === null ? '' : String(item.stock));
+  const [costValue, setCostValue] = useState(item.unitCost === null ? '' : String(item.unitCost));
   const tracked = item.stock !== null;
 
-  // Keep the draft input aligned with server stock after +10 / Set / refresh.
-  // Without this, restock updates the badge but leaves the typed box stale.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- sync controlled draft from props after server mutation
     setValue(item.stock === null ? '' : String(item.stock));
   }, [item.stock]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync controlled draft from props after server mutation
+    setCostValue(item.unitCost === null ? '' : String(item.unitCost));
+  }, [item.unitCost]);
 
   function commit() {
     const trimmed = value.trim();
@@ -184,17 +197,36 @@ function InventoryRow({
     onSet(Math.floor(n));
   }
 
+  function commitCost() {
+    const trimmed = costValue.trim();
+    if (trimmed === '') {
+      onSetCost(null);
+      return;
+    }
+    const n = Number(trimmed);
+    if (!Number.isFinite(n) || n < 0) {
+      toast.error('Unit cost must be zero or a positive number.');
+      return;
+    }
+    onSetCost(n);
+  }
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+    <div className="flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <p className="truncate text-sm font-medium">{item.name}</p>
           <StockBadge stock={item.stock} />
         </div>
-        {item.price && <p className="mt-0.5 text-xs text-muted-foreground">{item.price}</p>}
+        {item.price && <p className="mt-0.5 text-xs text-muted-foreground">Sell: {item.price}</p>}
+        {item.unitCost !== null && (
+          <p className="mt-0.5 text-xs text-muted-foreground">Cost: {item.unitCost}</p>
+        )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-col gap-2 sm:items-end">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Stock</span>
         <Input
           type="number"
           min={0}
@@ -232,6 +264,30 @@ function InventoryRow({
             Stop tracking
           </Button>
         )}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Unit cost</span>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            value={costValue}
+            onChange={(e) => setCostValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                commitCost();
+              }
+            }}
+            disabled={busy}
+            placeholder="—"
+            aria-label={`Unit cost for ${item.name}`}
+            className="h-8 w-24"
+          />
+          <Button size="sm" variant="outline" onClick={commitCost} disabled={busy}>
+            Set cost
+          </Button>
+        </div>
       </div>
     </div>
   );

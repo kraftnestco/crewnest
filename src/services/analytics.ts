@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { MIN_CSAT_SAMPLE } from '@/lib/constants';
+import { computeCogsFromOrders, countRepeatBuyers, sumOperatingExpenses } from '@/services/finance';
 import type { AlertSignal, HandoffCause } from '@/types/domain';
 
 /**
@@ -68,6 +69,43 @@ export interface CommerceMetrics {
   paymentEligibleOrders: number;
   paidOrders: number;
   paymentConversionRate: number | null;
+}
+
+/**
+ * Owner-facing money metrics for a date range. When catalogue items carry
+ * `unit_cost` and operating expenses are logged, netProfit reflects true
+ * profit (revenue − refunds − COGS − expenses).
+ */
+export interface EcommerceMetrics {
+  revenuePaid: number;
+  refundedAmount: number;
+  /** Paid revenue minus refunds in the same window. */
+  netRevenue: number;
+  /** Product cost of goods sold (paid orders × unit_cost). */
+  cogs: number;
+  /** Logged business expenses in the same window. */
+  operatingExpenses: number;
+  /** netRevenue − cogs − operatingExpenses. */
+  netProfit: number;
+  grossMarginPct: number | null;
+  repeatBuyers: number;
+  /** Confirmed/fulfilled order totals (includes unpaid). */
+  grossSales: number;
+  pendingPaymentAmount: number;
+  ordersPaid: number;
+  ordersSecured: number;
+  averageOrderValue: number | null;
+  itemsSold: number;
+  primaryCurrency: string | null;
+  multiCurrency: boolean;
+}
+
+export interface PlatformBreakdownRow {
+  platform: 'whatsapp' | 'facebook' | 'instagram' | 'web' | 'voice';
+  conversationsStarted: number;
+  responseRate: number | null;
+  performanceRate: number | null; // deflection-like: automated conversations / started
+  conversionRate: number | null; // secured orders / started conversations
 }
 
 const ALL_HANDOFF_CAUSES: HandoffCause[] = ['requested', 'alert', 'tool_exhaustion', 'media_review'];
@@ -313,4 +351,177 @@ export async function getCommerceMetrics(tenantId: string | null, range: DateRan
     paidOrders,
     paymentConversionRate,
   };
+}
+
+function sumOrderAmounts(
+  rows: Array<{ amount_total: number | null; currency: string | null; payment_status: string; status: string; items: unknown }>,
+): EcommerceMetrics {
+  const currencyTotals = new Map<string, number>();
+  let revenuePaid = 0;
+  let refundedAmount = 0;
+  let grossSales = 0;
+  let pendingPaymentAmount = 0;
+  let ordersPaid = 0;
+  let ordersSecured = 0;
+  let itemsSold = 0;
+  let paidAmountForAov = 0;
+
+  for (const row of rows) {
+    const amount = typeof row.amount_total === 'number' && Number.isFinite(row.amount_total) ? row.amount_total : 0;
+    const currency = row.currency?.trim() || '_';
+    currencyTotals.set(currency, (currencyTotals.get(currency) ?? 0) + amount);
+
+    const secured = row.status === 'confirmed' || row.status === 'fulfilled';
+    if (secured) {
+      ordersSecured += 1;
+      grossSales += amount;
+      if (Array.isArray(row.items)) {
+        for (const item of row.items) {
+          if (item && typeof item === 'object' && 'qty' in item) {
+            const qty = Number((item as { qty?: unknown }).qty);
+            if (Number.isFinite(qty) && qty > 0) itemsSold += qty;
+          }
+        }
+      }
+    }
+
+    if (row.payment_status === 'paid') {
+      revenuePaid += amount;
+      ordersPaid += 1;
+      paidAmountForAov += amount;
+    } else if (row.payment_status === 'refunded') {
+      refundedAmount += amount;
+    } else if (secured && (row.payment_status === 'unpaid' || row.payment_status === 'awaiting_verification')) {
+      pendingPaymentAmount += amount;
+    }
+  }
+
+  const currencies = [...currencyTotals.keys()].filter((c) => c !== '_');
+  let primaryCurrency: string | null = null;
+  if (currencies.length > 0) {
+    primaryCurrency = currencies.sort((a, b) => (currencyTotals.get(b) ?? 0) - (currencyTotals.get(a) ?? 0))[0] ?? null;
+  }
+
+  return {
+    revenuePaid,
+    refundedAmount,
+    netRevenue: revenuePaid - refundedAmount,
+    cogs: 0,
+    operatingExpenses: 0,
+    netProfit: revenuePaid - refundedAmount,
+    grossMarginPct: null,
+    repeatBuyers: 0,
+    grossSales,
+    pendingPaymentAmount,
+    ordersPaid,
+    ordersSecured,
+    averageOrderValue: ordersPaid > 0 ? paidAmountForAov / ordersPaid : null,
+    itemsSold,
+    primaryCurrency,
+    multiCurrency: currencies.length > 1,
+  };
+}
+
+/**
+ * Revenue / net / AOV snapshot for the owner dashboard and analytics page.
+ * Includes cancelled rows only when they were refunded (so refunds still show).
+ */
+export async function getEcommerceMetrics(tenantId: string | null, range: DateRange): Promise<EcommerceMetrics> {
+  const supabase = await createSupabaseServerClient();
+
+  let query = supabase
+    .from('orders')
+    .select('status, payment_status, amount_total, currency, items')
+    .gte('created_at', range.from)
+    .lt('created_at', range.to)
+    .or('status.in.(confirmed,fulfilled),payment_status.eq.refunded');
+
+  if (tenantId) query = query.eq('tenant_id', tenantId);
+
+  const catalogPromise = tenantId
+    ? supabase.from('tenants').select('catalog_data').eq('id', tenantId).single()
+    : Promise.resolve({ data: null, error: null });
+
+  const [{ data, error }, catalogRes] = await Promise.all([query, catalogPromise]);
+  if (error) throw error;
+
+  const base = sumOrderAmounts(data ?? []);
+  if (!tenantId) return base;
+
+  const catalogData = catalogRes.data?.catalog_data ?? null;
+  const cogs = computeCogsFromOrders(data ?? [], catalogData);
+  const operatingExpenses = await sumOperatingExpenses(tenantId, range);
+  const repeatBuyers = await countRepeatBuyers(tenantId, range);
+  const netProfit = base.netRevenue - cogs - operatingExpenses;
+  const grossMarginPct =
+    base.netRevenue > 0 && cogs > 0 ? ((base.netRevenue - cogs) / base.netRevenue) * 100 : null;
+
+  return {
+    ...base,
+    cogs,
+    operatingExpenses,
+    netProfit,
+    grossMarginPct,
+    repeatBuyers,
+  };
+}
+
+/**
+ * Per-platform performance slice for the client analytics page: response,
+ * automation performance, and conversion shown separately for each channel.
+ */
+export async function getPlatformBreakdown(
+  tenantId: string | null,
+  range: DateRange,
+): Promise<PlatformBreakdownRow[]> {
+  const supabase = await createSupabaseServerClient();
+
+  let sessionsQuery = supabase
+    .from('chat_sessions')
+    .select('id, platform, is_human_handoff')
+    .gte('created_at', range.from)
+    .lt('created_at', range.to);
+  let repliesQuery = supabase
+    .from('chat_messages')
+    .select('session_id')
+    .eq('role', 'assistant')
+    .gte('created_at', range.from)
+    .lt('created_at', range.to);
+  let ordersQuery = supabase
+    .from('orders')
+    .select('platform, status')
+    .in('status', ['confirmed', 'fulfilled'])
+    .gte('created_at', range.from)
+    .lt('created_at', range.to);
+
+  if (tenantId) {
+    sessionsQuery = sessionsQuery.eq('tenant_id', tenantId);
+    repliesQuery = repliesQuery.eq('tenant_id', tenantId);
+    ordersQuery = ordersQuery.eq('tenant_id', tenantId);
+  }
+
+  const [{ data: sessions, error: sessionsError }, { data: replies, error: repliesError }, { data: orders, error: ordersError }] =
+    await Promise.all([sessionsQuery, repliesQuery, ordersQuery]);
+  if (sessionsError) throw sessionsError;
+  if (repliesError) throw repliesError;
+  if (ordersError) throw ordersError;
+
+  const platforms: PlatformBreakdownRow['platform'][] = ['whatsapp', 'instagram', 'facebook', 'web'];
+  const repliedSessionIds = new Set((replies ?? []).map((row) => row.session_id));
+
+  return platforms.map((platform) => {
+    const platformSessions = (sessions ?? []).filter((s) => s.platform === platform);
+    const conversationsStarted = platformSessions.length;
+    const responded = platformSessions.filter((s) => repliedSessionIds.has(s.id)).length;
+    const automated = platformSessions.filter((s) => !s.is_human_handoff).length;
+    const securedOrders = (orders ?? []).filter((o) => o.platform === platform).length;
+
+    return {
+      platform,
+      conversationsStarted,
+      responseRate: conversationsStarted > 0 ? responded / conversationsStarted : null,
+      performanceRate: conversationsStarted > 0 ? automated / conversationsStarted : null,
+      conversionRate: conversationsStarted > 0 ? securedOrders / conversationsStarted : null,
+    };
+  });
 }

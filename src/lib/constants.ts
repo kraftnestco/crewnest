@@ -235,18 +235,15 @@ export const RETRIEVAL_TOP_K = 8;
 export const RETRIEVED_CONTEXT_TOKEN_BUDGET = 2000;
 
 /**
- * Free-plan daily cap on NEW distinct customer conversations per tenant (docs:
- * self-serve signup plan, Phase D). Resets at UTC midnight. Existing sessions
- * already counted for the day keep replying normally — only a brand-new
- * (tenant, platform, external user) session is gated.
+ * Free-plan monthly cap on NEW distinct customer conversations per tenant.
+ * Resets at UTC month start. Existing sessions keep replying normally — only a
+ * brand-new (tenant, platform, external user) session is gated.
  *
- * @deprecated The daily cap is now PER PLAN (free/starter 5, growth 20, pro
- * unlimited) and lives in `lib/entitlements.ts`. Read
- * `entitlementsFor(tenant.plan).dailyConversations` instead — this alias is kept
- * only so any external reference keeps compiling, and is derived from the
- * entitlements table so the two can never disagree.
+ * Prefer `entitlementsFor(tenant.plan).monthlyConversations`. This alias is kept
+ * so older imports keep compiling and stays derived from ENTITLEMENTS.
  */
-export const FREE_PLAN_DAILY_SESSION_CAP = ENTITLEMENTS.free.dailyConversations;
+export const FREE_PLAN_DAILY_SESSION_CAP = ENTITLEMENTS.free.monthlyConversations;
+export const FREE_PLAN_MONTHLY_SESSION_CAP = ENTITLEMENTS.free.monthlyConversations;
 
 /**
  * Stage U-cap (docs/18 §3, finding #7) — platform default for the free-plan

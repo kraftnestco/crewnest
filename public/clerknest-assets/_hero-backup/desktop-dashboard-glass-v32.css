@@ -1,0 +1,18 @@
+﻿/* BACKUP: desktop glass dashboard panel styles from landing-links.js v32
+   Restore by pasting into @media (min-width: 1024px) and removing
+   [data-cn-desktop-bubbles] injection + unhiding .cn-hero-visual dashboard.
+*/
+.cn-mobile-hero .cn-hero-visual {
+  position: relative;
+  z-index: 2;
+}
+.cn-mobile-hero .cn-hero-visual [class*="max-w-[540px]"] {
+  background-image: linear-gradient(135deg, rgba(37, 211, 102, 0.28), rgba(0, 132, 255, 0.22)) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.22) !important;
+  padding: 1px !important;
+}
+.cn-mobile-hero .cn-hero-visual [class*="rounded-[20px]"][class*="bg-white"] {
+  background: rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(20px) saturate(1.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}

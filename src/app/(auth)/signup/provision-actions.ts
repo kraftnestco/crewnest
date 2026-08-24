@@ -10,7 +10,7 @@ import { parseCatalogueFreeform } from '@/services/ai/catalogueParser';
 import { ingestTenantKnowledge } from '@/services/knowledge';
 import * as tenantsService from '@/services/tenants';
 import type { DemoTenantInput } from '@/services/demo/schema';
-import { isPlanId } from '@/lib/entitlements';
+import { isPaidPlanId, isPlanId } from '@/lib/entitlements';
 import { normalizeBillingCountry } from '@/lib/signup-country';
 import type { Json } from '@/types/database';
 import { log } from '@/lib/log';
@@ -49,8 +49,10 @@ export async function provisionTenantAction(input: {
   }
 
   const { demoTenant } = input;
-  const planId = isPlanId(input.planId) ? input.planId : 'free';
-  const isFree = planId === 'free';
+  // Enterprise is sales-led — never treat it as a self-serve pending upgrade.
+  const requested = isPlanId(input.planId) ? input.planId : 'free';
+  const planId = isPaidPlanId(requested) || requested === 'free' ? requested : 'free';
+  const isSelfServePaid = isPaidPlanId(planId);
 
   const svc = createServiceClient();
   const { data: tenant, error: insertError } = await svc
@@ -85,7 +87,7 @@ export async function provisionTenantAction(input: {
       // through the provider itself (Stripe metadata.plan_id /
       // Safepay's `<tenantId>:<planId>` reference), not through this row.
       plan: 'free',
-      plan_status: isFree ? null : 'pending_upgrade',
+      plan_status: isSelfServePaid ? 'pending_upgrade' : null,
       billing_country: normalizeBillingCountry(input.billingCountry),
     })
     .select('id')
@@ -121,7 +123,7 @@ export async function provisionTenantAction(input: {
     log.warn('[signup] referral attribution failed', { tenantId: tenant.id, err });
   }
 
-  if (!isFree) {
+  if (isSelfServePaid) {
     await notify({
       scope: 'agency',
       tenantId: tenant.id,
@@ -151,5 +153,5 @@ export async function provisionTenantAction(input: {
   });
 
   revalidatePath('/dashboard');
-  return { error: null, tenantId: tenant.id, planStatus: isFree ? null : 'pending_upgrade' };
+  return { error: null, tenantId: tenant.id, planStatus: isSelfServePaid ? 'pending_upgrade' : null };
 }

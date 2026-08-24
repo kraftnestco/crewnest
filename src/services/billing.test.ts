@@ -17,6 +17,7 @@ vi.mock('@/lib/env', () => ({
     STRIPE_PRICE_STARTER: 'price_starter_39',
     STRIPE_PRICE_GROWTH: 'price_growth_49',
     STRIPE_PRICE_PRO: 'price_pro_79',
+    STRIPE_PRICE_ENTERPRISE: 'price_enterprise_199',
   },
 }));
 vi.mock('@/lib/supabase/service', () => ({ createServiceClient: () => ({}) }));

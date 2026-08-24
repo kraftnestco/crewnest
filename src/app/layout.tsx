@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ClerkNest — AI employees for every channel",
+  title: "ClerkNest | AI employees for every channel",
   description:
     "ClerkNest gives your business an AI employee that answers customers across WhatsApp, Facebook, Instagram, and website chat. Every answer is grounded in your catalogue, with human handoff built in.",
   icons: {

@@ -6,6 +6,7 @@ import {
   ChartNoAxesColumn,
   CreditCard,
   House,
+  Landmark,
   MessagesSquare,
   Package,
   Store,
@@ -29,6 +30,7 @@ function buildItems(showBusiness: boolean, showBookings: boolean): NavItem[] {
       ? [{ href: '/dashboard/appointments', label: 'Appointments', shortLabel: 'Bookings', icon: CalendarDays }]
       : []),
     { href: '/dashboard/analytics', label: 'Analytics', icon: ChartNoAxesColumn },
+    ...(showBusiness ? [{ href: '/dashboard/finance', label: 'Finance', shortLabel: 'Finance', icon: Landmark }] : []),
     ...(showBusiness ? [{ href: '/dashboard/business', label: 'My Business', shortLabel: 'Business', icon: Store }] : []),
     // Ordered daily-driver-first: whatever falls past MobileTabBar's 4-visible
     // cap collapses into its "More" menu, not off the nav entirely (docs/27

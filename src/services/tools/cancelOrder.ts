@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import * as orders from '@/services/orders';
+import { revertOrderStockEffects } from '@/services/inventoryStore';
 import { notifyBoth } from '@/services/notifications';
 import { orderRef } from '@/lib/orderRef';
 import type { ToolContext, ToolExecutor } from './registry';
@@ -49,6 +50,20 @@ export const cancelOrderTool: ToolExecutor = {
     }
 
     const updated = await orders.cancel(target.id, args.reason ?? null);
+
+    // Customer cancellation: if this was a confirmed order, its stock was
+    // already consumed at confirmation time, so return those units.
+    if (target.status === 'confirmed') {
+      try {
+        await revertOrderStockEffects(
+          ctx.tenant.id,
+          target.items.map((i) => ({ name: i.name, qty: i.qty })),
+        );
+      } catch {
+        // Best-effort parity with order confirmation decrement: don't block the
+        // customer cancellation if stock rollback fails.
+      }
+    }
 
     await notifyBoth({
       tenantId: ctx.tenant.id,
