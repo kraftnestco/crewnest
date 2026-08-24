@@ -23,7 +23,7 @@ export default async function SignupPage({
         </>
       }
     >
-      <SignupForm initialEmail={email ?? ''} planId={plan ?? 'free'} />
+      <SignupForm initialEmail={email ?? ''} planId={plan ?? 'free'} planPreselected={Boolean(plan)} />
     </AuthShell>
   );
 }

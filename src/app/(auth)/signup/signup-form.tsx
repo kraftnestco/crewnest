@@ -17,7 +17,22 @@ import { SIGNUP_COUNTRY_OPTIONS, normalizeBillingCountry } from '@/lib/signup-co
  * code via the Supabase "Confirm signup" template, which must be configured
  * with `{{ .Token }}` the same way Invite/Recovery already are.
  */
-export function SignupForm({ initialEmail, planId }: { initialEmail: string; planId: string }) {
+export function SignupForm({
+  initialEmail,
+  planId,
+  planPreselected = false,
+}: {
+  initialEmail: string;
+  planId: string;
+  /**
+   * True only when the visitor arrived with an explicit `?plan=` from the
+   * demo's paywall modal. A direct visit to /signup has no param and
+   * defaults to 'free' for the form's internal logic — but we must NOT then
+   * claim "you selected the Free plan", since they selected nothing. The
+   * real plan choice happens later on the onboarding plan-picker step.
+   */
+  planPreselected?: boolean;
+}) {
   const [supabase] = useState(() => createSupabaseBrowserClient());
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
@@ -121,7 +136,7 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
 
   return (
     <div className="flex flex-col gap-3">
-      {plan && (
+      {plan && planPreselected && (
         <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
           You selected the <span className="font-medium text-foreground">{plan.name}</span> plan ({plan.price}).
         </p>
