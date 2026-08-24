@@ -74,6 +74,7 @@ const schema = z.object({
   /** Growth ($49) — added alongside the tier; unset ⇒ Growth checkout refuses loudly, like the others. */
   STRIPE_PRICE_GROWTH: z.string().optional(),
   STRIPE_PRICE_PRO: z.string().optional(),
+  STRIPE_PRICE_ENTERPRISE: z.string().optional(),
   // Optional — Safepay billing for Pakistani tenants (docs/25). Same posture as
   // Stripe above: unset ⇒ checkout/portal refuse loudly rather than no-op.
   SAFEPAY_SECRET_KEY: z.string().optional(),
@@ -82,6 +83,7 @@ const schema = z.object({
   /** Growth ($49) — see STRIPE_PRICE_GROWTH. */
   SAFEPAY_PLAN_GROWTH: z.string().optional(),
   SAFEPAY_PLAN_PRO: z.string().optional(),
+  SAFEPAY_PLAN_ENTERPRISE: z.string().optional(),
   /** 'production' | 'sandbox' — Safepay's API host. Defaults to sandbox so a
    *  half-configured deploy can never take real money by accident. */
   SAFEPAY_ENVIRONMENT: z.enum(['production', 'sandbox']).default('sandbox'),

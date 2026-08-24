@@ -1,4 +1,8 @@
-import type { NextConfig } from "next";
+﻿import type { NextConfig } from "next";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Baseline security headers.
@@ -34,8 +38,14 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: projectRoot,
+  },
   async rewrites() {
     return {
+      // beforeFiles: serve the prebuilt ClerkNest landing on "/" so it wins
+      // over app/page.tsx. App routes (/login, /signup, /dashboard) are
+      // different paths and are unaffected.
       beforeFiles: [
         {
           source: "/",

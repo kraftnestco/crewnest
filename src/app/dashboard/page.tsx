@@ -6,17 +6,21 @@ import {
   BarChart3,
   CheckCircle2,
   ChevronRight,
+  DollarSign,
   MessageCircle,
   MessagesSquare,
   Rocket,
+  ShoppingBag,
   Sparkles,
+  TrendingUp,
   Users,
+  Wallet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getTenantAttentionItems, getClerkCards } from '@/services/overview';
-import { countSessionsToday } from '@/services/sessions';
+import { countSessionsThisMonth } from '@/services/sessions';
 import { entitlementsFor, isLimited } from '@/lib/entitlements';
 import { PAYWALL_PLANS } from '@/services/demo/plans';
 import { formatRelativeTime } from '@/lib/relative-time';
@@ -24,14 +28,22 @@ import { PageHeader } from '@/components/page-header';
 import { EmptyState } from '@/components/empty-state';
 import { Card, CardContent } from '@/components/ui/card';
 import { BusinessCopilot } from '@/components/copilot/business-copilot';
+import { PlatformBadge, type PlatformId } from '@/app/_landing/platform-icons';
 import { ClerkStrip } from './clerk-strip';
 import { HomeIcon } from '@/components/home-icon';
+import { getEcommerceMetrics, type DateRange } from '@/services/analytics';
 
 const CHANNEL_LABELS: Record<string, string> = {
   whatsapp: 'WhatsApp',
   facebook: 'Messenger',
   instagram: 'Instagram',
   web: 'Website chat',
+};
+const CHANNEL_BADGES: Record<string, PlatformId> = {
+  whatsapp: 'whatsapp',
+  facebook: 'messenger',
+  instagram: 'instagram',
+  web: 'web',
 };
 
 function QuotaRing({ remaining, total }: { remaining: number; total: number }) {
@@ -111,7 +123,34 @@ function StatCard({
  * or hidden behind a paywall), the copilot sits below it as a section rather
  * than replacing the page, and the activity numbers close it out.
  */
-export default async function DashboardHomePage() {
+const SALES_RANGE_OPTIONS = [
+  { value: '7d', label: '7 days', days: 7 },
+  { value: '30d', label: '30 days', days: 30 },
+  { value: '90d', label: '90 days', days: 90 },
+  { value: 'mtd', label: 'This month', days: null },
+] as const;
+
+function formatMoney(amount: number, currency: string | null): string {
+  const code = currency && currency.length === 3 ? currency.toUpperCase() : null;
+  if (code) {
+    try {
+      return new Intl.NumberFormat(undefined, { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(amount);
+    } catch {
+      // fall through
+    }
+  }
+  return amount.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+export default async function DashboardHomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ salesRange?: string }>;
+}) {
+  const { salesRange: salesRangeParam } = await searchParams;
+  const selectedSalesRange =
+    SALES_RANGE_OPTIONS.find((r) => r.value === salesRangeParam) ?? SALES_RANGE_OPTIONS[1];
+
   const ctx = await getCallerContext(); // layout already gated; re-derive (React cache dedupes)
   if (!ctx) redirect('/login');
   const cookieStore = await cookies();
@@ -130,6 +169,12 @@ export default async function DashboardHomePage() {
   const dayAgo = new Date(now - 24 * 60 * 60 * 1000).toISOString();
   const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
   const monthStart = new Date(new Date(now).getFullYear(), new Date(now).getMonth(), 1).toISOString();
+  const salesTo = new Date(now);
+  const salesFrom =
+    selectedSalesRange.value === 'mtd'
+      ? new Date(monthStart)
+      : new Date(now - (selectedSalesRange.days ?? 30) * 24 * 60 * 60 * 1000);
+  const salesRange: DateRange = { from: salesFrom.toISOString(), to: salesTo.toISOString() };
 
   const [
     attentionItems,
@@ -138,13 +183,17 @@ export default async function DashboardHomePage() {
     { count: activeConversations },
     { count: ordersThisMonth },
     { count: appointmentsThisMonth },
-    conversationsToday,
+    conversationsThisMonth,
     { data: ratingRows },
+    { data: sessions30d },
+    { data: userMessages30d },
+    { data: platformOrders30d },
+    ecommerce,
   ] = await Promise.all([
     getTenantAttentionItems(activeTenantId, 5),
     supabase
       .from('tenants')
-      .select('business_name, whatsapp_phone_number_id, meta_page_id, instagram_id, widget_public_key, plan, business_type, booking_enabled')
+      .select('business_name, whatsapp_phone_number_id, meta_page_id, instagram_id, widget_public_key, plan, business_type, booking_enabled, default_currency')
       .eq('id', activeTenantId)
       .single(),
     supabase
@@ -168,8 +217,25 @@ export default async function DashboardHomePage() {
       .eq('tenant_id', activeTenantId)
       .neq('status', 'cancelled')
       .gte('created_at', monthStart),
-    countSessionsToday(activeTenantId),
+    countSessionsThisMonth(activeTenantId),
     supabase.from('orders').select('review_rating').eq('tenant_id', activeTenantId).not('review_rating', 'is', null),
+    supabase
+      .from('chat_sessions')
+      .select('id, platform')
+      .eq('tenant_id', activeTenantId)
+      .gte('created_at', thirtyDaysAgo),
+    supabase
+      .from('chat_messages')
+      .select('session_id')
+      .eq('tenant_id', activeTenantId)
+      .eq('role', 'user')
+      .gte('created_at', thirtyDaysAgo),
+    supabase
+      .from('orders')
+      .select('platform')
+      .eq('tenant_id', activeTenantId)
+      .gte('created_at', thirtyDaysAgo),
+    getEcommerceMetrics(activeTenantId, salesRange),
   ]);
 
   const ratings = (ratingRows ?? []).map((r) => r.review_rating).filter((r): r is number => r !== null);
@@ -180,12 +246,12 @@ export default async function DashboardHomePage() {
   // why marketing copy and enforcement must not live in separate places).
   const entitlements = entitlementsFor(tenant?.plan);
   const hasCopilot = entitlements.hasCopilot;
-  const dailyCap = entitlements.dailyConversations;
-  // The daily cap now applies to Starter/Growth too, not just free — so the
-  // banner is shown for any LIMITED plan rather than keyed off plan === 'free'.
-  const showQuotaBanner = isLimited(dailyCap);
-  const quotaRemaining = Math.max(0, dailyCap - conversationsToday);
+  const monthlyCap = entitlements.monthlyConversations;
+  // Monthly new-conversation caps apply to every limited plan, not just free.
+  const showQuotaBanner = isLimited(monthlyCap);
+  const quotaRemaining = Math.max(0, monthlyCap - conversationsThisMonth);
   const planLabel = PAYWALL_PLANS.find((p) => p.id === tenant?.plan)?.name ?? 'Free';
+  const moneyCurrency = ecommerce.primaryCurrency ?? tenant?.default_currency ?? null;
 
   const channelConnected: Record<string, boolean> = {
     whatsapp: Boolean(tenant?.whatsapp_phone_number_id),
@@ -196,6 +262,14 @@ export default async function DashboardHomePage() {
   const connectedChannels = Object.entries(channelConnected)
     .filter(([, connected]) => connected)
     .map(([key]) => CHANNEL_LABELS[key]);
+
+  const sessionPlatformById = new Map((sessions30d ?? []).map((s) => [s.id, s.platform]));
+  const platformStats = Object.keys(CHANNEL_LABELS).map((platform) => {
+    const conversations = (sessions30d ?? []).filter((s) => s.platform === platform).length;
+    const messages = (userMessages30d ?? []).filter((m) => sessionPlatformById.get(m.session_id) === platform).length;
+    const orders = (platformOrders30d ?? []).filter((o) => o.platform === platform).length;
+    return { platform, conversations, messages, orders };
+  });
 
   // docs/27 §7.4 — the hero metric is whichever number proves the AI is doing
   // the job: appointments for a service business that has booking on, orders
@@ -239,8 +313,8 @@ export default async function DashboardHomePage() {
             <p className="text-sm font-medium">{planLabel} plan</p>
             <p className={`mt-0.5 text-sm ${quotaRemaining === 0 ? '' : 'text-muted-foreground'}`}>
               {quotaRemaining === 0
-                ? "You've used all of today's new-conversation slots. New customers won't get a reply until tomorrow."
-                : `${quotaRemaining} of ${dailyCap} new conversations left today.`}
+                ? "You've used all of this month's new-conversation slots. New customers won't get a reply until next month."
+                : `${quotaRemaining} of ${monthlyCap} new conversations left this month.`}
             </p>
             <Link
               href="/dashboard/billing"
@@ -251,9 +325,68 @@ export default async function DashboardHomePage() {
               {quotaRemaining === 0 ? 'Upgrade for more →' : 'See plans →'}
             </Link>
           </div>
-          {quotaRemaining > 0 && <QuotaRing remaining={quotaRemaining} total={dailyCap} />}
+          {quotaRemaining > 0 && <QuotaRing remaining={quotaRemaining} total={monthlyCap} />}
         </div>
       )}
+
+      {/* Sales snapshot — revenue / net / AOV for a selectable period. */}
+      <div>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-heading text-sm font-semibold">Sales &amp; profit</h2>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {SALES_RANGE_OPTIONS.map((r) => (
+              <Link
+                key={r.value}
+                href={`/dashboard?salesRange=${r.value}`}
+                className={`rounded-lg px-2.5 py-1 text-xs ring-1 transition-colors ${
+                  r.value === selectedSalesRange.value
+                    ? 'bg-primary text-primary-foreground ring-primary'
+                    : 'bg-card text-foreground ring-foreground/10 hover:ring-foreground/20'
+                }`}
+              >
+                {r.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Revenue earned"
+            value={formatMoney(ecommerce.revenuePaid, moneyCurrency)}
+            icon={DollarSign}
+            large
+          />
+          <StatCard
+            label="Net profit"
+            value={formatMoney(ecommerce.netProfit, moneyCurrency)}
+            icon={TrendingUp}
+            tone="success"
+          />
+          <StatCard
+            label="Product cost (COGS)"
+            value={formatMoney(ecommerce.cogs, moneyCurrency)}
+            icon={Wallet}
+          />
+          <StatCard
+            label="Expenses"
+            value={formatMoney(ecommerce.operatingExpenses, moneyCurrency)}
+            icon={ShoppingBag}
+          />
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Net profit = revenue − refunds − COGS − expenses
+          {ecommerce.repeatBuyers > 0 ? ` · ${ecommerce.repeatBuyers} repeat buyers` : ''}
+          {ecommerce.ordersPaid > 0
+            ? ` · ${ecommerce.ordersPaid} paid · ${ecommerce.itemsSold} items sold`
+            : ecommerce.ordersSecured > 0
+              ? ` · ${ecommerce.ordersSecured} secured orders`
+              : ' · No paid orders in this period yet'}
+          {ecommerce.multiCurrency ? ' · Mixed currencies — totals use the primary currency only' : ''}.{' '}
+          <Link href="/dashboard/finance" className="underline underline-offset-2">
+            Manage finances →
+          </Link>
+        </p>
+      </div>
 
       {/* docs/27 §7.1/§7.2 — the needs-attention queue, always visible regardless
           of plan or role, one human sentence + one action per row. */}
@@ -338,6 +471,21 @@ export default async function DashboardHomePage() {
           working, plus the supporting activity stats. */}
       <div>
         <h2 className="mb-2 font-heading text-sm font-semibold">Last 30 days</h2>
+        <div className="mb-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {platformStats.map((stat) => (
+            <Card key={stat.platform}>
+              <CardContent className="p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <PlatformBadge platform={CHANNEL_BADGES[stat.platform]} className="size-6 rounded-lg shadow-none" iconClassName="size-3" />
+                  <p className="text-sm font-medium">{CHANNEL_LABELS[stat.platform]}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {stat.messages} msgs · {stat.orders} orders · {stat.conversations} chats
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
         {!hasActivity ? (
           <EmptyState
             icon={Rocket}

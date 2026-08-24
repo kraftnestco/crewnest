@@ -1,4 +1,5 @@
 import { ENTITLEMENTS, type PlanId } from '@/lib/entitlements';
+import { SUPPORT_EMAIL } from '@/lib/constants';
 
 /**
  * Paywall plan config (docs: "try it for your business" plan, Phase C). Plain
@@ -28,13 +29,17 @@ export interface PlanOption {
   features: string[];
   /** Rendered as the emphasised card in the pricing grid. */
   highlight?: boolean;
+  /** When true, CTA opens mail instead of self-serve checkout (unused — all tiers self-serve). */
+  contactSales?: boolean;
 }
 
-/** "Up to 5 customer conversations/day" / "Unlimited customer conversations". */
+/** "Up to 100 customer conversations/month" / "Unlimited customer conversations". */
 function conversationsFeature(plan: PlanId): string {
-  const n = ENTITLEMENTS[plan].dailyConversations;
-  return Number.isFinite(n) ? `Up to ${n} customer conversations/day` : 'Unlimited customer conversations';
+  const n = ENTITLEMENTS[plan].monthlyConversations;
+  return Number.isFinite(n) ? `Up to ${n} customer conversations/month` : 'Unlimited customer conversations';
 }
+
+export const ENTERPRISE_CONTACT_HREF = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('ClerkNest Enterprise plan')}`;
 
 export const PAYWALL_PLANS: PlanOption[] = [
   {
@@ -87,6 +92,19 @@ export const PAYWALL_PLANS: PlanOption[] = [
       conversationsFeature('pro'),
       'Multiple team seats & roles',
       'Priority support',
+    ],
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price: '$199/mo',
+    pricePkr: 'Rs 55,000/mo',
+    tagline: 'For multi-location brands and high-volume operations.',
+    features: [
+      'Everything in Pro',
+      conversationsFeature('enterprise'),
+      'Dedicated onboarding & success',
+      'Custom SLA & priority support',
     ],
   },
 ];

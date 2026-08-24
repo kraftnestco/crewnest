@@ -51,7 +51,7 @@ import type { AuthoredBy, ChatSession, InboundMessage, OrderAttachment, Tenant }
 import { log } from '@/lib/log';
 
 export interface OrchestratorResult {
-  /** Null only when a free-plan tenant's daily new-conversation cap blocked the session itself. */
+  /** Null only when a plan's monthly new-conversation cap blocked session creation. */
   sessionId: string | null;
   /** The reply to show/send; null when muted (handoff) or dropped. */
   replyText: string | null;
@@ -67,8 +67,8 @@ export interface OrchestratorResult {
  * paying customer's customer that the business is on a free plan would be both
  * wrong and embarrassing.
  */
-const DAILY_CONVERSATION_LIMIT_REACHED_TEXT =
-  "Thanks for reaching out! We've reached today's conversation limit — please try again tomorrow, or the business will get back to you soon.";
+const MONTHLY_CONVERSATION_LIMIT_REACHED_TEXT =
+  "Thanks for reaching out! We've reached this month's conversation limit — please try again next month, or the business will get back to you soon.";
 
 /**
  * Shown when a conversation exceeds the plan's per-conversation message budget
@@ -118,16 +118,15 @@ export async function handleInboundMessage(
     return null;
   }
 
-  // 2. Session (one per customer per channel). The plan's daily NEW-conversation
-  // cap applies here (lib/entitlements.ts — free/starter 5, growth 20, pro
-  // unlimited); existing sessions are unaffected, since they were counted on the
-  // day they were created — see sessions.findOrCreate's doc comment.
+  // 2. Session (one per customer per channel). The plan's monthly NEW-conversation
+  // cap applies here (lib/entitlements.ts). Existing sessions are unaffected —
+  // they were counted on the month they were created — see sessions.findOrCreate.
   const entitlements = entitlementsFor(tenant.plan);
   const sessionOrCap = await sessions.findOrCreate(
     tenant.id,
     input.platform,
     input.externalUserId,
-    isLimited(entitlements.dailyConversations) ? entitlements.dailyConversations : undefined,
+    isLimited(entitlements.monthlyConversations) ? entitlements.monthlyConversations : undefined,
     input.customerName,
   );
 
@@ -137,11 +136,11 @@ export async function handleInboundMessage(
         tenant,
         platform: input.platform,
         to: input.externalUserId,
-        text: DAILY_CONVERSATION_LIMIT_REACHED_TEXT,
+        text: MONTHLY_CONVERSATION_LIMIT_REACHED_TEXT,
       });
       return { sessionId: null, replyText: null, handoff: false };
     }
-    return { sessionId: null, replyText: DAILY_CONVERSATION_LIMIT_REACHED_TEXT, handoff: false };
+    return { sessionId: null, replyText: MONTHLY_CONVERSATION_LIMIT_REACHED_TEXT, handoff: false };
   }
   const session = sessionOrCap;
 
@@ -590,7 +589,7 @@ async function runTurn(
   const { key, usedByok } = await getLlmKey(tenant);
 
   // 8b. Free-plan rolling 30-day cost ceiling (docs/18 §3, Stage U-cap, finding #7)
-  // — the daily cap at step 2 only throttles NEW conversations; an existing free
+  // — the monthly cap at step 2 only throttles NEW conversations; an existing free
   // session could otherwise run up unbounded master-key spend. Scoped to plan='free'
   // AND this turn using the master key (a BYOK free tenant spends their own key —
   // not ours to cap). Checked here, now that `usedByok` is known, before any model

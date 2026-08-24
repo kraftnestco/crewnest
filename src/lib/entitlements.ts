@@ -6,7 +6,7 @@
  * copilot gating) and tests alike. `'use server'` files may only export async
  * functions, which is why this lives in lib/ and not next to the plan config.
  *
- * WHY ONE MODULE: before this existed, "Up to 5 conversations/day" was a string
+ * WHY ONE MODULE: before this existed, "Up to 5 conversations/month" was a string
  * in the plan card while `FREE_PLAN_DAILY_SESSION_CAP` was a separate constant
  * in lib/constants, and "One channel at a time" was marketing copy enforced
  * nowhere at all. Marketing copy and enforcement drifting apart is how a paywall
@@ -15,19 +15,19 @@
  */
 
 /** Plan ids exactly as written to `tenants.plan`. */
-export type PlanId = 'free' | 'starter' | 'growth' | 'pro';
+export type PlanId = 'free' | 'starter' | 'growth' | 'pro' | 'enterprise';
 
-export const PLAN_IDS: readonly PlanId[] = ['free', 'starter', 'growth', 'pro'] as const;
+export const PLAN_IDS: readonly PlanId[] = ['free', 'starter', 'growth', 'pro', 'enterprise'] as const;
 
-/** Paid plans a tenant can check out into (free is not purchasable). */
+/** Paid plans a tenant can self-serve checkout into. Free is not purchasable. */
 export type PaidPlanId = Exclude<PlanId, 'free'>;
 
-export const PAID_PLAN_IDS: readonly PaidPlanId[] = ['starter', 'growth', 'pro'] as const;
+export const PAID_PLAN_IDS: readonly PaidPlanId[] = ['starter', 'growth', 'pro', 'enterprise'] as const;
 
 /** `Infinity` means unlimited — deliberately not `null`, so comparisons stay plain numbers. */
 export interface PlanEntitlements {
-  /** New conversations that may START per UTC day. Existing conversations are never blocked by this. */
-  dailyConversations: number;
+  /** New conversations that may START per UTC month. Existing conversations are never blocked by this. */
+  monthlyConversations: number;
   /**
    * Max CUSTOMER messages in a single conversation before the AI stops replying
    * and hands off to a human (§ "mid-sized conversations only"). Counts inbound
@@ -43,33 +43,31 @@ export interface PlanEntitlements {
 
 export const ENTITLEMENTS: Record<PlanId, PlanEntitlements> = {
   free: {
-    dailyConversations: 5,
+    monthlyConversations: 100,
     maxMessagesPerConversation: 20,
     maxChannels: 1,
     hasCopilot: false,
   },
   starter: {
-    // Was 5 — identical to Free, so the $39 upgrade had no visible reason to
-    // exist beyond message length/channel count (docs/27 §3 M9, D-07; user
-    // decision: raise Starter's own cap rather than leave the tiers tied).
-    // 15, not the doc's example of 50 — Growth ($49, one tier up) caps at 20,
-    // and 50 would have made the CHEAPER tier out-volume the pricier one.
-    // Kept below Growth so the existing "daily cap never decreases going up
-    // the ladder" invariant (entitlements.test.ts) holds without also having
-    // to reprice Growth, which wasn't part of this decision.
-    dailyConversations: 15,
+    monthlyConversations: 500,
     maxMessagesPerConversation: Infinity,
     maxChannels: Infinity,
     hasCopilot: false,
   },
   growth: {
-    dailyConversations: 20,
+    monthlyConversations: 2000,
     maxMessagesPerConversation: Infinity,
     maxChannels: Infinity,
     hasCopilot: true,
   },
   pro: {
-    dailyConversations: Infinity,
+    monthlyConversations: 10_000,
+    maxMessagesPerConversation: Infinity,
+    maxChannels: Infinity,
+    hasCopilot: true,
+  },
+  enterprise: {
+    monthlyConversations: Infinity,
     maxMessagesPerConversation: Infinity,
     maxChannels: Infinity,
     hasCopilot: true,
@@ -120,6 +118,7 @@ const PLAN_NAMES: Record<PlanId, string> = {
   starter: 'Starter',
   growth: 'Growth',
   pro: 'Pro',
+  enterprise: 'Enterprise',
 };
 
 export function planDisplayName(plan: string | null | undefined): string {

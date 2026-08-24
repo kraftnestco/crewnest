@@ -1,0 +1,37 @@
+/*
+  Desktop/laptop hero — extracted from prebuilt bundle (index.html inline CSS).
+  This is the DEFAULT bundle treatment BEFORE landing-links.js mobile overrides.
+
+  .hero-mesh — dark purple/rose radial gradients + dot grid (techy mesh — user wants to avoid)
+  .hero-photo — cover photo background (ecom collage with boxes/icons on desktop)
+  .bubble-deco — decorative floating elements in hero visual column
+*/
+
+.hero-mesh {
+  background:
+    radial-gradient(90% 70% at 78% 20%, #c23a6b29, #0000 58%),
+    radial-gradient(70% 60% at 8% 80%, #6b4c9a33, #0000 55%),
+    linear-gradient(160deg, #1a120f 0%, #0d0b09 100%);
+}
+
+.hero-photo {
+  background-position: 50% 28%;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+/* Dot grid overlay (bundle) */
+background-image: radial-gradient(circle, #faf8f324 1px, #0000 1.6px);
+background-size: 22px 22px;
+
+/*
+  landing-links.js MOBILE override (max-width 1023px):
+  - Forces background #0d0b09
+  - Sets .hero-photo to url("/clerknest-assets/mobilehero.png") with dark scrim
+  - Hides .hero-mesh, .bubble-deco, .cn-hero-visual
+  - Shows .cn-mobile-bubbles chat demo instead
+
+  landing-links.js DESKTOP (min-width 1024px):
+  - Only hides .cn-mobile-bubbles
+  - Bundle desktop collage + dashboard visual remains visible
+*/

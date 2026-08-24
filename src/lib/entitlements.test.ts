@@ -18,15 +18,15 @@ import {
  * silently drifted away from what customers were sold.
  */
 describe('plan entitlements — the advertised limits', () => {
-  it('free: 5 conversations/day, mid-sized only, one channel, no AI assistant', () => {
-    expect(ENTITLEMENTS.free.dailyConversations).toBe(5);
+  it('free: 100 conversations/month, mid-sized only, one channel, no AI assistant', () => {
+    expect(ENTITLEMENTS.free.monthlyConversations).toBe(100);
     expect(ENTITLEMENTS.free.maxMessagesPerConversation).toBe(20);
     expect(ENTITLEMENTS.free.maxChannels).toBe(1);
     expect(ENTITLEMENTS.free.hasCopilot).toBe(false);
   });
 
-  it('starter ($39): 15/day (a real step up from Free\'s 5, and below Growth\'s 20), unlimited length and ALL channels', () => {
-    expect(ENTITLEMENTS.starter.dailyConversations).toBe(15);
+  it('starter ($39): 500/month, unlimited length and ALL channels', () => {
+    expect(ENTITLEMENTS.starter.monthlyConversations).toBe(500);
     expect(isLimited(ENTITLEMENTS.starter.maxMessagesPerConversation)).toBe(false);
     expect(isLimited(ENTITLEMENTS.starter.maxChannels)).toBe(false);
   });
@@ -35,35 +35,33 @@ describe('plan entitlements — the advertised limits', () => {
     expect(ENTITLEMENTS.starter.hasCopilot).toBe(false);
   });
 
-  it('growth ($49): 20/day and the AI assistant', () => {
-    expect(ENTITLEMENTS.growth.dailyConversations).toBe(20);
+  it('growth ($49): 2000/month and the AI assistant', () => {
+    expect(ENTITLEMENTS.growth.monthlyConversations).toBe(2000);
     expect(ENTITLEMENTS.growth.hasCopilot).toBe(true);
     expect(isLimited(ENTITLEMENTS.growth.maxChannels)).toBe(false);
   });
 
-  it('pro ($79): unlimited conversations, keeps the AI assistant', () => {
-    expect(isLimited(ENTITLEMENTS.pro.dailyConversations)).toBe(false);
+  it('pro ($79): 10000/month, keeps the AI assistant', () => {
+    expect(ENTITLEMENTS.pro.monthlyConversations).toBe(10_000);
     expect(ENTITLEMENTS.pro.hasCopilot).toBe(true);
   });
 
-  it('daily conversation allowance never decreases as tiers go up', () => {
-    // Guards against a paste error making a higher tier worse than a lower one.
-    const caps = PLAN_IDS.map((p) => ENTITLEMENTS[p].dailyConversations);
+  it('enterprise: unlimited conversations, keeps the AI assistant', () => {
+    expect(isLimited(ENTITLEMENTS.enterprise.monthlyConversations)).toBe(false);
+    expect(ENTITLEMENTS.enterprise.hasCopilot).toBe(true);
+  });
+
+  it('monthly conversation allowance never decreases as tiers go up', () => {
+    const caps = PLAN_IDS.map((p) => ENTITLEMENTS[p].monthlyConversations);
     for (let i = 1; i < caps.length; i++) {
       expect(caps[i]).toBeGreaterThanOrEqual(caps[i - 1]);
     }
   });
 
   it('no paid tier advertises the exact same headline conversation cap as the tier below it (D-07)', () => {
-    // The bug this guards: Free and Starter both being 5/day meant Starter's
-    // $39 had no visible reason to exist over staying on Free — a real
-    // commercial defect, not just a display nit. "Never decreases" above
-    // would have let two EQUAL caps through silently; this asserts they
-    // actually differ (unlimited, i.e. Infinity !== a finite number, always
-    // counts as differing here).
     for (let i = 1; i < PLAN_IDS.length; i++) {
-      const lower = ENTITLEMENTS[PLAN_IDS[i - 1]].dailyConversations;
-      const higher = ENTITLEMENTS[PLAN_IDS[i]].dailyConversations;
+      const lower = ENTITLEMENTS[PLAN_IDS[i - 1]].monthlyConversations;
+      const higher = ENTITLEMENTS[PLAN_IDS[i]].monthlyConversations;
       expect(higher, `${PLAN_IDS[i]} must not repeat ${PLAN_IDS[i - 1]}'s exact cap`).not.toBe(lower);
     }
   });
@@ -81,9 +79,7 @@ describe('entitlementsFor — resolving a plan string from the database', () => 
   });
 
   it('falls back to FREE for unknown/legacy/missing values, never to a paid tier', () => {
-    // The safe direction: under-serving is fixed by an upgrade; over-serving is
-    // revenue silently lost with no signal anywhere.
-    for (const bad of ['enterprise', 'starter_v2', '', 'PRO', null, undefined]) {
+    for (const bad of ['enterprise_v2', 'starter_v2', '', 'PRO', null, undefined]) {
       expect(entitlementsFor(bad)).toBe(ENTITLEMENTS.free);
     }
   });
@@ -91,17 +87,9 @@ describe('entitlementsFor — resolving a plan string from the database', () => 
 
 describe('entitlements ignore plan_status — why signup must provision on free', () => {
   it('grants a tier purely from `tenants.plan`, with no pending/unpaid concept', () => {
-    // This is the reason `provisionTenantAction` writes plan:'free' even when a
-    // paid tier was selected. There is deliberately no `plan_status` input here:
-    // a 'pending_upgrade' row is indistinguishable from a paid one to this
-    // function, so writing the SELECTED tier at signup would hand a visitor full
-    // entitlements before any money moved — pick Pro, abandon checkout, keep
-    // unlimited everything forever. The billing webhook is the only writer of
-    // `tenants.plan` (docs/26 §4).
     expect(entitlementsFor('pro')).toBe(ENTITLEMENTS.pro);
+    expect(entitlementsFor('enterprise')).toBe(ENTITLEMENTS.enterprise);
     expect(entitlementsFor('free')).toBe(ENTITLEMENTS.free);
-    // entitlementsFor takes ONE argument. If a future change adds a status
-    // parameter, this assertion is the prompt to revisit the signup path.
     expect(entitlementsFor.length).toBe(1);
   });
 });
@@ -109,12 +97,13 @@ describe('entitlements ignore plan_status — why signup must provision on free'
 describe('plan id guards', () => {
   it('isPlanId accepts every real plan and rejects others', () => {
     for (const id of PLAN_IDS) expect(isPlanId(id)).toBe(true);
-    expect(isPlanId('enterprise')).toBe(false);
-    expect(isPlanId('Free')).toBe(false); // case-sensitive on purpose — ids are exact db values
+    expect(isPlanId('enterprise_v2')).toBe(false);
+    expect(isPlanId('Free')).toBe(false);
   });
 
-  it('isPaidPlanId excludes free — free is not purchasable', () => {
+  it('isPaidPlanId includes enterprise and excludes free', () => {
     expect(isPaidPlanId('free')).toBe(false);
+    expect(isPaidPlanId('enterprise')).toBe(true);
     for (const id of PAID_PLAN_IDS) expect(isPaidPlanId(id)).toBe(true);
   });
 
@@ -124,11 +113,12 @@ describe('plan id guards', () => {
 });
 
 describe('display helpers', () => {
-  it('names every plan, including the one a two-way ternary used to miss', () => {
+  it('names every plan', () => {
     expect(planDisplayName('free')).toBe('Free');
     expect(planDisplayName('starter')).toBe('Starter');
     expect(planDisplayName('growth')).toBe('Growth');
     expect(planDisplayName('pro')).toBe('Pro');
+    expect(planDisplayName('enterprise')).toBe('Enterprise');
   });
 
   it('falls back to Free for an unknown plan rather than throwing', () => {
@@ -140,6 +130,7 @@ describe('display helpers', () => {
     expect(planRank('free')).toBeLessThan(planRank('starter'));
     expect(planRank('starter')).toBeLessThan(planRank('growth'));
     expect(planRank('growth')).toBeLessThan(planRank('pro'));
+    expect(planRank('pro')).toBeLessThan(planRank('enterprise'));
   });
 
   it('formatLimit renders a number or Unlimited', () => {

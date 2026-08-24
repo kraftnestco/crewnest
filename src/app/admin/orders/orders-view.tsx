@@ -43,6 +43,7 @@ import {
   markPaidAction,
   rejectOrderAction,
   rejectPaymentProofAction,
+  type OrderRange,
   type OrderRow,
   type OrderSort,
   type OrderStatus,
@@ -117,6 +118,12 @@ const SORT_OPTIONS: Array<{ value: OrderSort; label: string }> = [
   { value: 'date_asc', label: 'Date: oldest first' },
   { value: 'price_asc', label: 'Price: low to high' },
   { value: 'price_desc', label: 'Price: high to low' },
+];
+const RANGE_OPTIONS: Array<{ value: OrderRange; label: string }> = [
+  { value: 'all', label: 'All time' },
+  { value: '7d', label: 'Last 7 days' },
+  { value: '30d', label: 'Last 30 days' },
+  { value: '90d', label: 'Last 90 days' },
 ];
 
 const STATUS_BADGE: Record<OrderStatus, 'default' | 'outline' | 'secondary' | 'destructive'> = {
@@ -565,6 +572,7 @@ export function OrdersView({
   chatBasePath = '/admin/chat',
   initialStatus = 'all',
   initialTenantId = null,
+  initialRange = 'all',
 }: {
   initialOrders: OrderRow[];
   tenants: TenantRow[];
@@ -582,11 +590,14 @@ export function OrdersView({
    * the notification bell's client filter is gated on being an agency caller.
    */
   initialTenantId?: string | null;
+  /** Date window for "orders received in a period". */
+  initialRange?: OrderRange;
 }) {
   const [orders, setOrders] = useState(initialOrders);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>(initialStatus);
   const [tenantFilter, setTenantFilter] = useState<string>(initialTenantId ?? ALL_CLIENTS);
   const [sortFilter, setSortFilter] = useState<OrderSort>('date_desc');
+  const [rangeFilter, setRangeFilter] = useState<OrderRange>(initialRange);
   const [loadedCount, setLoadedCount] = useState(initialOrders.length);
   const [hasMore, setHasMore] = useState(initialOrders.length === 25);
   const [isPending, startTransition] = useTransition();
@@ -595,6 +606,7 @@ export function OrdersView({
   const statusFilterRef = useRef(statusFilter);
   const tenantFilterRef = useRef(tenantFilter);
   const sortFilterRef = useRef(sortFilter);
+  const rangeFilterRef = useRef(rangeFilter);
 
   const tenantMap = useMemo(() => new Map(tenants.map((t) => [t.id, t.business_name])), [tenants]);
 
@@ -609,6 +621,9 @@ export function OrdersView({
   useEffect(() => {
     sortFilterRef.current = sortFilter;
   }, [sortFilter]);
+  useEffect(() => {
+    rangeFilterRef.current = rangeFilter;
+  }, [rangeFilter]);
 
   useEffect(() => {
     if (realtimeAccessToken) void supabase.realtime.setAuth(realtimeAccessToken);
@@ -651,7 +666,7 @@ export function OrdersView({
     const tenantId = tenantFilter === ALL_CLIENTS ? null : tenantFilter;
     startTransition(async () => {
       try {
-        const page = await getOrdersPageAction({ status: next, tenantId, sort: sortFilter });
+        const page = await getOrdersPageAction({ status: next, tenantId, sort: sortFilter, range: rangeFilter });
         setOrders(page.orders);
         setLoadedCount(page.orders.length);
         setHasMore(page.hasMore);
@@ -666,7 +681,7 @@ export function OrdersView({
     const tenantId = next === ALL_CLIENTS ? null : next;
     startTransition(async () => {
       try {
-        const page = await getOrdersPageAction({ status: statusFilter, tenantId, sort: sortFilter });
+        const page = await getOrdersPageAction({ status: statusFilter, tenantId, sort: sortFilter, range: rangeFilter });
         setOrders(page.orders);
         setLoadedCount(page.orders.length);
         setHasMore(page.hasMore);
@@ -682,12 +697,28 @@ export function OrdersView({
     const tenantId = tenantFilter === ALL_CLIENTS ? null : tenantFilter;
     startTransition(async () => {
       try {
-        const page = await getOrdersPageAction({ status: statusFilter, tenantId, sort });
+        const page = await getOrdersPageAction({ status: statusFilter, tenantId, sort, range: rangeFilter });
         setOrders(page.orders);
         setLoadedCount(page.orders.length);
         setHasMore(page.hasMore);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to sort orders.');
+      }
+    });
+  }
+
+  function handleRangeChange(next: string) {
+    const range = next as OrderRange;
+    setRangeFilter(range);
+    const tenantId = tenantFilter === ALL_CLIENTS ? null : tenantFilter;
+    startTransition(async () => {
+      try {
+        const page = await getOrdersPageAction({ status: statusFilter, tenantId, sort: sortFilter, range });
+        setOrders(page.orders);
+        setLoadedCount(page.orders.length);
+        setHasMore(page.hasMore);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to update date range.');
       }
     });
   }
@@ -700,6 +731,7 @@ export function OrdersView({
           status: statusFilter,
           tenantId,
           sort: sortFilter,
+          range: rangeFilter,
           offset: loadedCount,
         });
         setOrders((prev) => {
@@ -735,7 +767,7 @@ export function OrdersView({
     <div className="space-y-6 p-4 lg:p-6">
       <PageHeader
         title="Orders"
-        description="New orders appear instantly below; scroll down for full history."
+        description="New orders appear instantly below; filter by date to inspect a specific period."
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -800,9 +832,33 @@ export function OrdersView({
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              disabled={isPending}
+              aria-label="Filter orders by date range"
+              className="flex items-center gap-1.5 rounded-md border bg-card px-2.5 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 disabled:pointer-events-none disabled:opacity-50"
+            >
+              <CalendarDays className="size-3.5 shrink-0 text-muted-foreground" />
+              <span>{RANGE_OPTIONS.find((option) => option.value === rangeFilter)?.label}</span>
+              <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-44">
+              <DropdownMenuRadioGroup value={rangeFilter} onValueChange={handleRangeChange}>
+                {RANGE_OPTIONS.map((option) => (
+                  <DropdownMenuRadioItem key={option.value} value={option.value}>
+                    {option.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <StatusLegend items={ORDER_STATUS_LEGEND} />
       </div>
+      <p className="text-sm text-muted-foreground">
+        {orders.length} order{orders.length === 1 ? '' : 's'} in{' '}
+        {RANGE_OPTIONS.find((option) => option.value === rangeFilter)?.label.toLowerCase()}.
+      </p>
 
       <div className="space-y-2.5">
         {orders.map((o) => (

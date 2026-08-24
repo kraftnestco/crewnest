@@ -1,0 +1,78 @@
+ClerkNest hero backup — updated 2026-08-23 (v25: desktop hero-laptop-v3.png @ contain)
+
+CURRENT (v25 in landing-links.js):
+- Desktop (≥1024px): bundle two-column layout + dashboard visual UNCHANGED
+  — bg: hero-laptop-v3.png on .hero-photo
+  — contain + center (whole image visible; charcoal letterbox on gaps)
+  — min-height 100vh on hero; brightness filter, left scrim, hero-mesh hidden
+- Mobile (≤1023px): unchanged — mobilehero.png, column stack, bubble demo
+- Style ID: cn-mobile-hero-layout-v25
+
+ASSETS:
+- hero-laptop-v3.png — public/clerknest-assets/ (from ChatGPT Image Aug 23, 2026, 09_09_00 PM.png; 1536×1024, 3:2)
+- hero-laptop-v2.jpg — public/clerknest-assets/ (v21–v24, superseded by v3)
+- hero-laptop-collage.jpg — public/clerknest-assets/ (v20 collage, still on disk)
+- mobilehero.png — public/clerknest-assets/ (mobile only)
+
+BACKUP FILES IN THIS FOLDER:
+- laptop-hero-v19-before-collage-bg.js — v19 desktop block (mobilehero.png on desktop)
+- laptop-hero-v17-before-try-mobile-bg.js — v17 desktop block (bundle default collage/mesh)
+- landing-links-hero-snippet-backup.js — hero CSS injection (v13)
+- bundle-hero-css-snippet.css — raw hero rules from prebuilt bundle
+- desktop-hero-bundle-reference.css — annotated desktop mesh/photo treatment
+- notes.txt — this file
+
+HOW TO RESTORE v24 (hero-laptop-v2.jpg on desktop):
+1. Open public/clerknest-assets/landing-links.js
+2. Set HERO_LAYOUT_ID to "cn-mobile-hero-layout-v24"
+3. In @media (min-width: 1024px) .hero-photo block, set:
+   background-image: url("/clerknest-assets/hero-laptop-v2.jpg") !important;
+4. Add "cn-mobile-hero-layout-v25" to the stale-style removal array
+5. Hard-refresh (Ctrl+Shift+R) at localhost:3000
+
+HOW TO RESTORE v20 (hero-laptop-collage.jpg on desktop):
+1. Open public/clerknest-assets/landing-links.js
+2. Set HERO_LAYOUT_ID to "cn-mobile-hero-layout-v20"
+3. In @media (min-width: 1024px) .hero-photo block, set:
+   background-image: url("/clerknest-assets/hero-laptop-collage.jpg") !important;
+4. Add "cn-mobile-hero-layout-v25" to the stale-style removal array
+5. Hard-refresh (Ctrl+Shift+R) at localhost:3000
+
+HOW TO RESTORE v19 (mobilehero.png on desktop):
+1. Set HERO_LAYOUT_ID to "cn-mobile-hero-layout-v19"
+2. Replace @media (min-width: 1024px) bg block with laptop-hero-v19-before-collage-bg.js
+3. Hard-refresh
+
+HOW TO RESTORE v17 (original bundle dark collage + mesh):
+1. Set HERO_LAYOUT_ID to "cn-mobile-hero-layout-v17"
+2. Replace desktop block with laptop-hero-v17-before-try-mobile-bg.js
+3. Hard-refresh
+
+WHAT CHANGED IN v25 (2026-08-23):
+- Copied ChatGPT Image Aug 23, 2026, 09_09_00 PM.png → hero-laptop-v3.png (1536×1024, 3:2)
+- Desktop .hero-photo now uses hero-laptop-v3.png instead of hero-laptop-v2.jpg
+- bg-size: contain (3:2 is not 16:9 — whole pic visible with charcoal letterbox)
+- Style ID bumped v24 → v25
+
+WHAT CHANGED IN v24 (2026-08-23):
+- Desktop .hero-photo background-size cover → contain (whole image visible)
+- Asset unchanged: hero-laptop-v2.jpg
+
+WHAT CHANGED IN v23 (2026-08-23):
+- Desktop .hero-photo background-size 90% → cover (max image visible while filling hero)
+- Desktop .cn-mobile-hero min-height: 100vh for full first-view fill
+- Asset unchanged: hero-laptop-v2.jpg
+
+WHAT CHANGED IN v22 (2026-08-23):
+- Desktop .hero-photo background-size 105% → 90% (more zoomed out, more image visible)
+- Asset unchanged: hero-laptop-v2.jpg
+
+WHAT CHANGED IN v21 (2026-08-23):
+- Copied ChatGPT Image Aug 23, 2026, 07_56_19 PM.png → hero-laptop-v2.jpg
+- Desktop .hero-photo now uses hero-laptop-v2.jpg instead of hero-laptop-collage.jpg
+- Same bg-only treatment: 105% center, brightness filter, left scrim, mesh hidden
+
+WHAT CHANGED IN v20 (2026-08-23):
+- Copied user collage to public/clerknest-assets/hero-laptop-collage.jpg
+- Desktop .hero-photo now uses collage instead of mobilehero.png
+- Slightly lighter scrim on right so dashboard panels stay visible

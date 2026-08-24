@@ -1,18 +1,20 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import type { OrderStatus } from './actions';
+import type { OrderRange, OrderStatus } from './actions';
 import { OrdersView } from './orders-view';
 
 const VALID_STATUSES: OrderStatus[] = ['pending', 'confirmed', 'fulfilled', 'cancelled'];
+const VALID_RANGES: OrderRange[] = ['all', '7d', '30d', '90d'];
 
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; tenant?: string }>;
+  searchParams: Promise<{ status?: string; tenant?: string; range?: string }>;
 }) {
-  const { status: statusParam, tenant: tenantParam } = await searchParams;
+  const { status: statusParam, tenant: tenantParam, range: rangeParam } = await searchParams;
   const initialStatus: OrderStatus | 'all' = VALID_STATUSES.includes(statusParam as OrderStatus)
     ? (statusParam as OrderStatus)
     : 'all';
+  const initialRange: OrderRange = VALID_RANGES.includes(rangeParam as OrderRange) ? (rangeParam as OrderRange) : 'all';
 
   const supabase = await createSupabaseServerClient();
 
@@ -37,6 +39,11 @@ export default async function OrdersPage({
   if (initialTenantId) {
     ordersQuery = ordersQuery.eq('tenant_id', initialTenantId);
   }
+  if (initialRange !== 'all') {
+    const now = Date.now();
+    const days = initialRange === '7d' ? 7 : initialRange === '30d' ? 30 : 90;
+    ordersQuery = ordersQuery.gte('created_at', new Date(now - days * 24 * 60 * 60 * 1000).toISOString());
+  }
 
   const { data: orders } = await ordersQuery;
 
@@ -47,6 +54,7 @@ export default async function OrdersPage({
       realtimeAccessToken={session?.access_token ?? null}
       initialStatus={initialStatus}
       initialTenantId={initialTenantId}
+      initialRange={initialRange}
     />
   );
 }

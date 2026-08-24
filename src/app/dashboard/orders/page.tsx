@@ -3,19 +3,21 @@ import { redirect } from 'next/navigation';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { OrdersView } from '@/app/admin/orders/orders-view';
-import type { OrderStatus } from '@/app/admin/orders/actions';
+import type { OrderRange, OrderStatus } from '@/app/admin/orders/actions';
 
 const VALID_STATUSES: OrderStatus[] = ['pending', 'confirmed', 'fulfilled', 'cancelled'];
+const VALID_RANGES: OrderRange[] = ['all', '7d', '30d', '90d'];
 
 export default async function DashboardOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; range?: string }>;
 }) {
-  const { status: statusParam } = await searchParams;
+  const { status: statusParam, range: rangeParam } = await searchParams;
   const initialStatus: OrderStatus | 'all' = VALID_STATUSES.includes(statusParam as OrderStatus)
     ? (statusParam as OrderStatus)
     : 'all';
+  const initialRange: OrderRange = VALID_RANGES.includes(rangeParam as OrderRange) ? (rangeParam as OrderRange) : 'all';
 
   const ctx = await getCallerContext(); // layout already gated; re-derive (React cache dedupes)
   if (!ctx) redirect('/login');
@@ -39,6 +41,11 @@ export default async function DashboardOrdersPage({
     .limit(25);
   if (initialStatus !== 'all') {
     ordersQuery = ordersQuery.eq('status', initialStatus);
+  }
+  if (initialRange !== 'all') {
+    const now = Date.now();
+    const days = initialRange === '7d' ? 7 : initialRange === '30d' ? 30 : 90;
+    ordersQuery = ordersQuery.gte('created_at', new Date(now - days * 24 * 60 * 60 * 1000).toISOString());
   }
 
   const [{ data: orders }, { data: memberTenants }] = await Promise.all([
@@ -69,6 +76,7 @@ export default async function DashboardOrdersPage({
       chatBasePath="/dashboard/chat"
       initialStatus={initialStatus}
       initialTenantId={null}
+      initialRange={initialRange}
     />
   );
 }

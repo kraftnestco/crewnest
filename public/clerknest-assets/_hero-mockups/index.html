@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hero mockups — ClerkNest unified first view</title>
+  <link rel="stylesheet" href="shared-mockup.css" />
+  <style>
+    body { background: #e8e4dc; }
+    .index-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      max-width: 960px;
+      margin: 0 auto 2rem;
+      padding: 0 1.5rem;
+    }
+    .index-card {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      background: #fff;
+      border-radius: 1rem;
+      padding: 1.25rem;
+      box-shadow: 0 12px 28px rgba(26, 18, 15, 0.08);
+      border: 1px solid rgba(26, 18, 15, 0.06);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .index-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 36px rgba(26, 18, 15, 0.12);
+    }
+    .index-card h2 {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      margin: 0 0 0.35rem;
+    }
+    .index-card p { margin: 0; font-size: 0.85rem; color: var(--ink-muted); }
+    .swatch {
+      height: 4rem;
+      border-radius: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .swatch-a { background: linear-gradient(165deg, #faf8f3, #ebe2d2); }
+    .swatch-b { background: linear-gradient(160deg, #f7f0e4, #e8dcc8); }
+    .swatch-c { background: linear-gradient(180deg, #faf8f3, #f5efe8); }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <h1>ClerkNest — unified hero mockups</h1>
+    <p>Three middle-ground concepts: clean ivory atmosphere, subtle ecom props, dashboard as the product story. Each page shows mobile (~390×844) and desktop (~1280) side by side.</p>
+    <p style="font-size:0.8rem;color:#8a7f76;">Backups: <code>/clerknest-assets/_hero-backup/</code></p>
+  </header>
+  <div class="index-grid">
+    <a class="index-card" href="mockup-a.html">
+      <div class="swatch swatch-a"></div>
+      <h2>A — Clean Ivory + Soft Props</h2>
+      <p>Mobile-like ivory field; blurred boxes + faint platform icons; sharp chat/dashboard panel.</p>
+    </a>
+    <a class="index-card" href="mockup-b.html">
+      <div class="swatch swatch-b"></div>
+      <h2>B — Warm Shop Floor</h2>
+      <p>Warmer light; one cardboard stack + 2–3 icons near dashboard edge.</p>
+    </a>
+    <a class="index-card" href="mockup-c.html">
+      <div class="swatch swatch-c"></div>
+      <h2>C — Quiet Channels</h2>
+      <p>Almost no photography; soft rose/sand shapes; platform row in copy; dashboard only.</p>
+    </a>
+  </div>
+</body>
+</html>

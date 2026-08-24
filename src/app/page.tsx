@@ -358,7 +358,7 @@ export default function Home() {
                   Feels native everywhere it shows up.
                 </h3>
                 <p className="mt-3 text-stage-warm-fg/75 text-balance">
-                  Same AI employee, same catalogue — it just wears whatever app your customer opened.
+                  Same AI employee, same catalogue, it just wears whatever app your customer opened.
                 </p>
               </div>
               <div className="mt-10">
@@ -421,7 +421,7 @@ export default function Home() {
             </div>
             {/* Four tiers now — 2-up on tablet, 4-up on desktop (was md:grid-cols-3
                 with three plans, which would have orphaned the fourth card). */}
-            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {PAYWALL_PLANS.map((plan) => {
                 // Driven by the plan config, not a hardcoded id, so moving the
                 // emphasis is a one-line data change.

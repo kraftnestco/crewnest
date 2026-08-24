@@ -115,7 +115,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
 
         {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 
-        <Button type="submit" disabled={isPending} className="mt-1 h-10">
+        <Button type="submit" disabled={isPending} className="mt-1 h-10 bg-primary text-primary-foreground hover:bg-primary/90">
           {isPending ? 'Signing in…' : 'Sign in'}
         </Button>
 

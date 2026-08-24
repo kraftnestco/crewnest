@@ -1,0 +1,73 @@
+{
+  "kids": [
+    {
+      "text": "AI Employee · Answering 24/7",
+      "display": "flex",
+      "hidden": false,
+      "badge": true,
+      "platforms": false,
+      "top": 84,
+      "bottom": 107,
+      "h": 23,
+      "w": 180
+    },
+    {
+      "text": "Your Business,Answered Instantly.",
+      "display": "block",
+      "hidden": false,
+      "badge": false,
+      "platforms": false,
+      "top": 116,
+      "bottom": 178,
+      "h": 63,
+      "w": 265
+    },
+    {
+      "text": "Answers every DM, takes orders and books appointments across WhatsApp, Instagram, Messenge",
+      "display": "block",
+      "hidden": false,
+      "badge": false,
+      "platforms": false,
+      "top": 187,
+      "bottom": 240,
+      "h": 53,
+      "w": 280
+    },
+    {
+      "text": "Meet ClerkNest Sign up",
+      "display": "flex",
+      "hidden": false,
+      "badge": false,
+      "platforms": false,
+      "top": 254,
+      "bottom": 297,
+      "h": 42,
+      "w": 243
+    },
+    {
+      "text": "★★★★★Loved by 500+ salons, boutiques & clinics",
+      "display": "none",
+      "hidden": true,
+      "badge": false,
+      "platforms": false,
+      "top": 0,
+      "bottom": 0,
+      "h": 0,
+      "w": 0
+    },
+    {
+      "text": "Social Media Automation Platform",
+      "display": "flex",
+      "hidden": false,
+      "badge": false,
+      "platforms": true,
+      "top": 308,
+      "bottom": 330,
+      "h": 23,
+      "w": 255
+    }
+  ],
+  "vw": 390,
+  "vh": 844,
+  "layout": true
+}
