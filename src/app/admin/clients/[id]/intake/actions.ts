@@ -15,6 +15,7 @@ import type {
   MagicImportResult,
   PromptArchitectFields,
 } from '@/components/intake/intake-shared';
+import { parseIntakeFormData } from '@/components/intake/parse-intake-form';
 import type { UpdateIntakeState } from './intake-state';
 import { log } from '@/lib/log';
 
@@ -23,12 +24,6 @@ import { log } from '@/lib/log';
  * Agency-operated today; the same action becomes the client's self-serve save
  * once Phase-2 client logins land — no rewrite (docs/10 §9).
  */
-
-const MEDIA_HANDLING_VALUES = ['match_catalogue', 'accept_any', 'reject'] as const;
-const VOICE_HANDLING_VALUES = ['ai_autonomous', 'human_review'] as const;
-const BUSINESS_TYPE_VALUES = ['product', 'service'] as const;
-/** App-level allow-list (docs/11 §2.3) — payment_method(s) are plain text/text[], not a DB enum. */
-const PAYMENT_METHOD_VALUES = ['cod', 'manual_transfer', 'gateway'] as const;
 
 /**
  * Prompt Architect (docs/19 O1). Called imperatively from the intake UI to
@@ -127,93 +122,24 @@ export async function updateIntakeAction(
     return { error: 'Forbidden: only a tenant admin may edit business settings.', success: false };
   }
 
-  const systemPrompt = String(formData.get('system_prompt') ?? '');
-  const customOrderInstructions = String(formData.get('custom_order_instructions') ?? '').trim() || null;
-  const mediaHandlingRaw = String(formData.get('media_handling') ?? 'match_catalogue');
-  const mediaHandling = (MEDIA_HANDLING_VALUES as readonly string[]).includes(mediaHandlingRaw)
-    ? mediaHandlingRaw
-    : 'match_catalogue';
-  const voiceHandlingRaw = String(formData.get('voice_handling') ?? 'human_review');
-  const voiceHandling = (VOICE_HANDLING_VALUES as readonly string[]).includes(voiceHandlingRaw)
-    ? voiceHandlingRaw
-    : 'human_review';
-  const businessTypeRaw = String(formData.get('business_type') ?? 'product');
-  const businessType = (BUSINESS_TYPE_VALUES as readonly string[]).includes(businessTypeRaw)
-    ? businessTypeRaw
-    : 'product';
-  const bookingLink = String(formData.get('booking_link') ?? '').trim() || null;
-
-  // Appointment booking (docs/24). Force-disabled for a product business: the
-  // tools are gated on businessType === 'service' in the tool registry, so an
-  // enabled flag on a product tenant would be a setting that silently does
-  // nothing. Enforced here, server-side, not only in the form.
-  const bookingEnabled = businessType === 'service' && formData.get('booking_enabled') === 'on';
-  const bookingModeRaw = String(formData.get('booking_mode') ?? '').trim();
-  const bookingMode = bookingModeRaw === 'own_link' || bookingModeRaw === 'calcom' ? bookingModeRaw : null;
-  const bookingOwnLink = String(formData.get('booking_own_link') ?? '').trim() || null;
-  /** Clamped, not just parsed — a hand-edited form must not produce a 0-minute or 10-year window. */
-  const clampInt = (raw: FormDataEntryValue | null, fallback: number, min: number, max: number): number => {
-    const n = Number.parseInt(String(raw ?? ''), 10);
-    if (!Number.isFinite(n)) return fallback;
-    return Math.min(Math.max(n, min), max);
-  };
-  const bookingDurationMinutes = clampInt(formData.get('booking_duration_minutes'), 30, 5, 480);
-  const bookingLeadTimeMinutes = clampInt(formData.get('booking_lead_time_minutes'), 120, 0, 10080);
-  const bookingMaxDaysAhead = clampInt(formData.get('booking_max_days_ahead'), 30, 1, 365);
-  const customOrdersEnabled = formData.get('custom_orders_enabled') === 'on';
-  const customOrdersRequireApproval = formData.get('custom_orders_require_approval') === 'on';
-  const knowledgeBaseRaw = String(formData.get('knowledge_base_json') ?? '').trim();
-  const businessHoursRaw = String(formData.get('business_hours_json') ?? '').trim();
-  const timezone = String(formData.get('timezone') ?? '').trim() || null;
-  const paymentsEnabled = formData.get('payments_enabled') === 'on';
-  const paymentMethodsRaw = formData.getAll('payment_methods').map(String);
-  const paymentMethods = paymentMethodsRaw.filter((m) => (PAYMENT_METHOD_VALUES as readonly string[]).includes(m));
-  const paymentInstructions = String(formData.get('payment_instructions') ?? '').trim() || null;
-  const defaultCurrency = String(formData.get('default_currency') ?? '').trim() || 'PKR';
-  const prepaidRequired = formData.get('prepaid_required') === 'on';
+  // Field parsing is shared with self-serve onboarding's provision action
+  // (parse-intake-form.ts) so the two can't drift on an allow-list.
+  const parsed = parseIntakeFormData(formData, { isPlatformAdmin: ctx.isPlatformAdmin });
+  if ('error' in parsed) return { error: parsed.error, success: false };
 
   // Admins edit catalog_data as raw JSON directly; clients describe their
   // catalogue in plain language and we derive the JSON the AI actually reads
   // (docs/13 §9 follow-up — clients are non-technical, JSON stays admin-only).
   let catalogData: Json = {};
-  let catalogFreeformText: string | null = null;
   if (ctx.isPlatformAdmin) {
-    const catalogRaw = String(formData.get('catalog_data') ?? '').trim();
-    if (catalogRaw) {
-      try {
-        catalogData = JSON.parse(catalogRaw) as Json;
-      } catch {
-        return { error: 'Catalogue must be valid JSON.', success: false };
-      }
-    }
-  } else {
-    catalogFreeformText = String(formData.get('catalog_freeform') ?? '').trim() || null;
-    if (catalogFreeformText) {
-      const tenant = await tenants.getById(tenantId);
-      if (!tenant) return { error: 'Tenant not found.', success: false };
-      try {
-        catalogData = await parseCatalogueFreeform(tenant, catalogFreeformText);
-      } catch {
-        return { error: "Couldn't process your catalogue text. Please try again.", success: false };
-      }
-    }
-  }
-
-  let knowledgeBase: Json | null = null;
-  if (knowledgeBaseRaw) {
+    catalogData = parsed.catalogDataAdmin ?? {};
+  } else if (parsed.catalogFreeformText) {
+    const tenant = await tenants.getById(tenantId);
+    if (!tenant) return { error: 'Tenant not found.', success: false };
     try {
-      knowledgeBase = JSON.parse(knowledgeBaseRaw) as Json;
+      catalogData = await parseCatalogueFreeform(tenant, parsed.catalogFreeformText);
     } catch {
-      return { error: 'Knowledge base was malformed. Please retry.', success: false };
-    }
-  }
-
-  let businessHours: Json | null = null;
-  if (businessHoursRaw) {
-    try {
-      businessHours = JSON.parse(businessHoursRaw) as Json;
-    } catch {
-      return { error: 'Business hours were malformed. Please retry.', success: false };
+      return { error: "Couldn't process your catalogue text. Please try again.", success: false };
     }
   }
 
@@ -221,34 +147,36 @@ export async function updateIntakeAction(
   const { error } = await supabase
     .from('tenants')
     .update({
-      system_prompt: systemPrompt,
+      system_prompt: parsed.systemPrompt,
       catalog_data: catalogData,
-      custom_order_instructions: customOrderInstructions,
-      media_handling: mediaHandling,
-      voice_handling: voiceHandling,
-      custom_orders_enabled: customOrdersEnabled,
-      custom_orders_require_approval: customOrdersRequireApproval,
-      business_type: businessType,
-      booking_link: bookingLink,
-      booking_enabled: bookingEnabled,
-      booking_mode: bookingMode,
-      booking_own_link: bookingOwnLink,
-      booking_duration_minutes: bookingDurationMinutes,
-      booking_lead_time_minutes: bookingLeadTimeMinutes,
-      booking_max_days_ahead: bookingMaxDaysAhead,
-      knowledge_base: knowledgeBase,
-      business_hours: businessHours,
-      timezone,
-      payments_enabled: paymentsEnabled,
-      payment_methods: paymentMethods.length ? paymentMethods : ['cod'],
-      payment_instructions: paymentInstructions,
-      default_currency: defaultCurrency,
-      prepaid_required: prepaidRequired,
+      custom_order_instructions: parsed.customOrderInstructions,
+      media_handling: parsed.mediaHandling,
+      voice_handling: parsed.voiceHandling,
+      custom_orders_enabled: parsed.customOrdersEnabled,
+      custom_orders_require_approval: parsed.customOrdersRequireApproval,
+      business_type: parsed.businessType,
+      booking_link: parsed.bookingLink,
+      booking_enabled: parsed.bookingEnabled,
+      booking_mode: parsed.bookingMode,
+      booking_own_link: parsed.bookingOwnLink,
+      booking_duration_minutes: parsed.bookingDurationMinutes,
+      booking_lead_time_minutes: parsed.bookingLeadTimeMinutes,
+      booking_max_days_ahead: parsed.bookingMaxDaysAhead,
+      knowledge_base: parsed.knowledgeBase,
+      business_hours: parsed.businessHours,
+      timezone: parsed.timezone,
+      payments_enabled: parsed.paymentsEnabled,
+      payment_methods: parsed.paymentMethods.length ? parsed.paymentMethods : ['cod'],
+      payment_instructions: parsed.paymentInstructions,
+      default_currency: parsed.defaultCurrency,
+      prepaid_required: parsed.prepaidRequired,
       // Only set on the client path — an admin's JSON save must never wipe
       // the client's stored freeform text back to null. Same reasoning for
       // intake_completed_at: only the client's own wizard save marks it done
       // (docs: "try it for your business" plan, Phase A).
-      ...(ctx.isPlatformAdmin ? {} : { catalog_freeform_text: catalogFreeformText, intake_completed_at: new Date().toISOString() }),
+      ...(ctx.isPlatformAdmin
+        ? {}
+        : { catalog_freeform_text: parsed.catalogFreeformText, intake_completed_at: new Date().toISOString() }),
     })
     .eq('id', tenantId);
 
@@ -260,7 +188,7 @@ export async function updateIntakeAction(
     const tenant = await tenants.getById(tenantId);
     if (!tenant) return;
     try {
-      await ingestTenantKnowledge(tenant, catalogData, knowledgeBase);
+      await ingestTenantKnowledge(tenant, catalogData, parsed.knowledgeBase);
     } catch (err) {
       log.error('[intake] knowledge re-embed failed', { tenantId, err });
     }

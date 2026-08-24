@@ -10,7 +10,7 @@ import { DEMO_HANDOFF_KEY, BILLING_COUNTRY_KEY, type DemoHandoff } from '@/servi
 // duplicate here silently skipped checkout for any newly added paid tier.
 import { isPaidPlanId } from '@/lib/entitlements';
 
-type Status = 'provisioning' | 'done_pending_upgrade' | 'nothing_to_provision' | 'error';
+type Status = 'provisioning' | 'done_pending_upgrade' | 'error';
 
 /**
  * Lands here after either typed-code verify or the Google OAuth round trip
@@ -35,7 +35,13 @@ export function CompleteClient() {
     async function run() {
       const raw = sessionStorage.getItem(DEMO_HANDOFF_KEY);
       if (!raw) {
-        if (!cancelled) setStatus('nothing_to_provision');
+        // No demo handoff -> this is a direct signup (not via /try). Send the
+        // user to the onboarding wizard to fill the intake and pick a plan,
+        // instead of the old "you're signed in, head to dashboard" card that
+        // landed them on the dead-end "Access pending" screen (no tenant was
+        // ever created). A returning tenantless user reaches the same wizard
+        // via the dashboard layout's redirect.
+        if (!cancelled) window.location.assign('/signup/onboarding');
         return;
       }
 
@@ -43,7 +49,8 @@ export function CompleteClient() {
       try {
         handoff = JSON.parse(raw);
       } catch {
-        if (!cancelled) setStatus('nothing_to_provision');
+        // Corrupted handoff — treat like none and fall through to onboarding.
+        if (!cancelled) window.location.assign('/signup/onboarding');
         return;
       }
 
@@ -95,22 +102,6 @@ export function CompleteClient() {
       cancelled = true;
     };
   }, []);
-
-  if (status === 'nothing_to_provision') {
-    return (
-      <Card className="mx-auto max-w-sm">
-        <CardHeader>
-          <CardTitle>You&apos;re signed in</CardTitle>
-          <CardDescription>Head to your dashboard to get started.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button className="w-full" onClick={() => window.location.assign('/dashboard')}>
-            Go to dashboard
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
 
   if (status === 'done_pending_upgrade') {
     return (

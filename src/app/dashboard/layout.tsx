@@ -23,21 +23,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   if (ctx.memberships.length === 0) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="w-full max-w-sm rounded-xl bg-card p-6 text-center ring-1 ring-foreground/10">
-          <h1 className="font-page-heading text-lg">Access pending</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Your account isn&apos;t linked to a business yet. Ask your ClerkNest contact to grant access.
-          </p>
-          <form action={signOutAction} className="mt-4">
-            <Button type="submit" variant="outline" className="w-full">
-              Sign out
-            </Button>
-          </form>
-        </div>
-      </div>
-    );
+    // A signed-in account with no tenant: a self-serve signup that hasn't
+    // finished onboarding (the wizard creates the tenant). Send them there to
+    // complete it rather than stranding them on a static "Access pending"
+    // screen with no way forward. Fresh start every visit — partial progress
+    // is intentionally not persisted.
+    redirect('/signup/onboarding');
   }
 
   const cookieStore = await cookies();
