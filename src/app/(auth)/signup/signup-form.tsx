@@ -62,6 +62,18 @@ export function SignupForm({ initialEmail, planId }: { initialEmail: string; pla
       return;
     }
 
+    // Supabase silently returns an obfuscated user (never an error) for an
+    // email that's already registered AND confirmed — a deliberate anti-
+    // enumeration choice, but it means we can't rely on `signUpError` to
+    // catch it. The one reliable tell: `identities` comes back empty only
+    // for this exact case (a genuinely new signup always has one). Without
+    // this check the form fell through to "check your email for a code" for
+    // an email that was never going to receive one.
+    if (data.user?.identities?.length === 0) {
+      setError('That email is already registered. Try signing in instead, or use "Forgot password" on the sign-in page.');
+      return;
+    }
+
     if (data.session) {
       // Email confirmations are off for this project — the session is live already.
       window.location.assign('/signup/complete');
