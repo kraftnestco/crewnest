@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { ListSelect } from '@/components/ui/list-select';
 import { PromptArchitect } from '@/components/intake/prompt-architect';
 import { COMMON_TIMEZONES, CURRENCY_OPTIONS } from '@/lib/constants';
 import {
@@ -549,28 +550,17 @@ export function IntakeWizard({
           <CardContent className="space-y-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="timezone">Timezone</Label>
-              <select
+              <ListSelect
                 id="timezone"
                 value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-                className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-              >
-                <option value="">Select a timezone…</option>
-                <optgroup label="Common">
-                  {COMMON_TIMEZONES.map((tz) => (
-                    <option key={tz} value={tz}>
-                      {tz.replace(/_/g, ' ')}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="All timezones">
-                  {allTimezones.map((tz) => (
-                    <option key={tz} value={tz}>
-                      {tz.replace(/_/g, ' ')}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
+                onChange={setTimezone}
+                ariaLabel="Timezone"
+                placeholder="Select a timezone…"
+                groups={[
+                  { label: 'Common', options: COMMON_TIMEZONES.map((tz) => ({ value: tz, label: tz.replace(/_/g, ' ') })) },
+                  { label: 'All timezones', options: allTimezones.map((tz) => ({ value: tz, label: tz.replace(/_/g, ' ') })) },
+                ]}
+              />
               <p className="text-xs text-muted-foreground">
                 Used for &quot;are you open now?&quot; and, if booking is on, for every appointment time.
               </p>
@@ -655,23 +645,26 @@ export function IntakeWizard({
                 )}
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="default_currency">Currency</Label>
-                  <select
-                    id="default_currency"
-                    className="h-9 max-w-[16rem] rounded-md border border-input bg-transparent px-3 text-sm"
-                    value={defaultCurrency}
-                    onChange={(e) => setDefaultCurrency(e.target.value)}
-                  >
-                    {/* A stored value outside the shortlist is kept as an option
-                        rather than silently rewritten to PKR on the next save. */}
-                    {!CURRENCY_OPTIONS.some((c) => c.code === defaultCurrency) && defaultCurrency && (
-                      <option value={defaultCurrency}>{defaultCurrency}</option>
-                    )}
-                    {CURRENCY_OPTIONS.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
+                <ListSelect
+                  id="default_currency"
+                  value={defaultCurrency}
+                  onChange={setDefaultCurrency}
+                  ariaLabel="Currency"
+                  triggerClassName="max-w-[16rem]"
+                  groups={[
+                    {
+                      options: [
+                        // A stored value outside the shortlist is kept as an
+                        // option rather than silently rewritten to PKR on the
+                        // next save — same behavior as the old <select>.
+                        ...(!CURRENCY_OPTIONS.some((c) => c.code === defaultCurrency) && defaultCurrency
+                          ? [{ value: defaultCurrency, label: defaultCurrency }]
+                          : []),
+                        ...CURRENCY_OPTIONS.map((c) => ({ value: c.code, label: c.label })),
+                      ],
+                    },
+                  ]}
+                />
                 </div>
               </>
             )}
