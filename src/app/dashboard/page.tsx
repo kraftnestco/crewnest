@@ -55,8 +55,8 @@ function QuotaRing({ remaining, total }: { remaining: number; total: number }) {
   // The caption sits under the ring, not inside it — "Conversations left" can't
   // fit within the stroke at any legible size.
   return (
-    <div className="flex shrink-0 flex-col items-center gap-1" aria-hidden>
-      <div className="relative size-[4.5rem]">
+    <div className="flex shrink-0 flex-col items-center gap-1.5" aria-hidden>
+      <div className="relative size-20">
         <svg viewBox="0 0 64 64" className="size-full -rotate-90">
           <circle
             cx="32"
@@ -79,7 +79,7 @@ function QuotaRing({ remaining, total }: { remaining: number; total: number }) {
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-base font-semibold tabular-nums">
+          <span className="text-sm font-semibold leading-none tracking-tight tabular-nums">
             {remaining}/{total}
           </span>
         </div>
@@ -107,8 +107,14 @@ function StatCard({
       <CardContent className="flex items-center gap-3 p-4">
         <HomeIcon icon={icon} tone={tone} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className={large ? 'mt-0.5 text-4xl font-semibold tabular-nums' : 'mt-0.5 text-2xl font-semibold tabular-nums'}>
+          <p className="truncate text-sm text-muted-foreground">{label}</p>
+          <p
+            className={
+              large
+                ? 'mt-0.5 truncate text-3xl font-semibold tabular-nums sm:text-4xl'
+                : 'mt-0.5 truncate text-2xl font-semibold tabular-nums'
+            }
+          >
             {value}
           </p>
         </div>
