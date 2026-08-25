@@ -2243,6 +2243,24 @@
         .cn-mobile-hero .cn-hero-copy {
           margin-top: 0 !important;
         }
+        /*
+          Real laptop/desktop only (fine pointer + hover) — iPad Pro also
+          matches min-width:1024px above and its "text a bit up" placement
+          (align-items: flex-start, above) is intentional for that device;
+          this narrower query can't touch it since a touch-only iPad reports
+          hover:none/pointer:coarse. On an actual laptop the hero column was
+          pinned ~80px from the top of a full-height section with nothing
+          filling the rest, reading as "stuck at the top" — vertically
+          centering it in the section (padding-top removed, since centering
+          already accounts for the header, which overlays rather than
+          occupying layout height) fixes that without touching iPad Pro.
+        */
+        @media (hover: hover) and (pointer: fine) {
+          .cn-mobile-hero > .max-w-7xl {
+            padding-top: 0 !important;
+            align-items: center !important;
+          }
+        }
         .cn-desktop-bubbles .cn-bubble-stage,
         .cn-desktop-bubbles .cn-desktop-stage {
           flex: 1 1 auto;
