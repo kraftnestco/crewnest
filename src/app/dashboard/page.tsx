@@ -111,8 +111,8 @@ function StatCard({
           <p
             className={
               large
-                ? 'mt-0.5 truncate text-3xl font-semibold tabular-nums sm:text-4xl'
-                : 'mt-0.5 truncate text-2xl font-semibold tabular-nums'
+                ? 'mt-0.5 break-words text-2xl font-semibold tabular-nums xl:text-4xl'
+                : 'mt-0.5 break-words text-2xl font-semibold tabular-nums'
             }
           >
             {value}
