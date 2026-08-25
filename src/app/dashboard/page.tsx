@@ -108,15 +108,7 @@ function StatCard({
         <HomeIcon icon={icon} tone={tone} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm text-muted-foreground">{label}</p>
-          <p
-            className={
-              large
-                ? 'mt-0.5 break-words text-2xl font-semibold tabular-nums xl:text-4xl'
-                : 'mt-0.5 break-words text-2xl font-semibold tabular-nums'
-            }
-          >
-            {value}
-          </p>
+          <p className="mt-0.5 whitespace-nowrap text-2xl font-semibold tabular-nums">{value}</p>
         </div>
       </CardContent>
     </Card>
