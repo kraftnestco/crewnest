@@ -25,6 +25,7 @@ import { getLlmKey } from '@/lib/secrets';
 import { sendText, MetaWindowError } from './meta/send';
 import * as metaProfile from './meta/profile';
 import { notify, notifyBoth } from '@/services/notifications';
+import { createServiceClient } from '@/lib/supabase/service';
 import {
   sanitizeInbound,
   stripHandoffToken,
@@ -36,6 +37,7 @@ import {
   looksLikeLeakedReasoning,
 } from './security/sanitize';
 import { entitlementsFor, isLimited } from '@/lib/entitlements';
+import * as conversationUsage from './conversationUsage';
 import {
   MEMORY_TOKEN_BUDGET,
   MAX_TOOL_ROUNDS,
@@ -51,7 +53,7 @@ import type { AuthoredBy, ChatSession, InboundMessage, OrderAttachment, Tenant }
 import { log } from '@/lib/log';
 
 export interface OrchestratorResult {
-  /** Null only when a plan's monthly new-conversation cap blocked session creation. */
+  /** Null only when a monthly billable-conversation cap blocked the turn before a session existed. */
   sessionId: string | null;
   /** The reply to show/send; null when muted (handoff) or dropped. */
   replyText: string | null;
@@ -59,16 +61,12 @@ export interface OrchestratorResult {
 }
 
 /**
- * Shown to the customer, and returned to the web widget, when the plan's DAILY
- * new-conversation cap blocks a NEW conversation.
- *
- * Deliberately says "conversation limit" and not "free plan": the cap now
- * applies to Starter and Growth as well (lib/entitlements.ts), and telling a
- * paying customer's customer that the business is on a free plan would be both
- * wrong and embarrassing.
+ * Shown to the customer when the plan's MONTHLY conversation cap blocks a NEW
+ * billable conversation (24h inactivity window — see conversationUsage).
+ * Deliberately does not name the plan tier to the end customer.
  */
 const MONTHLY_CONVERSATION_LIMIT_REACHED_TEXT =
-  "Thanks for reaching out! We've reached this month's conversation limit — please try again next month, or the business will get back to you soon.";
+  "Thanks for reaching out! This business has reached its conversation limit for now — they'll get back to you soon.";
 
 /**
  * Shown when a conversation exceeds the plan's per-conversation message budget
@@ -118,31 +116,74 @@ export async function handleInboundMessage(
     return null;
   }
 
-  // 2. Session (one per customer per channel). The plan's monthly NEW-conversation
-  // cap applies here (lib/entitlements.ts). Existing sessions are unaffected —
-  // they were counted on the month they were created — see sessions.findOrCreate.
+  // 2. Session (one per customer per channel). Monthly billable-conversation
+  // metering (24h inactivity window) runs after we have a session — a returning
+  // customer after 24h silence still consumes a slot even though the session row
+  // already exists.
   const entitlements = entitlementsFor(tenant.plan);
-  const sessionOrCap = await sessions.findOrCreate(
+  const session = await sessions.findOrCreate(
     tenant.id,
     input.platform,
     input.externalUserId,
-    isLimited(entitlements.monthlyConversations) ? entitlements.monthlyConversations : undefined,
     input.customerName,
   );
 
-  if (sessionOrCap === 'cap_reached') {
-    if (input.platform !== 'web') {
-      await sendText({
-        tenant,
-        platform: input.platform,
-        to: input.externalUserId,
-        text: MONTHLY_CONVERSATION_LIMIT_REACHED_TEXT,
+  if (isLimited(entitlements.monthlyConversations)) {
+    const gate = await conversationUsage.gateBillableConversation({
+      tenantId: tenant.id,
+      sessionId: session.id,
+      monthlyCap: entitlements.monthlyConversations,
+    });
+    if (!gate.ok) {
+      const client = createServiceClient();
+      const since = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+      const { count: recent } = await client
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', tenant.id)
+        .eq('scope', 'tenant')
+        .eq('type', 'upgrade_request')
+        .eq('title', 'Upgrade to keep answering customers')
+        .gte('created_at', since);
+      if ((recent ?? 0) === 0) {
+        await notifyBoth({
+          tenantId: tenant.id,
+          type: 'upgrade_request',
+          entityType: 'tenant',
+          entityId: tenant.id,
+          agency: {
+            title: 'Conversation limit reached',
+            body: `${tenant.businessName} hit its monthly conversation cap (${gate.used}/${gate.cap}) — customer messages will wait until they upgrade or the month resets.`,
+            link: `/admin/clients/${tenant.id}`,
+          },
+          tenant: {
+            title: 'Upgrade to keep answering customers',
+            body: `You've used all ${gate.cap} conversations this month. Upgrade your plan so new customers keep getting AI replies.`,
+            link: '/dashboard/billing',
+          },
+        });
+      }
+
+      await messages.persist({
+        sessionId: session.id,
+        tenantId: tenant.id,
+        role: 'user',
+        content: sanitizeInbound(input.text),
+        providerMsgId: input.providerMsgId,
       });
-      return { sessionId: null, replyText: null, handoff: false };
+
+      if (input.platform !== 'web') {
+        await sendText({
+          tenant,
+          platform: input.platform,
+          to: input.externalUserId,
+          text: MONTHLY_CONVERSATION_LIMIT_REACHED_TEXT,
+        });
+        return { sessionId: session.id, replyText: null, handoff: false };
+      }
+      return { sessionId: session.id, replyText: MONTHLY_CONVERSATION_LIMIT_REACHED_TEXT, handoff: false };
     }
-    return { sessionId: null, replyText: MONTHLY_CONVERSATION_LIMIT_REACHED_TEXT, handoff: false };
   }
-  const session = sessionOrCap;
 
   // 2b. Messenger/Instagram carry no name/photo in the webhook payload (unlike
   // WhatsApp's contacts[]) — best-effort backfill once per session via a Graph
@@ -589,7 +630,7 @@ async function runTurn(
   const { key, usedByok } = await getLlmKey(tenant);
 
   // 8b. Free-plan rolling 30-day cost ceiling (docs/18 §3, Stage U-cap, finding #7)
-  // — the monthly cap at step 2 only throttles NEW conversations; an existing free
+  // — the daily cap at step 2 only throttles NEW conversations; an existing free
   // session could otherwise run up unbounded master-key spend. Scoped to plan='free'
   // AND this turn using the master key (a BYOK free tenant spends their own key —
   // not ours to cap). Checked here, now that `usedByok` is known, before any model

@@ -245,15 +245,12 @@ export const RETRIEVAL_TOP_K = 8;
 export const RETRIEVED_CONTEXT_TOKEN_BUDGET = 2000;
 
 /**
- * Free-plan monthly cap on NEW distinct customer conversations per tenant.
- * Resets at UTC month start. Existing sessions keep replying normally — only a
- * brand-new (tenant, platform, external user) session is gated.
+ * Free-plan monthly conversation allowance (display / legacy alias).
+ * Enforcement lives in `lib/entitlements.ts` → `monthlyConversations`.
  *
- * Prefer `entitlementsFor(tenant.plan).monthlyConversations`. This alias is kept
- * so older imports keep compiling and stays derived from ENTITLEMENTS.
+ * @deprecated Prefer `entitlementsFor(tenant.plan).monthlyConversations`.
  */
 export const FREE_PLAN_DAILY_SESSION_CAP = ENTITLEMENTS.free.monthlyConversations;
-export const FREE_PLAN_MONTHLY_SESSION_CAP = ENTITLEMENTS.free.monthlyConversations;
 
 /**
  * Stage U-cap (docs/18 §3, finding #7) — platform default for the free-plan

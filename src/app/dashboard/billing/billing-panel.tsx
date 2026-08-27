@@ -7,11 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { displayFont } from '@/app/_landing/fonts';
 import { createCheckoutSessionAction, createPortalLinkAction, cancelSubscriptionAction } from './actions';
-import { type PlanOption } from '@/services/demo/plans';
+import { planPriceLabel, type PlanOption } from '@/services/demo/plans';
 import type { BillingProviderId } from '@/types/domain';
-import { isPaidPlanId, planRank, type PaidPlanId } from '@/lib/entitlements';
+import { planRank, type PaidPlanId } from '@/lib/entitlements';
 
 export function BillingPanel({
   tenantId,
@@ -34,6 +33,7 @@ export function BillingPanel({
 
   // Safepay has no hosted customer portal, so those tenants cancel in-app.
   const isSafepay = billingProvider === 'safepay';
+  const currency = isSafepay ? ('PKR' as const) : ('USD' as const);
 
   async function handleCancel() {
     if (!window.confirm('Cancel your subscription? You’ll move to the Free plan at the end of your billing period.')) {
@@ -53,8 +53,7 @@ export function BillingPanel({
   }
 
   async function handleChoosePlan(plan: PlanOption) {
-    if (plan.contactSales || plan.id === 'free' || plan.id === currentPlan) return;
-    if (!isPaidPlanId(plan.id)) return;
+    if (plan.id === 'free' || plan.id === currentPlan) return;
     setPendingPlan(plan.id);
     try {
       const result = await createCheckoutSessionAction(tenantId, plan.id as PaidPlanId);
@@ -129,62 +128,59 @@ export function BillingPanel({
         </Card>
       )}
 
-      {/* Card chrome matches marketing #pricing / paywall — five tiers including Enterprise. */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+      {/* Four tiers — 2-up then 4-up (was sm:grid-cols-3 for three plans). */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {plans.map((plan) => {
           const isCurrent = plan.id === currentPlan;
-          const highlighted = Boolean(plan.highlight);
+          // With four tiers, "Choose Starter" while on Pro reads as a neutral
+          // option when it is actually a downgrade — label it for what it is.
           const isDowngrade = planRank(plan.id) < planRank(currentPlan);
-          const price = isSafepay ? (plan.pricePkr ?? plan.price) : plan.price;
-          const showCheckout = isPaidPlanId(plan.id) && !isCurrent;
           return (
-            <div key={plan.id} className="relative h-full">
-              {isCurrent && (
-                <Badge className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2">Current plan</Badge>
+            <Card
+              key={plan.id}
+              className={cn(
+                'relative overflow-visible',
+                isCurrent && 'ring-2 ring-primary',
+                !isCurrent && plan.highlight && 'ring-1 ring-primary/40',
               )}
-              {!isCurrent && highlighted && (
-                <Badge className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2 border-transparent bg-pending-tint text-pending-text">
+            >
+              {isCurrent && <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2">Current plan</Badge>}
+              {!isCurrent && plan.highlight && (
+                <Badge variant="secondary" className="absolute -top-2.5 left-1/2 -translate-x-1/2">
                   Most popular
                 </Badge>
               )}
-              <Card
-                className={cn(
-                  'flex h-full flex-col',
-                  isCurrent && 'ring-2 ring-primary',
-                  !isCurrent && highlighted && 'shadow-lg ring-primary/40',
+              <CardHeader>
+                <CardTitle className="text-base">{plan.name}</CardTitle>
+                <p className="text-lg font-semibold">{planPriceLabel(plan, currency)}</p>
+                <CardDescription>{plan.tagline}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <ul className="space-y-1 text-xs text-muted-foreground">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-start gap-1.5">
+                      <Check className="mt-0.5 size-3 shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                {plan.id !== 'free' && !isCurrent && (
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    variant={isDowngrade ? 'outline' : 'default'}
+                    onClick={() => handleChoosePlan(plan)}
+                    disabled={pendingPlan !== null}
+                  >
+                    {pendingPlan === plan.id
+                      ? 'Redirecting…'
+                      : isDowngrade
+                        ? `Switch to ${plan.name}`
+                        : `Choose ${plan.name}`}
+                  </Button>
                 )}
-              >
-                <CardHeader className="pb-3">
-                  <CardTitle className={cn(displayFont.className, 'font-semibold')}>{plan.name}</CardTitle>
-                  <p className={cn(displayFont.className, 'text-3xl font-semibold tracking-tight')}>{price}</p>
-                  <CardDescription className="text-pretty">{plan.tagline}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-1 flex-col justify-between gap-6 pt-0">
-                  <ul className="flex flex-col gap-2.5">
-                    {plan.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm text-foreground/85">
-                        <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  {showCheckout && (
-                    <Button
-                      className="w-full"
-                      variant={highlighted && !isDowngrade ? 'default' : 'outline'}
-                      onClick={() => handleChoosePlan(plan)}
-                      disabled={pendingPlan !== null}
-                    >
-                      {pendingPlan === plan.id
-                        ? 'Redirecting…'
-                        : isDowngrade
-                          ? `Switch to ${plan.name}`
-                          : `Choose ${plan.name}`}
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+              </CardContent>
+            </Card>
           );
         })}
       </div>

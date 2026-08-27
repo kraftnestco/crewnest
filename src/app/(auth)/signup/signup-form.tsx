@@ -5,10 +5,11 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PAYWALL_PLANS } from '@/services/demo/plans';
+import { PAYWALL_PLANS, planPriceLabel } from '@/services/demo/plans';
 import { SignupVerifyForm } from './signup-verify-form';
 import { BILLING_COUNTRY_KEY, DEMO_HANDOFF_KEY, type DemoHandoff } from '@/services/demo/handoff';
 import { SIGNUP_COUNTRY_OPTIONS, normalizeBillingCountry } from '@/lib/signup-country';
+import { pricingCurrencyForCountry } from '@/lib/pricing-currency';
 
 /**
  * Self-serve signup (docs: "try it for your business" plan, Phase C) — the
@@ -44,6 +45,7 @@ export function SignupForm({
   const [country, setCountry] = useState('PK');
 
   const plan = PAYWALL_PLANS.find((p) => p.id === planId);
+  const currency = pricingCurrencyForCountry(country);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -138,7 +140,7 @@ export function SignupForm({
     <div className="flex flex-col gap-3">
       {plan && planPreselected && (
         <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-          You selected the <span className="font-medium text-foreground">{plan.name}</span> plan ({plan.price}).
+          You selected the <span className="font-medium text-foreground">{plan.name}</span> plan ({planPriceLabel(plan, currency)}).
         </p>
       )}
 

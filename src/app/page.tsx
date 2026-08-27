@@ -19,7 +19,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { PAYWALL_PLANS } from '@/services/demo/plans';
+import { PAYWALL_PLANS, planPriceLabel } from '@/services/demo/plans';
+import { resolveRequestPricingCurrency } from '@/lib/pricing-currency.server';
 import { Logomark } from './_landing/logomark';
 import { BeforeAfterGainCard } from './_landing/scroll-reveal';
 import { ChannelReskin } from './_landing/channel-reskin';
@@ -194,7 +195,8 @@ const BEFORE_AFTER = [
   },
 ] as const;
 
-export default function Home() {
+export default async function Home() {
+  const currency = await resolveRequestPricingCurrency();
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
@@ -441,7 +443,7 @@ export default function Home() {
                     <CardHeader>
                       <CardTitle className={cn(displayFont.className, 'font-semibold')}>{plan.name}</CardTitle>
                       <p className={cn(displayFont.className, 'text-3xl font-semibold tracking-tight')}>
-                        {plan.price}
+                        {planPriceLabel(plan, currency)}
                       </p>
                       <CardDescription>{plan.tagline}</CardDescription>
                     </CardHeader>

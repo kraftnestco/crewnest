@@ -6,33 +6,39 @@
  * copilot gating) and tests alike. `'use server'` files may only export async
  * functions, which is why this lives in lib/ and not next to the plan config.
  *
- * WHY ONE MODULE: before this existed, "Up to 5 conversations/month" was a string
- * in the plan card while `FREE_PLAN_DAILY_SESSION_CAP` was a separate constant
- * in lib/constants, and "One channel at a time" was marketing copy enforced
- * nowhere at all. Marketing copy and enforcement drifting apart is how a paywall
- * quietly stops matching what customers were sold. Everything a plan grants is
- * now derived from ENTITLEMENTS, including the feature bullets on the cards.
+ * WHY ONE MODULE: before this existed, marketing copy and enforcement lived in
+ * separate files and drifted apart. Everything a plan grants is now derived
+ * from ENTITLEMENTS, including the feature bullets on the cards.
  */
 
 /** Plan ids exactly as written to `tenants.plan`. */
-export type PlanId = 'free' | 'starter' | 'growth' | 'pro' | 'enterprise';
+export type PlanId = 'free' | 'starter' | 'growth' | 'pro';
 
-export const PLAN_IDS: readonly PlanId[] = ['free', 'starter', 'growth', 'pro', 'enterprise'] as const;
+export const PLAN_IDS: readonly PlanId[] = ['free', 'starter', 'growth', 'pro'] as const;
 
-/** Paid plans a tenant can self-serve checkout into. Free is not purchasable. */
+/** Paid plans a tenant can check out into (free is not purchasable). */
 export type PaidPlanId = Exclude<PlanId, 'free'>;
 
-export const PAID_PLAN_IDS: readonly PaidPlanId[] = ['starter', 'growth', 'pro', 'enterprise'] as const;
+export const PAID_PLAN_IDS: readonly PaidPlanId[] = ['starter', 'growth', 'pro'] as const;
+
+/**
+ * Inactivity window for billable conversations. A returning customer on the
+ * same channel after this much silence starts a NEW billable conversation.
+ * Within the window, all messages are the same conversation.
+ */
+export const CONVERSATION_SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** `Infinity` means unlimited — deliberately not `null`, so comparisons stay plain numbers. */
 export interface PlanEntitlements {
-  /** New conversations that may START per UTC month. Existing conversations are never blocked by this. */
+  /**
+   * Billable conversations allowed per calendar month (UTC).
+   * A billable conversation = one customer on one channel, restarting after
+   * {@link CONVERSATION_SESSION_WINDOW_MS} of silence.
+   */
   monthlyConversations: number;
   /**
    * Max CUSTOMER messages in a single conversation before the AI stops replying
-   * and hands off to a human (§ "mid-sized conversations only"). Counts inbound
-   * customer turns only — the AI's own replies don't consume the budget, or a
-   * chatty assistant would shorten the customer's allowance.
+   * and hands off to a human. Counts inbound customer turns only.
    */
   maxMessagesPerConversation: number;
   /** How many channels (WhatsApp/Messenger/Instagram/web) may be connected at once. */
@@ -43,7 +49,7 @@ export interface PlanEntitlements {
 
 export const ENTITLEMENTS: Record<PlanId, PlanEntitlements> = {
   free: {
-    monthlyConversations: 100,
+    monthlyConversations: 50,
     maxMessagesPerConversation: 20,
     maxChannels: 1,
     hasCopilot: false,
@@ -51,23 +57,17 @@ export const ENTITLEMENTS: Record<PlanId, PlanEntitlements> = {
   starter: {
     monthlyConversations: 500,
     maxMessagesPerConversation: Infinity,
-    maxChannels: Infinity,
+    maxChannels: 1,
     hasCopilot: false,
   },
   growth: {
-    monthlyConversations: 2000,
+    monthlyConversations: 2_000,
     maxMessagesPerConversation: Infinity,
     maxChannels: Infinity,
     hasCopilot: true,
   },
   pro: {
     monthlyConversations: 10_000,
-    maxMessagesPerConversation: Infinity,
-    maxChannels: Infinity,
-    hasCopilot: true,
-  },
-  enterprise: {
-    monthlyConversations: Infinity,
     maxMessagesPerConversation: Infinity,
     maxChannels: Infinity,
     hasCopilot: true,
@@ -110,15 +110,13 @@ export function formatLimit(limit: number): string {
  *
  * Lives here rather than being derived from PAYWALL_PLANS so that server-side
  * callers with no business importing UI plan config (the billing webhooks, which
- * name the plan in a notification) still get the right label. A ternary over two
- * ids was already wrong the moment a third tier existed.
+ * name the plan in a notification) still get the right label.
  */
 const PLAN_NAMES: Record<PlanId, string> = {
   free: 'Free',
   starter: 'Starter',
   growth: 'Growth',
   pro: 'Pro',
-  enterprise: 'Enterprise',
 };
 
 export function planDisplayName(plan: string | null | undefined): string {

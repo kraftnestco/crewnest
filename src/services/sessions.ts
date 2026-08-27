@@ -30,19 +30,22 @@ function mapSession(row: ChatSessionRow): ChatSession {
 }
 
 /**
- * Count sessions created since UTC month start for a tenant — the denominator for
- * per-plan monthly new-conversation caps.
+ * Count sessions created since UTC midnight for a tenant.
+ *
+ * @deprecated Daily new-conversation caps were replaced by monthly billable
+ * conversation metering (`conversationUsage.countConversationsThisMonth`).
+ * Kept only for any residual callers / dashboards during transition.
  */
-export async function countSessionsThisMonth(tenantId: string): Promise<number> {
+export async function countSessionsToday(tenantId: string): Promise<number> {
   const client = createServiceClient();
-  const now = new Date();
-  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
 
   const { count, error } = await client
     .from('chat_sessions')
     .select('*', { count: 'exact', head: true })
     .eq('tenant_id', tenantId)
-    .gte('created_at', startOfMonth.toISOString());
+    .gte('created_at', startOfDay.toISOString());
 
   if (error) throw error;
   return count ?? 0;
@@ -50,20 +53,13 @@ export async function countSessionsThisMonth(tenantId: string): Promise<number> 
 
 /**
  * Find the session for (tenant, platform, external user), or create it.
- *
- * `monthlyCap`, when passed, bounds how many NEW conversations may start per
- * UTC month — an existing session is always
- * returned regardless of the cap, since it was already counted the month it
- * was created. Returns the literal `'cap_reached'` instead of creating a row
- * when a brand-new conversation would exceed it.
  */
 export async function findOrCreate(
   tenantId: string,
   platform: Platform,
   externalUserId: string,
-  monthlyCap?: number,
   customerName?: string | null,
-): Promise<ChatSession | 'cap_reached'> {
+): Promise<ChatSession> {
   const client = createServiceClient();
 
   const { data: existing, error: selectError } = await client
@@ -76,11 +72,6 @@ export async function findOrCreate(
 
   if (selectError) throw selectError;
   if (existing) return mapSession(existing);
-
-  if (monthlyCap !== undefined) {
-    const monthCount = await countSessionsThisMonth(tenantId);
-    if (monthCount >= monthlyCap) return 'cap_reached';
-  }
 
   const { data: inserted, error: insertError } = await client
     .from('chat_sessions')

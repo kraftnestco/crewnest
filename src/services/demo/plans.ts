@@ -1,69 +1,73 @@
-import { ENTITLEMENTS, type PlanId } from '@/lib/entitlements';
-import { SUPPORT_EMAIL } from '@/lib/constants';
+import { ENTITLEMENTS, formatLimit, type PlanId } from '@/lib/entitlements';
 
 /**
- * Paywall plan config (docs: "try it for your business" plan, Phase C). Plain
- * data only — kept out of any `'use server'` file, since those may only export
- * async functions. `id` is the exact string written to `tenants.plan`.
+ * Paywall plan config. Plain data only — kept out of any `'use server'` file.
+ * `id` is the exact string written to `tenants.plan`.
  *
- * The LIMIT bullets are derived from `ENTITLEMENTS` (lib/entitlements.ts) rather
- * than hand-written, so a card can never advertise a cap the enforcement code
- * doesn't apply. Only genuinely descriptive bullets (support level, seats) are
- * literal strings here.
+ * LIMIT bullets are derived from `ENTITLEMENTS` so a card can never advertise a
+ * cap the enforcement code doesn't apply.
  */
 export interface PlanOption {
   id: PlanId;
   name: string;
   price: string;
   /**
-   * Display price for Safepay (Pakistan) tenants (docs/25 §3.2).
-   *
-   * These are FIXED PKR plan amounts, not the USD price converted at checkout.
-   * Safepay's `createSubscription` takes only a planId — amount and currency
-   * live on the plan in their merchant dashboard, so there is no field for a
-   * converted amount. Changing a price therefore means editing the plan in
-   * Safepay AND this string; they are two halves of one change.
+   * Display price for Pakistan (Safepay) visitors/tenants (docs/25 §3.2).
+   * Fixed PKR plan amounts — Safepay bills the dashboard plan, not a converted USD.
    */
   pricePkr?: string;
   tagline: string;
   features: string[];
   /** Rendered as the emphasised card in the pricing grid. */
   highlight?: boolean;
-  /** When true, CTA opens mail instead of self-serve checkout (unused — all tiers self-serve). */
-  contactSales?: boolean;
 }
 
-/** "Up to 100 customer conversations/month" / "Unlimited customer conversations". */
+/** Marketing-only Enterprise card — not a checkoutable `tenants.plan` id. */
+export interface EnterprisePlanOption {
+  id: 'enterprise';
+  name: string;
+  price: string;
+  pricePkr?: string;
+  tagline: string;
+  features: string[];
+  cta: string;
+}
+
 function conversationsFeature(plan: PlanId): string {
   const n = ENTITLEMENTS[plan].monthlyConversations;
-  return Number.isFinite(n) ? `Up to ${n} customer conversations/month` : 'Unlimited customer conversations';
+  if (!Number.isFinite(n)) return 'Unlimited AI conversations';
+  return `Up to ${n.toLocaleString('en-US')} AI conversations / month`;
 }
 
-export const ENTERPRISE_CONTACT_HREF = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('ClerkNest Enterprise plan')}`;
+function channelsFeature(plan: PlanId): string {
+  const n = ENTITLEMENTS[plan].maxChannels;
+  return Number.isFinite(n) ? '1 channel at a time' : 'All channels — WhatsApp, Instagram, Messenger & web';
+}
 
 export const PAYWALL_PLANS: PlanOption[] = [
   {
     id: 'free',
     name: 'Free',
     price: '$0/mo',
-    tagline: 'Keep the AI you just built, capped for solo testing.',
+    pricePkr: 'Rs 0/mo',
+    tagline: 'Try ClerkNest on one channel, no commitment.',
     features: [
       conversationsFeature('free'),
-      `Up to ${ENTITLEMENTS.free.maxMessagesPerConversation} messages per conversation`,
-      'One channel at a time',
+      `Up to ${formatLimit(ENTITLEMENTS.free.maxMessagesPerConversation)} messages per conversation`,
+      channelsFeature('free'),
       'Community support',
     ],
   },
   {
     id: 'starter',
     name: 'Starter',
-    price: '$39/mo',
-    pricePkr: 'Rs 11,000/mo',
-    tagline: 'For a business that outgrew the free cap.',
+    price: '$11/mo',
+    pricePkr: 'Rs 3,000/mo',
+    tagline: 'For solo shops getting serious about one channel.',
     features: [
       conversationsFeature('starter'),
       'Conversations of any length',
-      'All channels — WhatsApp, Instagram, Messenger & web',
+      channelsFeature('starter'),
       'Order capture & payments',
     ],
   },
@@ -72,13 +76,13 @@ export const PAYWALL_PLANS: PlanOption[] = [
     name: 'Growth',
     price: '$49/mo',
     pricePkr: 'Rs 14,000/mo',
-    tagline: 'For a business handling real daily volume.',
+    tagline: 'Every channel, one AI brain.',
     highlight: true,
     features: [
       'Everything in Starter',
       conversationsFeature('growth'),
+      channelsFeature('growth'),
       'Your own AI assistant to run the business',
-      'Order capture & payments',
     ],
   },
   {
@@ -86,7 +90,7 @@ export const PAYWALL_PLANS: PlanOption[] = [
     name: 'Pro',
     price: '$79/mo',
     pricePkr: 'Rs 22,000/mo',
-    tagline: 'For teams who want the full command center.',
+    tagline: 'Higher limits for busy teams.',
     features: [
       'Everything in Growth',
       conversationsFeature('pro'),
@@ -94,17 +98,33 @@ export const PAYWALL_PLANS: PlanOption[] = [
       'Priority support',
     ],
   },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: '$199/mo',
-    pricePkr: 'Rs 55,000/mo',
-    tagline: 'For multi-location brands and high-volume operations.',
-    features: [
-      'Everything in Pro',
-      conversationsFeature('enterprise'),
-      'Dedicated onboarding & success',
-      'Custom SLA & priority support',
-    ],
-  },
 ];
+
+/** Enterprise — Talk to Sales. Shown on marketing grids; not provisioned via checkout. */
+export const ENTERPRISE_PLAN: EnterprisePlanOption = {
+  id: 'enterprise',
+  name: 'Enterprise',
+  price: 'Custom',
+  pricePkr: 'Custom',
+  tagline: 'Custom volume, SLA, and success support — scoped with us.',
+  features: [
+    'Custom conversation volume',
+    'All channels',
+    'Everything in Pro',
+    'Dedicated success manager',
+    'Custom SLA',
+  ],
+  cta: 'Talk to Sales',
+};
+
+/** All cards shown on public marketing surfaces (paywall + Enterprise). */
+export const MARKETING_PLANS = [...PAYWALL_PLANS, ENTERPRISE_PLAN] as const;
+
+/** Pick the display price string for a visitor/tenant currency. */
+export function planPriceLabel(
+  plan: Pick<PlanOption, 'price' | 'pricePkr'> | Pick<EnterprisePlanOption, 'price' | 'pricePkr'>,
+  currency: 'USD' | 'PKR',
+): string {
+  if (currency === 'PKR') return plan.pricePkr ?? plan.price;
+  return plan.price;
+}

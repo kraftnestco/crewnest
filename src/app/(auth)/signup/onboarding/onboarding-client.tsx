@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,9 +10,11 @@ import { displayFont } from '@/app/_landing/fonts';
 import { Logomark } from '@/app/_landing/logomark';
 import { IntakeWizard } from '@/components/intake/intake-wizard';
 import type { IntakeTenant } from '@/components/intake/intake-shared';
-import { PAYWALL_PLANS, type PlanOption } from '@/services/demo/plans';
+import { PAYWALL_PLANS, planPriceLabel, type PlanOption } from '@/services/demo/plans';
 import { BILLING_COUNTRY_KEY } from '@/services/demo/handoff';
 import { isPaidPlanId } from '@/lib/entitlements';
+import { pricingCurrencyForCountry } from '@/lib/pricing-currency';
+import { usePricingCurrency } from '@/hooks/use-pricing-currency';
 import { provisionFromIntakeAction } from './provision-from-intake-action';
 import { createCheckoutSessionAction } from '@/app/dashboard/billing/actions';
 import { signOutAction } from '@/app/admin/actions';
@@ -67,6 +69,16 @@ export function OnboardingClient() {
   const [provisioning, setProvisioning] = useState(false);
   const [provisionError, setProvisionError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const geoCurrency = usePricingCurrency();
+  const [sessionCurrency, setSessionCurrency] = useState<ReturnType<typeof pricingCurrencyForCountry> | null>(
+    null,
+  );
+  const currency = sessionCurrency ?? geoCurrency;
+
+  useEffect(() => {
+    const country = sessionStorage.getItem(BILLING_COUNTRY_KEY);
+    if (country) setSessionCurrency(pricingCurrencyForCountry(country));
+  }, []);
 
   function handleWizardFinish(fd: FormData) {
     if (!businessName.trim()) {
@@ -189,7 +201,7 @@ export function OnboardingClient() {
                   )}
                   <CardHeader>
                     <CardTitle className="text-base">{plan.name}</CardTitle>
-                    <p className="text-lg font-semibold">{plan.price}</p>
+                    <p className="text-lg font-semibold">{planPriceLabel(plan, currency)}</p>
                     <CardDescription>{plan.tagline}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">

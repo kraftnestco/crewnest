@@ -20,7 +20,7 @@ import type { LucideIcon } from 'lucide-react';
 import { getCallerContext, resolveActiveTenant } from '@/lib/auth/context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getTenantAttentionItems, getClerkCards } from '@/services/overview';
-import { countSessionsThisMonth } from '@/services/sessions';
+import { countConversationsThisMonth } from '@/services/conversationUsage';
 import { entitlementsFor, isLimited } from '@/lib/entitlements';
 import { PAYWALL_PLANS } from '@/services/demo/plans';
 import { formatRelativeTime } from '@/lib/relative-time';
@@ -215,7 +215,7 @@ export default async function DashboardHomePage({
       .eq('tenant_id', activeTenantId)
       .neq('status', 'cancelled')
       .gte('created_at', monthStart),
-    countSessionsThisMonth(activeTenantId),
+    countConversationsThisMonth(activeTenantId),
     supabase.from('orders').select('review_rating').eq('tenant_id', activeTenantId).not('review_rating', 'is', null),
     supabase
       .from('chat_sessions')
@@ -245,7 +245,7 @@ export default async function DashboardHomePage({
   const entitlements = entitlementsFor(tenant?.plan);
   const hasCopilot = entitlements.hasCopilot;
   const monthlyCap = entitlements.monthlyConversations;
-  // Monthly new-conversation caps apply to every limited plan, not just free.
+  // Monthly conversation caps apply to every limited plan, not just free.
   const showQuotaBanner = isLimited(monthlyCap);
   const quotaRemaining = Math.max(0, monthlyCap - conversationsThisMonth);
   const planLabel = PAYWALL_PLANS.find((p) => p.id === tenant?.plan)?.name ?? 'Free';
@@ -311,8 +311,8 @@ export default async function DashboardHomePage({
             <p className="text-sm font-medium">{planLabel} plan</p>
             <p className={`mt-0.5 text-sm ${quotaRemaining === 0 ? '' : 'text-muted-foreground'}`}>
               {quotaRemaining === 0
-                ? "You've used all of this month's new-conversation slots. New customers won't get a reply until next month."
-                : `${quotaRemaining} of ${monthlyCap} new conversations left this month.`}
+                ? "You've used all of this month's conversations. Upgrade so new customers keep getting AI replies."
+                : `${quotaRemaining} of ${monthlyCap.toLocaleString('en-US')} conversations left this month.`}
             </p>
             <Link
               href="/dashboard/billing"

@@ -417,6 +417,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      conversation_usage: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          session_id: string;
+          billed_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          session_id: string;
+          billed_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          session_id?: string;
+          billed_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'conversation_usage_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'conversation_usage_session_id_fkey';
+            columns: ['session_id'];
+            isOneToOne: false;
+            referencedRelation: 'chat_sessions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       usage_logs: {
         Row: {
           id: string;

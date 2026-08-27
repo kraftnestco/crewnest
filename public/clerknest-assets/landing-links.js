@@ -1278,11 +1278,54 @@
     const label = button.textContent?.trim() ?? "";
     if (/^Start (Free|Starter|Growth|Pro|Enterprise)$/.test(label)) {
       const link = document.createElement("a");
-      link.href = "/try";
+      link.href = label === "Talk to Sales" ? "mailto:kraftnestco@gmail.com" : "/try";
       link.click();
       return;
     }
   });
+
+  /*
+    Pakistan visitors: swap USD plan prices on the marketing pricing section
+    for the fixed PKR labels (Safepay amounts). Detected via /api/geo.
+  */
+  const PKR_BY_USD = {
+    $0: "Rs 0",
+    $11: "Rs 3,000",
+    $49: "Rs 14,000",
+    $79: "Rs 22,000",
+  };
+
+  const applyPkrPricing = () => {
+    const section = document.getElementById("pricing");
+    if (!section) return;
+
+    section.querySelectorAll("span.text-4xl").forEach((el) => {
+      const text = el.textContent?.trim() ?? "";
+      if (PKR_BY_USD[text]) el.textContent = PKR_BY_USD[text];
+    });
+
+    section.querySelectorAll("p").forEach((el) => {
+      const text = el.textContent ?? "";
+      if (text.includes("Growth costs $49/mo")) {
+        el.textContent = text.replace("Growth costs $49/mo", "Growth costs Rs 14,000/mo");
+      }
+    });
+  };
+
+  fetch("/api/geo")
+    .then((r) => r.json())
+    .then((data) => {
+      if (data?.currency !== "PKR") return;
+      const tryApply = () => {
+        if (document.getElementById("pricing")) applyPkrPricing();
+      };
+      tryApply();
+      new MutationObserver(tryApply).observe(document.getElementById("root") ?? document.body, {
+        childList: true,
+        subtree: true,
+      });
+    })
+    .catch(() => {});
 
   // Mobile drawer fallback: some bundled nav entries are rendered as button-ish
   // elements instead of stable anchors. Force Sign in / Sign up to the auth routes.

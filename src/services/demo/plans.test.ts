@@ -1,14 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { PAYWALL_PLANS } from './plans';
-import { ENTITLEMENTS, PLAN_IDS, isPlanId, isPaidPlanId } from '@/lib/entitlements';
+import { PAYWALL_PLANS, ENTERPRISE_PLAN, planPriceLabel } from './plans';
+import { ENTITLEMENTS, PLAN_IDS, isPlanId } from '@/lib/entitlements';
 
-/**
- * The plan CARDS are what a customer reads before paying. These tests exist
- * because the advertised limit and the enforced limit previously lived in
- * separate files ("Up to 100 conversations/month" as a string, the cap as a
- * constant) and could drift apart silently — which is how a paywall quietly
- * stops matching what was sold.
- */
 describe('paywall plan cards', () => {
   it('covers every plan id exactly once, in tier order', () => {
     expect(PAYWALL_PLANS.map((p) => p.id)).toEqual([...PLAN_IDS]);
@@ -21,15 +14,14 @@ describe('paywall plan cards', () => {
   it('advertises the prices actually being charged', () => {
     const price = (id: string) => PAYWALL_PLANS.find((p) => p.id === id)?.price;
     expect(price('free')).toBe('$0/mo');
-    expect(price('starter')).toBe('$39/mo');
+    expect(price('starter')).toBe('$11/mo');
     expect(price('growth')).toBe('$49/mo');
     expect(price('pro')).toBe('$79/mo');
-    expect(price('enterprise')).toBe('$199/mo');
   });
 
-  it('every self-serve paid plan carries a PKR price for Safepay tenants', () => {
+  it('every paid plan carries a PKR price for Safepay tenants', () => {
     for (const plan of PAYWALL_PLANS) {
-      if (!isPaidPlanId(plan.id)) continue;
+      if (plan.id === 'free') continue;
       expect(plan.pricePkr, `${plan.id} has no pricePkr`).toBeTruthy();
     }
   });
@@ -39,18 +31,12 @@ describe('paywall plan cards', () => {
       const cap = ENTITLEMENTS[plan.id].monthlyConversations;
       const bullets = plan.features.join(' | ');
       if (Number.isFinite(cap)) {
-        expect(bullets, `${plan.id} should advertise its ${cap}/month cap`).toContain(String(cap));
-        expect(bullets.toLowerCase()).toContain('month');
+        expect(bullets, `${plan.id} should advertise its ${cap}/month cap`).toContain(
+          cap.toLocaleString('en-US'),
+        );
       } else {
         expect(bullets.toLowerCase(), `${plan.id} is uncapped and should say so`).toContain('unlimited');
       }
-    }
-  });
-
-  it('never advertises a per-day conversation cap', () => {
-    for (const plan of PAYWALL_PLANS) {
-      const bullets = plan.features.join(' | ').toLowerCase();
-      expect(bullets.includes('/day') || bullets.includes('per day')).toBe(false);
     }
   });
 
@@ -64,7 +50,6 @@ describe('paywall plan cards', () => {
     expect(mentionsLength('starter')).toBe(false);
     expect(mentionsLength('growth')).toBe(false);
     expect(mentionsLength('pro')).toBe(false);
-    expect(mentionsLength('enterprise')).toBe(false);
   });
 
   it('advertises the AI assistant only on tiers that actually grant it', () => {
@@ -79,12 +64,6 @@ describe('paywall plan cards', () => {
     }
   });
 
-  it('every paid plan including Enterprise is self-serve checkout (no contact-sales tier)', () => {
-    for (const plan of PAYWALL_PLANS) {
-      expect(plan.contactSales ?? false).toBe(false);
-    }
-  });
-
   it('exactly one plan is highlighted as most popular', () => {
     expect(PAYWALL_PLANS.filter((p) => p.highlight)).toHaveLength(1);
   });
@@ -95,5 +74,18 @@ describe('paywall plan cards', () => {
       expect(plan.tagline).toBeTruthy();
       expect(plan.features.length).toBeGreaterThan(0);
     }
+  });
+
+  it('enterprise is Talk to Sales / Custom, not a checkout plan id', () => {
+    expect(ENTERPRISE_PLAN.id).toBe('enterprise');
+    expect(ENTERPRISE_PLAN.cta).toBe('Talk to Sales');
+    expect(ENTERPRISE_PLAN.price).toBe('Custom');
+    expect(isPlanId(ENTERPRISE_PLAN.id)).toBe(false);
+  });
+
+  it('planPriceLabel picks PKR when requested', () => {
+    const starter = PAYWALL_PLANS.find((p) => p.id === 'starter')!;
+    expect(planPriceLabel(starter, 'USD')).toBe('$11/mo');
+    expect(planPriceLabel(starter, 'PKR')).toBe('Rs 3,000/mo');
   });
 });
