@@ -11,6 +11,7 @@ import { createCheckoutSessionAction, createPortalLinkAction, cancelSubscription
 import { planPriceLabel, type PlanOption } from '@/services/demo/plans';
 import type { BillingProviderId } from '@/types/domain';
 import { planRank, type PaidPlanId } from '@/lib/entitlements';
+import type { PricingCurrency } from '@/lib/pricing-currency';
 
 export function BillingPanel({
   tenantId,
@@ -18,6 +19,7 @@ export function BillingPanel({
   planStatus,
   plans,
   billingProvider,
+  displayCurrency,
   hasSubscription,
 }: {
   tenantId: string;
@@ -25,6 +27,8 @@ export function BillingPanel({
   planStatus: string | null;
   plans: PlanOption[];
   billingProvider: BillingProviderId;
+  /** Tenant business currency from intake (`tenants.default_currency`). PKR → show PKR plan labels. */
+  displayCurrency?: string | null;
   hasSubscription: boolean;
 }) {
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
@@ -33,7 +37,9 @@ export function BillingPanel({
 
   // Safepay has no hosted customer portal, so those tenants cancel in-app.
   const isSafepay = billingProvider === 'safepay';
-  const currency = isSafepay ? ('PKR' as const) : ('USD' as const);
+  // Only PKR gets localized plan amounts; every other business currency keeps USD labels.
+  const currency: PricingCurrency =
+    (displayCurrency ?? '').trim().toUpperCase() === 'PKR' ? 'PKR' : 'USD';
 
   async function handleCancel() {
     if (!window.confirm('Cancel your subscription? You’ll move to the Free plan at the end of your billing period.')) {

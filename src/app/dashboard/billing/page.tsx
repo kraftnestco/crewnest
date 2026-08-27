@@ -26,14 +26,17 @@ export default async function DashboardBillingPage() {
   const supabase = await createSupabaseServerClient();
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('id, business_name, plan, plan_status, billing_provider, billing_country, safepay_subscription_id')
+    .select(
+      'id, business_name, plan, plan_status, billing_provider, billing_country, default_currency, safepay_subscription_id',
+    )
     .eq('id', activeTenantId)
     .single();
 
   if (!tenant) redirect('/dashboard');
 
-  // Provider decides both the displayed currency and how the tenant manages an
-  // existing subscription (hosted portal vs. in-app cancel) — docs/25 §2.
+  // Provider decides how the tenant manages an existing subscription (hosted
+  // portal vs. in-app cancel) — docs/25 §2. Plan price *labels* follow the
+  // business currency from intake (PKR only); everything else stays USD.
   const provider = providerForCountry(tenant.billing_country);
   const billingProvider = tenant.billing_provider === 'safepay' || tenant.billing_provider === 'stripe'
     ? tenant.billing_provider
@@ -48,6 +51,7 @@ export default async function DashboardBillingPage() {
         planStatus={tenant.plan_status}
         plans={PAYWALL_PLANS}
         billingProvider={billingProvider}
+        displayCurrency={tenant.default_currency}
         hasSubscription={Boolean(tenant.safepay_subscription_id)}
       />
     </div>

@@ -39,7 +39,6 @@ const STRIPE_PRICE_ENV: Record<PaidPlanId, () => string | undefined> = {
   starter: () => env.STRIPE_PRICE_STARTER,
   growth: () => env.STRIPE_PRICE_GROWTH,
   pro: () => env.STRIPE_PRICE_PRO,
-  enterprise: () => env.STRIPE_PRICE_ENTERPRISE,
 };
 
 export function priceIdForPlan(planId: PaidPlanId): string {

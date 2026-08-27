@@ -75,7 +75,6 @@ const SAFEPAY_PLAN_ENV: Record<PaidPlanId, () => string | undefined> = {
   starter: () => env.SAFEPAY_PLAN_STARTER,
   growth: () => env.SAFEPAY_PLAN_GROWTH,
   pro: () => env.SAFEPAY_PLAN_PRO,
-  enterprise: () => env.SAFEPAY_PLAN_ENTERPRISE,
 };
 
 export function planIdForPlan(planId: PaidPlanId): string {
